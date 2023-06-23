@@ -161,7 +161,7 @@ function clone_reddit_repo {
 }
 
 function clone_reddit_service_repo {
-    clone_reddit_repo $1 reddit-archive/reddit-service-$1
+    clone_reddit_repo $1 theorangedit/reddit-service-$1
 }
 
 clone_reddit_repo reddit theorangedit/open-source-reddit
