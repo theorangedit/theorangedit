@@ -462,7 +462,7 @@ def make_map(config):
        controller="mediaembed", action="mediaembed", credentials=None)
 
     mc('/code', controller='redirect', action='redirect',
-       dest='http://github.com/reddit/')
+       dest='http://github.com/theorangedit/')
 
     mc('/socialite', controller='redirect', action='redirect',
        dest='https://addons.mozilla.org/firefox/addon/socialite/')

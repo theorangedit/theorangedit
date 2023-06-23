@@ -467,14 +467,14 @@ def set_content_type():
             if user and not g.read_only_mode:
                 c.user = user
                 c.user_is_loggedin = True
-        if ext in ("mobile", "m") and not request.GET.get("keep_extension"):
+        if ext in ("mobile") and not request.GET.get("keep_extension"):
             try:
                 if request.cookies['reddit_mobility'] == "compact":
                     c.extension = "compact"
                     c.render_style = "compact"
             except (ValueError, KeyError):
                 c.suggest_compact = True
-        if ext in ("mobile", "m", "compact"):
+        if ext in ("mobile", "compact"):
             if request.GET.get("keep_extension"):
                 c.cookies['reddit_mobility'] = Cookie(ext, expires=NEVER)
 

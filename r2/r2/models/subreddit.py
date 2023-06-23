@@ -1427,7 +1427,10 @@ class Subreddit(Thing, Printable, BaseSite):
         # XXX: have to work with a copy of the list instead of modifying
         #   it directly, because it doesn't get marked as "dirty" and
         #   saved properly unless we assign a new list to the attr
-        sticky_fullnames = self.sticky_fullnames[:]
+        try:
+            sticky_fullnames = self.sticky_fullnames[:]
+        except TypeError:
+            return
         try:
             sticky_fullnames.remove(link._fullname)
         except ValueError:

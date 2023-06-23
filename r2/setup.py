@@ -89,13 +89,15 @@ setup(
         "python-snappy",
         "httpagentparser==1.7.8",
         "raven",
+        "pycryptodome",
+        "ndg-httpsclient",
     ],
     # setup tests (allowing for "python setup.py test")
     tests_require=['mock', 'nose', 'coverage'],
     test_suite="nose.collector",
     dependency_links=[
-        "https://github.com/reddit/snudown/archive/v1.1.3.tar.gz#egg=snudown-1.1.3",
-        "https://s3.amazonaws.com/code.reddit.com/pycaptcha-0.4.tar.gz#egg=pycaptcha-0.4",
+        "https://github.com/theorangedit/snudown/archive/v1.1.3.tar.gz#egg=snudown-1.1.3",
+        "https://github.com/theorangedit/PyCAPTCHA/archive/refs/tags/v0.4.zip#egg=pycaptcha-0.4",
     ],
     packages=find_packages(exclude=["ez_setup"]),
     cmdclass=commands,

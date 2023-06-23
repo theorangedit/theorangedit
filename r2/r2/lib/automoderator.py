@@ -79,11 +79,12 @@ from r2.models import (
 from r2.models.automoderator import PerformedRulesByThing
 from r2.models.wiki import wiki_id
 
-
+ACCOUNT = None
 if g.automoderator_account:
-    ACCOUNT = Account._by_name(g.automoderator_account)
-else:
-    ACCOUNT = None
+    try:
+        ACCOUNT = Account._by_name(g.automoderator_account)
+    except Exception:
+        ACCOUNT = None
 
 DISCLAIMER = "*I am a bot, and this action was performed automatically. Please [contact the moderators of this subreddit](/message/compose/?to=/r/{{subreddit}}) if you have any questions or concerns.*"
 
@@ -1538,7 +1539,7 @@ def run():
                 try:
                     rules = Ruleset(wp.content, timer)
                 except (AutoModeratorSyntaxError, AutoModeratorRuleTypeError):
-                    print "ERROR: Invalid config in /r/%s" % subreddit.name
+                    print "ERROR: Invalid config in /%s/%s" % (g.brander_community_abbr, subreddit.name)
                     return
 
                 rules_by_subreddit[subreddit._id] = rules
@@ -1550,13 +1551,13 @@ def run():
 
             try:
                 TimeoutFunction(rules.apply_to_item, 2)(item)
-                print "Checked %s from /r/%s" % (item, subreddit.name)
+                print "Checked %s from /%s/%s" % (item, g.brander_community_abbr, subreddit.name)
             except TimeoutFunctionException:
-                print "Timed out on %s from /r/%s" % (item, subreddit.name)
+                print "Timed out on %s from /%s/%s" % (item, g.brander_community_abbr, subreddit.name)
             except KeyboardInterrupt:
                 raise
             except:
-                print "Error on %s from /r/%s" % (item, subreddit.name)
+                print "Error on %s from /%s/%s" % (item, g.brander_community_abbr, subreddit.name)
                 print traceback.format_exc()
 
     amqp.consume_items('automoderator_q', process_message, verbose=False)
