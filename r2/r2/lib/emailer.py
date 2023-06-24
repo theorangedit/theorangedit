@@ -26,7 +26,8 @@ from email.MIMEText import MIMEText
 from email.MIMEMultipart import MIMEMultipart
 from email.errors import HeaderParseError
 import datetime
-import traceback, sys, smtplib
+import traceback, sys
+from smtplib import SMTP_SSL,SMTP
 
 from pylons import tmpl_context as c
 from pylons import app_globals as g
@@ -255,7 +256,7 @@ def send_queued_mail(test = False):
 
     clear = False
     if not test:
-        session = smtplib.SMTP(g.smtp_server)
+        session = SMTP(g.smtp_server, 587)
     def sendmail(email):
         try:
             mimetext = email.to_MIMEText()
@@ -264,17 +265,23 @@ def send_queued_mail(test = False):
                        % (email.fr_addr, email.to_addr))
             if test:
                 print mimetext.as_string()
+                print g.smtp_server
             else:
+                session.starttls()
+                session.login(email.fr_addr, g.smtp_password)
                 session.sendmail(email.fr_addr, email.to_addr,
                                  mimetext.as_string())
                 email.set_sent(rejected = False)
+                session.quit()
         # exception happens only for local recipient that doesn't exist
-        except (smtplib.SMTPRecipientsRefused, smtplib.SMTPSenderRefused,
-                UnicodeDecodeError, AttributeError, HeaderParseError):
+        except:
+                #(SMTP_SSL.SMTPRecipientsRefused, SMTP_SSL.SMTPSenderRefused,
+                #UnicodeDecodeError, AttributeError, HeaderParseError):
             # handle error and print, but don't stall the rest of the queue
             print "Handled error sending mail (traceback to follow)"
             traceback.print_exc(file = sys.stdout)
             email.set_sent(rejected = True)
+    
 
 
     try:
@@ -306,9 +313,8 @@ def send_queued_mail(test = False):
                 continue
             sendmail(email)
 
-    finally:
-        if not test:
-            session.quit()
+    except:
+        print "Error sending queued mail"
 
     # clear is true if anything was found and processed above
     if clear:
@@ -416,7 +422,8 @@ def send_html_email(to_addr, from_addr, subject, html,
             filename=attachment['name'])
         msg.attach(part)
 
-    session = smtplib.SMTP(g.smtp_server)
+    session = SMTP(g.smtp_server, 465)
+    session.login(from_addr, g.smtp_password)
     session.sendmail(from_addr, to_addr, msg.as_string())
     session.quit()
 

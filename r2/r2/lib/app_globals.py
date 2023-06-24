@@ -315,6 +315,7 @@ class Globals(object):
             'share_reply',
             'community_email',
             'smtp_server',
+            'smtp_password',
             'events_collector_url',
             'events_collector_test_url',
             'search_provider',
