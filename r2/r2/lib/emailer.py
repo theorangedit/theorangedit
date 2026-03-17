@@ -149,7 +149,7 @@ def message_notification_email(data):
     # If our counter's expired, initialize it again.
     g.cache.add(MESSAGE_THROTTLE_KEY, 0, time=24*60*60)
 
-    for datum in data.itervalues():
+    for datum in data.values():
         datum = json.loads(datum)
         user = Account._byID36(datum['to'], data=True)
         comment = Comment._by_fullname(datum['comment'], data=True)
@@ -264,8 +264,8 @@ def send_queued_mail(test = False):
                 print ("Got None mimetext for email from %r and to %r"
                        % (email.fr_addr, email.to_addr))
             if test:
-                print mimetext.as_string()
-                print g.smtp_server
+                print(mimetext.as_string())
+                print(g.smtp_server)
             else:
                 session.starttls()
                 session.login(email.fr_addr, g.smtp_password)
@@ -278,7 +278,7 @@ def send_queued_mail(test = False):
                 #(SMTP_SSL.SMTPRecipientsRefused, SMTP_SSL.SMTPSenderRefused,
                 #UnicodeDecodeError, AttributeError, HeaderParseError):
             # handle error and print, but don't stall the rest of the queue
-            print "Handled error sending mail (traceback to follow)"
+            print("Handled error sending mail (traceback to follow)")
             traceback.print_exc(file = sys.stdout)
             email.set_sent(rejected = True)
     
@@ -314,7 +314,7 @@ def send_queued_mail(test = False):
             sendmail(email)
 
     except:
-        print "Error sending queued mail"
+        print("Error sending queued mail")
 
     # clear is true if anything was found and processed above
     if clear:

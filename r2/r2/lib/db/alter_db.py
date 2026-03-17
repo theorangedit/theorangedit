@@ -53,12 +53,12 @@ def exec_all(command, data=False, rel = False, print_only = False):
         #print tt
         engine = tt.bind
         if print_only:
-            print command % dict(type=tt.name)
+            print(command % dict(type=tt.name))
         else:
             try:
                 engine.execute(command % dict(type=tt.name))
             except:
-                print "FAILED!"
+                print("FAILED!")
 
 "alter table %(type)s add primary key (thing_id, key)"
 "drop index idx_thing_id_%(type)s"

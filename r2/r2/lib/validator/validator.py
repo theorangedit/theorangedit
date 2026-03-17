@@ -130,7 +130,7 @@ class Validator(object):
                 a.append(val)
         try:
             return self.run(*a)
-        except TypeError, e:
+        except TypeError as e:
             if str(e).startswith('run() takes'):
                 # Prepend our class name so we know *which* run()
                 raise TypeError('%s.%s' % (type(self).__name__, str(e)))
@@ -161,7 +161,7 @@ def _make_validated_kw(fn, simple_vals, param_vals, env):
     for validator in simple_vals:
         validator(env)
     kw = build_arg_list(fn, env)
-    for var, validator in param_vals.iteritems():
+    for var, validator in param_vals.items():
         kw[var] = validator(env)
     return kw
 
@@ -169,7 +169,7 @@ def set_api_docs(fn, simple_vals, param_vals, extra_vals=None):
     doc = fn._api_doc = getattr(fn, '_api_doc', {})
     param_info = doc.get('parameters', {})
     notes = doc.get('notes', [])
-    for validator in chain(simple_vals, param_vals.itervalues()):
+    for validator in chain(simple_vals, param_vals.values()):
         param_docs = validator.param_docs()
         if validator.docs:
             param_docs.update(validator.docs)
@@ -182,7 +182,7 @@ def set_api_docs(fn, simple_vals, param_vals, extra_vals=None):
     doc['notes'] = notes
 
 def _validators_handle_csrf(simple_vals, param_vals):
-    for validator in chain(simple_vals, param_vals.itervalues()):
+    for validator in chain(simple_vals, param_vals.values()):
         if getattr(validator, 'handles_csrf', False):
             return True
     return False
@@ -1645,7 +1645,7 @@ class VThrottledLogin(VRequired):
     def get_ratelimits(self, account):
         is_previously_seen_ip = request.ip in [
             j for i in IPsByAccount.get(account._id, column_count=1000)
-            for j in i.itervalues()
+            for j in i.values()
         ]
 
         # We want to maintain different rate-limit buckets depending on whether
@@ -1704,7 +1704,7 @@ class VThrottledLogin(VRequired):
                 ratelimits = self.get_ratelimits(account)
                 now = int(time.time())
 
-                for rl, max_requests in ratelimits.iteritems():
+                for rl, max_requests in ratelimits.items():
                     try:
                         failed_logins = ratelimit.get_usage(str(rl), time_slice)
 
@@ -1873,9 +1873,9 @@ class VMessageRecipient(VExistingUname):
             try:
                 s = Subreddit._by_name(name)
                 if isinstance(s, FakeSubreddit):
-                    raise NotFound, "fake subreddit"
+                    raise NotFound("fake subreddit")
                 if s._spam:
-                    raise NotFound, "banned subreddit"
+                    raise NotFound("banned subreddit")
                 if s.is_muted(c.user) and not c.user_is_admin:
                     self.set_error(errors.USER_MUTED)
                 return s
@@ -1945,12 +1945,12 @@ class VNumber(Validator):
                 if self.coerce:
                     val = self.min
                 else:
-                    raise ValueError, ""
+                    raise ValueError("")
             elif self.max is not None and val > self.max:
                 if self.coerce:
                     val = self.max
                 else:
-                    raise ValueError, ""
+                    raise ValueError("")
             return val
         except ValueError:
             self._set_error()
@@ -3002,7 +3002,7 @@ class VValidatedJSON(VJSON):
                 raise RedditError('JSON_INVALID', code=400)
 
             validated_data = {}
-            for key, validator in self.spec.iteritems():
+            for key, validator in self.spec.items():
                 try:
                     validated_data[key] = validator.run(data[key])
                 except KeyError:
@@ -3014,7 +3014,7 @@ class VValidatedJSON(VJSON):
 
         def spec_docs(self):
             spec_docs = {}
-            for key, validator in self.spec.iteritems():
+            for key, validator in self.spec.items():
                 if hasattr(validator, 'spec_docs'):
                     spec_docs[key] = validator.spec_docs()
                 elif hasattr(validator, 'param_docs'):

@@ -192,7 +192,7 @@ class Account(Thing):
         #if no sr, return the sum
         if sr is None:
             total = 0
-            for k, v in self._t.iteritems():
+            for k, v in self._t.items():
                 if k.endswith(suffix):
                     total += v
 
@@ -263,7 +263,7 @@ class Account(Thing):
         link_karmas = Counter()
         combined_karmas = Counter()
 
-        for key, value in self._t.iteritems():
+        for key, value in self._t.items():
             if key.endswith(link_suffix):
                 sr_name = key[:-len(link_suffix)]
                 link_karmas[sr_name] += value
@@ -391,7 +391,7 @@ class Account(Thing):
         if uid:
             return cls._byID(uid, data=True)
         else:
-            raise NotFound, 'Account %s' % name
+            raise NotFound('Account %s' % name)
 
     @classmethod
     def _names_to_ids(cls, names, ignore_missing=False, allow_deleted=False,
@@ -999,7 +999,7 @@ def deleted_account_cleanup(data):
     from r2.models.flair import Flair
     from r2.models.token import OAuth2Client
 
-    for account_id36 in data.itervalues():
+    for account_id36 in data.values():
         account = Account._byID36(account_id36, data=True)
 
         if not account._deleted:
@@ -1025,7 +1025,7 @@ def deleted_account_cleanup(data):
         if account.has_subscribed:
             rel_removal_descriptions["subscriber"] = "Unsubscribed"
 
-        for rel_type, description in rel_removal_descriptions.iteritems():
+        for rel_type, description in rel_removal_descriptions.items():
             try:
                 ids_fn = getattr(Subreddit, "reverse_%s_ids" % rel_type)
                 sr_ids = ids_fn(account)
@@ -1050,7 +1050,7 @@ def deleted_account_cleanup(data):
             "enemy": Friend,
         }
 
-        for rel_name, rel_cls in rel_classes.iteritems():
+        for rel_name, rel_cls in rel_classes.items():
             try:
                 rels = rel_cls._query(
                     rel_cls.c._thing2_id == account._id,

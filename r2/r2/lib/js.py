@@ -178,12 +178,12 @@ class Module(Source):
                 source = self.wrap.format(content=source, name=self.name)
 
             if self.should_compile:
-                print >> sys.stderr, "Compiling {0}...".format(self.name),
+                print("Compiling {0}...".format(self.name),, file=sys.stderr)
                 minifier.compile(source, out)
             else:
-                print >> sys.stderr, "Concatenating {0}...".format(self.name),
+                print("Concatenating {0}...".format(self.name),, file=sys.stderr)
                 out.write(source)
-        print >> sys.stderr, " done."
+        print(" done.", file=sys.stderr)
 
     def url(self, absolute=False, mangle_name=True):
         from r2.lib.template_helpers import static
@@ -252,25 +252,25 @@ class PermissionsDataSource(DataSource):
         """
         if isinstance(obj, dict):
             props = []
-            for key, value in obj.iteritems():
+            for key, value in obj.items():
                 value_encoded = cls._make_marked_json(value)
                 props.append("%s: %s" % (key, value_encoded))
             return "{%s}" % ",".join(props)
-        elif isinstance(obj, basestring):
+        elif isinstance(obj, str):
             return "r.N_(%s)" % json.dumps(obj)
         else:
-            raise ValueError, "unsupported type"
+            raise ValueError("unsupported type")
 
     def get_source(self, **kw):
         permission_set_info = {k: v.info for k, v in
-                               self.permission_sets.iteritems()}
+                               self.permission_sets.items()}
         permissions = self._make_marked_json(permission_set_info)
         return "r.permissions = _.extend(r.permissions || {}, %s)" % permissions
 
     @property
     def dependencies(self):
         dependencies = set(super(PermissionsDataSource, self).dependencies)
-        for permission_set in self.permission_sets.itervalues():
+        for permission_set in self.permission_sets.values():
             dependencies.add(inspect.getsourcefile(permission_set))
         return list(dependencies)
 
@@ -312,7 +312,7 @@ class StringsSource(LocaleSpecificSource):
 
     invalid_formatting_specifier_re = re.compile(r"(?<!%)%\w|(?<!%)%\(\w+\)[^s]")
     def _check_formatting_specifiers(self, string):
-        if not isinstance(string, basestring):
+        if not isinstance(string, str):
             return
 
         if self.invalid_formatting_specifier_re.search(string):
@@ -380,7 +380,7 @@ class LocalizedModule(Module):
         if msgids:
             localized_appendices = localized_appendices + [StringsSource(msgids)]
 
-        print >> sys.stderr, "Creating language-specific files:"
+        print("Creating language-specific files:", file=sys.stderr)
         for lang, unused in iter_langs():
             lang_path = LocalizedModule.languagize_path(
                 self.destination_path, lang)
@@ -391,7 +391,7 @@ class LocalizedModule(Module):
                 os.unlink(lang_path)
 
             with open(lang_path, "w") as out:
-                print >> sys.stderr, "  " + lang_path
+                print("  " + lang_path, file=sys.stderr)
                 out.write(reddit_source)
                 for appendix in localized_appendices:
                     out.write(appendix.get_localized_source(lang) + ";")
@@ -744,7 +744,7 @@ def src(*names, **kwargs):
     for name in names:
         urls = module[name].url(**kwargs)
 
-        if isinstance(urls, str) or isinstance(urls, unicode):
+        if isinstance(urls, str) or isinstance(urls, str):
             sources.append(urls)
         else:
             for url in list(urls):
@@ -777,14 +777,14 @@ def build_command(fn):
 
 @build_command
 def enumerate_modules():
-    for name, m in module.iteritems():
-        print name
+    for name, m in module.items():
+        print(name)
 
 
 @build_command
 def dependencies(name):
     for dep in module[name].dependencies:
-        print dep
+        print(dep)
 
 
 @build_command
@@ -792,11 +792,11 @@ def enumerate_outputs(*names):
     if names:
         modules = [module[name] for name in names]
     else:
-        modules = module.itervalues()
+        modules = module.values()
 
     for m in modules:
         for output in m.outputs:
-            print output
+            print(output)
 
 
 @build_command

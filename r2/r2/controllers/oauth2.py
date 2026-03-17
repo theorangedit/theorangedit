@@ -21,7 +21,7 @@
 ###############################################################################
 
 from datetime import datetime
-from urllib import urlencode
+from urllib.parse import urlencode
 import base64
 import simplejson
 

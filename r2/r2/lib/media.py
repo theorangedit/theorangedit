@@ -23,7 +23,7 @@
 import sys
 
 import base64
-import cStringIO
+import io
 import hashlib
 import json
 import math
@@ -33,8 +33,8 @@ import subprocess
 import tempfile
 import traceback
 import urllib
-import urllib2
-import urlparse
+import urllib.request as urllib2
+import urllib.parse as urlparse
 import gzip
 
 import BeautifulSoup
@@ -67,10 +67,8 @@ from r2.models.media_cache import (
     Media,
     MediaByURL,
 )
-from urllib2 import (
-    HTTPError,
-    URLError,
-)
+from urllib.request import HTTPError
+from urllib.error import URLError
 
 _IMAGE_PREVIEW_TEMPLATE = """
 <img class="%(css_class)s" src="%(url)s" width="%(width)s" height="%(height)s">
@@ -78,13 +76,13 @@ _IMAGE_PREVIEW_TEMPLATE = """
 
 
 def _image_to_str(image):
-    s = cStringIO.StringIO()
+    s = io.StringIO()
     image.save(s, image.format)
     return s.getvalue()
 
 
 def str_to_image(s):
-    s = cStringIO.StringIO(s)
+    s = io.StringIO(s)
     image = Image.open(s)
     return image
 
@@ -195,7 +193,7 @@ def _prepare_image(image):
 def _clean_url(url):
     """url quotes unicode data out of urls"""
     url = url.encode('utf8')
-    url = ''.join(urllib.quote(c) if ord(c) >= 127 else c for c in url)
+    url = ''.join(urllib.parse.quote(c) if ord(c) >= 127 else c for c in url)
     return url
 
 
@@ -300,7 +298,7 @@ def upload_media(image, file_type='.jpg', category='thumbs'):
     try:
         img = image
         do_convert = True
-        if isinstance(img, basestring):
+        if isinstance(img, str):
             img = str_to_image(img)
             if img.format == "PNG" and file_type == ".png":
                 img.verify()
@@ -373,12 +371,12 @@ def _scrape_media(url, autoplay=False, maxwidth=600, force=False,
         # media object it just gave us. if not, null out the media object
         # to protect downstream code
         if media_object and not scraper.media_embed(media_object):
-            print "%s made a bad media obj for url %s" % (scraper, url)
+            print("%s made a bad media obj for url %s" % (scraper, url))
             media_object = None
 
         if (secure_media_object and
             not scraper.media_embed(secure_media_object)):
-            print "%s made a bad secure media obj for url %s" % (scraper, url)
+            print("%s made a bad secure media obj for url %s" % (scraper, url))
             secure_media_object = None
 
         # If thumbnail can't be found, attempt again using _ThumbnailOnlyScraper
@@ -720,7 +718,7 @@ class _ThumbnailOnlyScraper(Scraper):
 
     def _extract_image_urls(self, soup):
         for img in soup.findAll("img", src=True):
-            yield urlparse.urljoin(self.url, img["src"])
+            yield urllib.parse.urljoin(self.url, img["src"])
 
     def _find_thumbnail_image(self):
         """Find what we think is the best thumbnail image for a link.
@@ -818,7 +816,7 @@ class _EmbedlyScraper(Scraper):
         }
 
         param_dict.update(self.embedly_params)
-        params = urllib.urlencode(param_dict)
+        params = urllib.parse.urlencode(param_dict)
 
         timer = g.stats.get_timer("providers.embedly.oembed")
         timer.start()
@@ -1022,11 +1020,11 @@ def run():
         try:
             TimeoutFunction(_set_media, 30)(link, use_cache=True)
         except TimeoutFunctionException:
-            print "Timed out on %s" % fname
+            print("Timed out on %s" % fname)
         except KeyboardInterrupt:
             raise
         except:
-            print "Error fetching %s" % fname
-            print traceback.format_exc()
+            print("Error fetching %s" % fname)
+            print(traceback.format_exc())
 
     amqp.consume_items('scraper_q', process_link)

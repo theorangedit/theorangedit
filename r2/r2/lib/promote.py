@@ -31,7 +31,7 @@ import json
 import random
 import time
 import urllib
-import urlparse
+import urllib.parse as urlparse
 
 from pylons import tmpl_context as c
 from pylons import app_globals as g
@@ -139,7 +139,7 @@ def view_live_url(link, campaign, srname):
 
 def payment_url(action, link_id36, campaign_id36):
     path = '/promoted/%s/%s/%s' % (action, link_id36, campaign_id36)
-    return urlparse.urljoin(g.payment_domain, path)
+    return urllib.parse.urljoin(g.payment_domain, path)
 
 def pay_url(l, campaign):
     return payment_url('pay', l._id36, campaign._id36)
@@ -188,15 +188,15 @@ def is_pending(campaign):
     return today < to_date(campaign.start_date)
 
 def update_query(base_url, query_updates, unset=False):
-    scheme, netloc, path, params, query, fragment = urlparse.urlparse(base_url)
-    query_dict = urlparse.parse_qs(query)
+    scheme, netloc, path, params, query, fragment = urllib.parse.urlparse(base_url)
+    query_dict = urllib.parse.parse_qs(query)
     query_dict.update(query_updates)
 
     if unset:
-        query_dict = dict((k, v) for k, v in query_dict.iteritems() if v is not None)
+        query_dict = dict((k, v) for k, v in query_dict.items() if v is not None)
 
-    query = urllib.urlencode(query_dict, doseq=True)
-    return urlparse.urlunparse((scheme, netloc, path, params, query, fragment))
+    query = urllib.parse.urlencode(query_dict, doseq=True)
+    return urllib.parse.urlunparse((scheme, netloc, path, params, query, fragment))
 
 
 def update_served(items):
@@ -424,7 +424,7 @@ def edit_campaign(link, campaign, dates, target, frequency_cap,
         campaign.bid_pennies = bid_pennies
 
     change_strs = map(lambda t: '%s: %s -> %s' % (t[0], t[1][0], t[1][1]),
-                      changed.iteritems())
+                      changed.items())
     change_text = ', '.join(change_strs)
     campaign._commit()
 
@@ -1108,7 +1108,7 @@ def keywords_from_context(
 
 # special handling for memcache ascii protocol
 SPECIAL_NAMES = {" reddit.com": "_reddit.com"}
-REVERSED_NAMES = {v: k for k, v in SPECIAL_NAMES.iteritems()}
+REVERSED_NAMES = {v: k for k, v in SPECIAL_NAMES.items()}
 
 
 def _get_live_promotions(sanitized_names):
@@ -1139,9 +1139,9 @@ def get_live_promotions(sr_names):
     )
     promos_by_srname = {
         REVERSED_NAMES.get(name, name): val
-        for name, val in promos_by_sanitized_name.iteritems()
+        for name, val in promos_by_sanitized_name.items()
     }
-    return itertools.chain.from_iterable(promos_by_srname.itervalues())
+    return itertools.chain.from_iterable(promos_by_srname.values())
 
 
 def lottery_promoted_links(sr_names, n=10):
@@ -1281,9 +1281,9 @@ def Run(verbose=True):
     """
 
     if verbose:
-        print "%s promote.py:Run() - make_daily_promotions()" % datetime.datetime.now(g.tz)
+        print("%s promote.py:Run() - make_daily_promotions()" % datetime.datetime.now(g.tz))
 
     make_daily_promotions()
 
     if verbose:
-        print "%s promote.py:Run() - finished" % datetime.datetime.now(g.tz)
+        print("%s promote.py:Run() - finished" % datetime.datetime.now(g.tz))

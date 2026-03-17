@@ -22,7 +22,7 @@
 
 from threading import local
 from hashlib import md5
-import cPickle as pickle
+import pickle as pickle
 from copy import copy
 from curses.ascii import isgraph
 import logging
@@ -59,7 +59,7 @@ class CacheUtils(object):
                 pass
 
     def add_multi(self, keys, prefix='', time=0):
-        for k,v in keys.iteritems():
+        for k,v in keys.items():
             self.add(prefix+str(k), v, time = time)
 
     def get_multi(self, keys, prefix='', **kw):
@@ -80,7 +80,7 @@ class CMemcache(CacheUtils):
         self.servers = servers
         self.clients = pylibmc.ClientPool(n_slots = num_clients)
 
-        for x in xrange(num_clients):
+        for x in range(num_clients):
             client = pylibmc.Client(servers, binary=binary)
             behaviors = {
                 'no_block': no_block, # use async I/O
@@ -131,7 +131,7 @@ class CMemcache(CacheUtils):
         if time < 0:
             raise ValueError("Rejecting negative TTL for key %s" % key)
 
-        str_keys = {str(k): v for k, v in keys.iteritems()}
+        str_keys = {str(k): v for k, v in keys.items()}
         with self.clients.reserve() as mc:
             return mc.set_multi(str_keys, key_prefix=prefix, time=time,
                                 min_compress_len=self.min_compress_len)
@@ -141,7 +141,7 @@ class CMemcache(CacheUtils):
         if time < 0:
             raise ValueError("Rejecting negative TTL for key %s" % key)
 
-        str_keys = {str(k): v for k, v in keys.iteritems()}
+        str_keys = {str(k): v for k, v in keys.items()}
         with self.clients.reserve() as mc:
             return mc.add_multi(str_keys, key_prefix=prefix, time=time)
 
@@ -282,7 +282,7 @@ class HardCache(CacheUtils):
         return results
 
     def set_multi(self, keys, prefix='', time=0):
-        for k,v in keys.iteritems():
+        for k,v in keys.items():
             if v != NoneResult:
                 self.set(prefix+str(k), v, time=time)
 
@@ -312,7 +312,7 @@ class LocalCache(dict, CacheUtils):
         return dict.__init__(self, *a, **kw)
 
     def _check_key(self, key):
-        if isinstance(key, unicode):
+        if isinstance(key, str):
             key = str(key) # try to convert it first
         if not isinstance(key, str):
             raise TypeError('Key is not a string: %r' % (key,))
@@ -337,7 +337,7 @@ class LocalCache(dict, CacheUtils):
         self[key] = val
 
     def set_multi(self, keys, prefix='', time=0):
-        for k,v in keys.iteritems():
+        for k,v in keys.items():
             self.set(prefix+str(k), v, time=time)
 
     def add(self, key, val, time = 0):
@@ -347,32 +347,32 @@ class LocalCache(dict, CacheUtils):
         return not was
 
     def delete(self, key):
-        if self.has_key(key):
+        if (key in self):
             del self[key]
 
     def delete_multi(self, keys):
         for key in keys:
-            if self.has_key(key):
+            if (key in self):
                 del self[key]
 
     def incr(self, key, delta=1, time=0):
-        if self.has_key(key):
+        if (key in self):
             self[key] = int(self[key]) + delta
 
     def decr(self, key, amt=1):
-        if self.has_key(key):
+        if (key in self):
             self[key] = int(self[key]) - amt
 
     def append(self, key, val, time = 0):
-        if self.has_key(key):
+        if (key in self):
             self[key] = str(self[key]) + val
 
     def prepend(self, key, val, time = 0):
-        if self.has_key(key):
+        if (key in self):
             self[key] = val + str(self[key])
 
     def replace(self, key, val, time = 0):
-        if self.has_key(key):
+        if (key in self):
             self[key] = val
 
     def flush_all(self):
@@ -482,7 +482,7 @@ class TransitionalCache(CacheUtils):
                 old_key_dict = args[0]
                 new_key_dict = {}
 
-                for old_key, val in old_key_dict.iteritems():
+                for old_key, val in old_key_dict.items():
                     new_prefix, new_key = self.key_transform(old_key, prefix)
                     new_key_dict[new_key] = val
                     new_prefixes.append(new_prefix)
@@ -709,7 +709,7 @@ class CacheChain(CacheUtils, local):
                 c.set_multi(d)
 
         out = dict((k, v)
-                   for (k, v) in out.iteritems()
+                   for (k, v) in out.items()
                    if v != NoneResult)
 
         if self.stats:
@@ -727,9 +727,9 @@ class CacheChain(CacheUtils, local):
                             self.caches)
 
     def debug(self, key):
-        print "Looking up [%r]" % key
+        print("Looking up [%r]" % key)
         for i, c in enumerate(self.caches):
-            print "[%d] %10s has value [%r]" % (i, c.__class__.__name__,
+            print("[%d] %10s has value [%r]" % (i, c.__class__.__name__,)
                                                 c.get(key))
 
     def reset(self):
@@ -839,7 +839,7 @@ class StaleCacheChain(CacheChain):
         if keys and stale:
             stale_values = self._getstale(keys)
             # never put stale data into the localcache
-            for k, v in stale_values.iteritems():
+            for k, v in stale_values.items():
                 ret[k] = v
                 keys.remove(k)
 
@@ -912,7 +912,7 @@ class Permacache(object):
         rows = self.cf.multiget(keys, columns=[self.COLUMN_NAME])
         ret = {
             key: pickle.loads(columns[self.COLUMN_NAME])
-            for key, columns in rows.iteritems()
+            for key, columns in rows.items()
         }
         if is_single:
             if ret:
@@ -930,7 +930,7 @@ class Permacache(object):
     def _backend_set_multi(self, keys, prefix=''):
         ret = {}
         with self.cf.batch():
-            for key, val in keys.iteritems():
+            for key, val in keys.items():
                 rowkey = "%s%s" % (prefix, key)
                 column = {self.COLUMN_NAME: pickle.dumps(val, protocol=2)}
                 ret[key] = self.cf.insert(rowkey, column)
@@ -1100,13 +1100,13 @@ class SelfEmptyingCache(LocalCache):
 def _make_hashable(s):
     if isinstance(s, str):
         return s
-    elif isinstance(s, unicode):
+    elif isinstance(s, str):
         return s.encode('utf-8')
     elif isinstance(s, (tuple, list)):
         return ','.join(_make_hashable(x) for x in s)
     elif isinstance(s, dict):
         return ','.join('%s:%s' % (_make_hashable(k), _make_hashable(v))
-                        for (k, v) in sorted(s.iteritems()))
+                        for (k, v) in sorted(s.items()))
     else:
         return str(s)
 

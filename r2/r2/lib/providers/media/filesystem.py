@@ -22,7 +22,7 @@
 
 import os
 import shutil
-import urlparse
+import urllib.parse as urlparse
 
 from pylons import app_globals as g
 
@@ -66,11 +66,11 @@ class FileSystemMediaProvider(MediaProvider):
         assert os.path.dirname(name) == ""
         path = os.path.join(g.media_fs_root, name)
         with open(path, "w") as f:
-            if isinstance(contents, basestring):
+            if isinstance(contents, str):
                 f.write(contents)
             else:
                 shutil.copyfileobj(contents, f)
-        return urlparse.urljoin(g.media_fs_base_url_http, name)
+        return urllib.parse.urljoin(g.media_fs_base_url_http, name)
         
     def purge(self, url):
         """Remove the content from disk. Content can not be recovered."""

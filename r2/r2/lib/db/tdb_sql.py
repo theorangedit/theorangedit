@@ -22,7 +22,7 @@
 
 from copy import deepcopy
 from datetime import datetime
-import cPickle as pickle
+import pickle as pickle
 import logging
 import operators
 import re
@@ -168,7 +168,7 @@ def index_commands(table, type):
         commands.append(index_str(table, 'name', 'name'))
         commands.append(index_str(table, 'date', 'date'))
     else:
-        print "unknown index_commands() type %s" % type
+        print("unknown index_commands() type %s" % type)
 
     return commands
 
@@ -391,7 +391,7 @@ def get_table(kind, action, tables, avoid_master_reads = False):
         return get_write_table(tables)
     elif action == 'read':
         #check to see if we're supposed to use the write db again
-        if c.use_write_db and c.use_write_db.has_key(kind):
+        if c.use_write_db and (kind in c.use_write_db):
             return get_write_table(tables)
         else:
             if avoid_master_reads and len(tables) > 1:
@@ -425,9 +425,9 @@ def make_thing(type_id, ups, downs, date, deleted, spam, id=None):
         r = t.insert().execute(**params)
         new_id = r.inserted_primary_key[0]
         new_r = r.last_inserted_params()
-        for k, v in params.iteritems():
+        for k, v in params.items():
             if new_r[k] != v:
-                raise CreationError, ("There's shit in the plumbing. " +
+                raise CreationError(("There's shit in the plumbing. " +)
                                       "expected %s, got %s" % (params,  new_r))
         return new_id
 
@@ -435,11 +435,11 @@ def make_thing(type_id, ups, downs, date, deleted, spam, id=None):
         id = do_insert(table)
         params['thing_id'] = id
         return id
-    except sa.exc.DBAPIError, e:
+    except sa.exc.DBAPIError as e:
         if not 'IntegrityError' in e.message:
             raise
         # wrap the error to prevent db layer bleeding out
-        raise CreationError, "Thing exists (%s)" % str(params)
+        raise CreationError("Thing exists (%s)" % str(params))
 
 
 def set_thing_props(type_id, thing_id, **props):
@@ -451,7 +451,7 @@ def set_thing_props(type_id, thing_id, **props):
     #use real columns
     def do_update(t):
         transactions.add_engine(t.bind)
-        new_props = dict((t.c[prop], val) for prop, val in props.iteritems())
+        new_props = dict((t.c[prop], val) for prop, val in props.items())
         u = t.update(t.c.thing_id == thing_id, values = new_props)
         u.execute()
 
@@ -483,11 +483,11 @@ def make_relation(rel_type_id, thing1_id, thing2_id, name, date=None):
                                    name = name, 
                                    date = date)
         return r.inserted_primary_key[0]
-    except sa.exc.DBAPIError, e:
+    except sa.exc.DBAPIError as e:
         if not 'IntegrityError' in e.message:
             raise
         # wrap the error to prevent db layer bleeding out
-        raise CreationError, "Relation exists (%s, %s, %s)" % (name, thing1_id, thing2_id)
+        raise CreationError("Relation exists (%s, %s, %s)" % (name, thing1_id, thing2_id))
         
 
 def set_rel_props(rel_type_id, rel_id, **props):
@@ -498,7 +498,7 @@ def set_rel_props(rel_type_id, rel_id, **props):
 
     #use real columns
     transactions.add_engine(t.bind)
-    new_props = dict((t.c[prop], val) for prop, val in props.iteritems())
+    new_props = dict((t.c[prop], val) for prop, val in props.items())
     u = t.update(t.c.rel_id == rel_id, values = new_props)
     u.execute()
 
@@ -507,9 +507,9 @@ def py2db(val, return_kind=False):
     if isinstance(val, bool):
         val = 't' if val else 'f'
         kind = 'bool'
-    elif isinstance(val, (str, unicode)):
+    elif isinstance(val, str):
         kind = 'str'
-    elif isinstance(val, (int, float, long)):
+    elif isinstance(val, (int, float)):
         kind = 'num'
     elif val is None:
         kind = 'none'
@@ -545,7 +545,7 @@ def update_data(table, thing_id, **vals):
                              table.c.key == sa.bindparam('_key')))
 
     inserts = []
-    for key, val in vals.iteritems():
+    for key, val in vals.items():
         val, kind = py2db(val, return_kind=True)
 
         uresult = u.execute(_key = key, value = val, kind = kind)
@@ -562,7 +562,7 @@ def create_data(table, thing_id, **vals):
     transactions.add_engine(table.bind)
 
     inserts = []
-    for key, val in vals.iteritems():
+    for key, val in vals.items():
         val, kind = py2db(val, return_kind=True)
         inserts.append(dict(key=key, value=val, kind=kind))
 
@@ -592,7 +592,7 @@ def fetch_query(table, id_col, thing_id):
 
     try:
         r = add_request_info(s).execute().fetchall()
-    except Exception, e:
+    except Exception as e:
         dbm.mark_dead(table.bind)
         # this thread must die so that others may live
         raise
@@ -608,7 +608,7 @@ def get_data(table, thing_id):
         val = db2py(row.value, row.kind)
         stor = res if single else res.setdefault(row.thing_id, storage())
         if single and row.thing_id != thing_id:
-            raise ValueError, ("tdb_sql.py: there's shit in the plumbing." 
+            raise ValueError(("tdb_sql.py: there's shit in the plumbing." )
                                + " got %s, wanted %s" % (row.thing_id,
                                                          thing_id))
         stor[row.key] = val
@@ -647,7 +647,7 @@ def get_thing(type_id, thing_id):
             res = stor
             # check that we got what we asked for
             if row.thing_id != thing_id:
-                raise ValueError, ("tdb_sql.py: there's shit in the plumbing." 
+                raise ValueError(("tdb_sql.py: there's shit in the plumbing." )
                                     + " got %s, wanted %s" % (row.thing_id,
                                                               thing_id))
         else:
@@ -830,7 +830,7 @@ def find_things(type_id, sort, limit, offset, constraints):
 
     try:
         r = add_request_info(s).execute()
-    except Exception, e:
+    except Exception as e:
         dbm.mark_dead(table.bind)
         # this thread must die so that others may live
         raise
@@ -915,7 +915,7 @@ def find_data(type_id, sort, limit, offset, constraints):
 
     try:
         r = add_request_info(s).execute()
-    except Exception, e:
+    except Exception as e:
         dbm.mark_dead(t_table.bind)
         # this thread must die so that others may live
         raise
@@ -1050,7 +1050,7 @@ def find_rels(ret_props, rel_type_id, sort, limit, offset, constraints):
 
     try:
         r = add_request_info(s).execute()
-    except Exception, e:
+    except Exception as e:
         dbm.mark_dead(r_table.bind)
         # this thread must die so that others may live
         raise

@@ -67,7 +67,7 @@ from operator import attrgetter
 import string
 import random as rand
 import re
-from urllib import quote_plus
+from urllib.parse import quote_plus
 
 class FrontController(RedditController):
 

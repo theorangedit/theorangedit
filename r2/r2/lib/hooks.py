@@ -41,7 +41,7 @@ Then, any place you want to hook into it, just throw on a decorator::
     
     @hooks.on('foo')
     def bar(ingredient):
-        print ingredient
+        print(ingredient)
 
     hooks.register_all()
 """

@@ -19,7 +19,7 @@
 # All portions of the code written by reddit are Copyright (c) 2006-2015 reddit
 # Inc. All Rights Reserved.
 ###############################################################################
-import cPickle as pickle
+import pickle as pickle
 from datetime import datetime, timedelta
 import functools
 import httplib
@@ -105,7 +105,7 @@ class CloudSearchUploader(object):
         add = etree.Element("add", id=thing._fullname, version=str(version),
                             lang="en")
 
-        for field_name, value in self.fields(thing).iteritems():
+        for field_name, value in self.fields(thing).items():
             field = etree.SubElement(add, "field", name=field_name)
             field.text = safe_xml_str(value)
 
@@ -207,10 +207,10 @@ class CloudSearchUploader(object):
                 delta=len(warnings))
 
         if not quiet:
-            print "%s Changes: +%i -%i" % (self.__class__.__name__,
+            print("%s Changes: +%i -%i" % (self.__class__.__name__,)
                                            adds, deletes)
             if len(warnings):
-                print "%s Warnings: %s" % (self.__class__.__name__,
+                print("%s Warnings: %s" % (self.__class__.__name__,)
                                            "; ".join(warnings))
 
         return cs_time
@@ -310,8 +310,8 @@ def chunk_xml(xml, depth=0):
         yield data
     else:
         depth += 1
-        print "WARNING: Chunking (depth=%s)" % depth
-        half = len(xml) / 2
+        print("WARNING: Chunking (depth=%s)" % depth)
+        half = len(xml) // 2
         left_half = xml # for ease of reading
         right_half = etree.Element("batch")
         # etree magic simultaneously removes the elements from one tree
@@ -392,7 +392,7 @@ def rebuild_link_index(start_at=None, sleeptime=1, cls=Link,
             try:
                 uploader.inject()
             except httplib.HTTPException as err:
-                print "Got %s, sleeping %s secs" % (err, x)
+                print("Got %s, sleeping %s secs" % (err, x))
                 time.sleep(x)
                 continue
             else:
@@ -400,7 +400,7 @@ def rebuild_link_index(start_at=None, sleeptime=1, cls=Link,
         else:
             raise err
         last_update = chunk[-1]
-        print "last updated %s" % last_update._fullname
+        print("last updated %s" % last_update._fullname)
         time.sleep(sleeptime)
 
 
@@ -414,7 +414,7 @@ rebuild_subreddit_index = functools.partial(rebuild_link_index,
 
 def test_run_link(start_link, count=1000):
     '''Inject `count` number of links, starting with `start_link`'''
-    if isinstance(start_link, basestring):
+    if isinstance(start_link, str):
         start_link = int(start_link, 36)
     links = Link._byID(range(start_link - count, start_link), data=True,
                        return_dict=False)
@@ -515,17 +515,17 @@ def _encode_query(query, bq, faceting, size, start, rank, rank_expressions,
     if rank:
         params["rank"] = rank
     if rank_expressions:
-        for rank, expression in rank_expressions.iteritems():
+        for rank, expression in rank_expressions.items():
             params['rank-%s' % rank] = expression
     if faceting:
-        params["facet"] = ",".join(faceting.iterkeys())
-        for facet, options in faceting.iteritems():
+        params["facet"] = ",".join(faceting.keys())
+        for facet, options in faceting.items():
             params["facet-%s-top-n" % facet] = options.get("count", 20)
             if "sort" in options:
                 params["facet-%s-sort" % facet] = options["sort"]
     if return_fields:
         params["return-fields"] = ",".join(return_fields)
-    encoded_query = urllib.urlencode(params)
+    encoded_query = urllib.parse.urlencode(params)
     path = _SEARCH + encoded_query
     return path
 

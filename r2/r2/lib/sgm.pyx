@@ -56,7 +56,7 @@ def sgm(cache, keys, miss_fn, str prefix='', int time=0, stale=False,
 
         cached = cache.get_multi(s_keys.keys(), prefix=prefix, **kw)
 
-        for k, v in cached.iteritems():
+        for k, v in cached.items():
             ret[s_keys[k]] = v
 
     still_need = set(s_keys.values()) - set(ret.keys())
@@ -76,7 +76,7 @@ def sgm(cache, keys, miss_fn, str prefix='', int time=0, stale=False,
         ret.update(calculated)
 
         calculated_to_cache = {}
-        for k, v in calculated.iteritems():
+        for k, v in calculated.items():
             calculated_to_cache[str(k)] = v
 
         try:

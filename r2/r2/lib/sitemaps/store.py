@@ -43,7 +43,7 @@ have to load all of the subreddits into memory, which would be ... bad.
 
 
 import gzip
-from StringIO import StringIO
+from io import StringIO
 
 from boto.s3.connection import S3Connection
 from boto.s3.key import Key

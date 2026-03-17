@@ -80,7 +80,7 @@ def recompute_unread(min_date = None):
     accounts_m = load_accounts(Inbox.rel(Account, Message))
     for i, a in enumerate(accounts_m):
         a = Account._byID(a)
-        print "%s / %s : %s" % (i, len(accounts_m), a)
+        print("%s / %s : %s" % (i, len(accounts_m), a))
         queries.get_unread_messages(a).update()
         queries.get_unread_comments(a).update()
         queries.get_unread_selfreply(a).update()
@@ -88,7 +88,7 @@ def recompute_unread(min_date = None):
     accounts = load_accounts(Inbox.rel(Account, Comment)) - accounts_m
     for i, a in enumerate(accounts):
         a = Account._byID(a)
-        print "%s / %s : %s" % (i, len(accounts), a)
+        print("%s / %s : %s" % (i, len(accounts), a))
         queries.get_unread_comments(a).update()
         queries.get_unread_selfreply(a).update()
 
@@ -181,7 +181,7 @@ def pushup_permacache(verbosity=1000):
     for keys in in_chunks(gen_keys(), verbosity):
         g.reset_caches()
         done += len(keys)
-        print 'Done %d: %r' % (done, keys[-1])
+        print('Done %d: %r' % (done, keys[-1]))
         populate(keys)
 
 
@@ -227,16 +227,16 @@ def port_deleted_links(after_id=None):
                 m.insert(query, [link])
 
 def convert_query_cache_to_json():
-    import cPickle
+    import pickle
     from r2.models.query_cache import json, UserQueryCache
 
     with UserQueryCache._cf.batch() as m:
         for key, columns in UserQueryCache._cf.get_range():
             out = {}
-            for ckey, cvalue in columns.iteritems():
+            for ckey, cvalue in columns.items():
                 try:
-                    raw = cPickle.loads(cvalue)
-                except cPickle.UnpicklingError:
+                    raw = pickle.loads(cvalue)
+                except pickle.UnpicklingError:
                     continue
                 out[ckey] = json.dumps(raw)
             m.insert(key, out)
@@ -255,7 +255,7 @@ def populate_spam_filtered():
 
     q = Subreddit._query(sort = asc('_date'))
     for sr in fetch_things2(q):
-        print 'Processing %s' % sr.name
+        print('Processing %s' % sr.name)
         links = Thing._by_fullname(get_spam_links(sr), data=True,
                                    return_dict=False)
         comments = Thing._by_fullname(get_spam_comments(sr), data=True,

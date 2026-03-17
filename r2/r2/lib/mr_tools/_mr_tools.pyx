@@ -21,7 +21,7 @@
 ###############################################################################
 
 import sys
-from itertools import imap, groupby
+from builtins import map, groupby
 from heapq import nlargest
 
 stdin = sys.stdin
@@ -69,19 +69,19 @@ cdef class Storage(dict):
 
 def valiter(grouper):
     key, group = grouper
-    return key, imap(lambda x: x[1:], group)
+    return key, map(lambda x: x[1:], group)
 
 cpdef list _keyiter_splitter(str x):
     x = x.strip('\n')
     return x.split('\t')
 
 def keyiter(stream=stdin):
-    lines = imap(_keyiter_splitter, stream)
+    lines = map(_keyiter_splitter, stream)
     groups = groupby(lines, lambda x: x[0])
-    return imap(valiter, groups)
+    return map(valiter, groups)
 
 def emit(vals):
-    print '\t'.join(map(str, vals))
+    print('\t'.join(map(str, vals)))
 
 def emit_all(vals):
     for val in vals:
@@ -97,7 +97,7 @@ cpdef Storage format_dataspec(msg, specs):
     # specs  =:= [ spec() ]
     cdef Storage ret = Storage()
     for val, spec in zip(msg, specs):
-        if isinstance(spec, basestring):
+        if isinstance(spec, str):
             # the spec is just a name
             name = spec
             ret[name] = val
@@ -129,7 +129,7 @@ cdef class dataspec_r(object):
     def __call__(self, fn):
         specs = self.specs
         def wrapped_fn_r(key, msgs):
-            return fn(key, imap(lambda msg: format_dataspec(msg, specs),
+            return fn(key, map(lambda msg: format_dataspec(msg, specs),
                                 msgs))
         return wrapped_fn_r
 

@@ -72,7 +72,7 @@ def memoize(iden, time = 0, stale=False, timeout=30):
 def test(x, y):
     import time
     time.sleep(1)
-    print 'calculating %d + %d' % (x, y)
+    print('calculating %d + %d' % (x, y))
     if x + y == 10:
         return None
     else:

@@ -1,5 +1,5 @@
 from mock import MagicMock, ANY, call
-from urllib import quote
+from urllib.parse import quote
 from r2.tests import RedditTestCase
 from r2.lib import hooks
 from r2.lib.loid import LoId, LOID_COOKIE, LOID_CREATED_COOKIE, isodate

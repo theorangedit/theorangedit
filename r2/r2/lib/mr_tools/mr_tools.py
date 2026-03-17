@@ -80,7 +80,7 @@ def join_things(fields, deleted=False, spam=True):
     mr_reduce(process)
     # Print to stderr to avoid getting this caught up in the pipe of
     # compute_time_listings.
-    print >> sys.stderr, '%s items processed, %s skipped' % (
+    print('%s items processed, %s skipped' % (, file=sys.stderr)
                          counters['processed'], counters['skipped'])
 
 class Mapper(object):
@@ -117,9 +117,9 @@ def test():
     from r2.lib.mr_tools._mr_tools import keyiter
 
     for key, vals in keyiter():
-        print key, vals
+        print(key, vals)
         for val in vals:
-            print '\t', val
+            print('\t', val)
 
 class UpperMapper(Mapper):
     def process(self, values):

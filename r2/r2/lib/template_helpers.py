@@ -47,7 +47,7 @@ import simplejson
 import os.path
 from copy import copy
 import random
-import urlparse
+import urllib.parse as urlparse
 import calendar
 import math
 import time
@@ -384,7 +384,7 @@ def replace_render(listing, item, render_func):
         if hasattr(item, "num_comments"):
             com_label, com_cls = comment_label(item.num_comments)
             if style == "compact":
-                com_label = unicode(item.num_comments)
+                com_label = str(item.num_comments)
             replacements['numcomments'] = com_label
             replacements['commentcls'] = com_cls
 
@@ -419,11 +419,11 @@ def replace_render(listing, item, render_func):
         renderer = render_func or item.render
         res = renderer(style = style, **replacements)
 
-        if isinstance(res, (str, unicode)):
+        if isinstance(res, str):
             rv = unsafe(res)
             if g.debug:
                 for leftover in re.findall('<\$>(.+?)(?:<|$)', rv):
-                    print "replace_render didn't replace %s" % leftover
+                    print("replace_render didn't replace %s" % leftover)
 
             return rv
 
@@ -676,7 +676,7 @@ def search_url(query, subreddit, restrict_sr="off", sort=None, recent=None, ref=
     if recent:
         url_query["t"] = recent
     path = "/r/%s/search?" % subreddit if subreddit else "/search?"
-    path += urllib.urlencode(url_query)
+    path += urllib.parse.urlencode(url_query)
     return path
 
 
@@ -741,7 +741,7 @@ def format_html(format_string, *args, **kwargs):
     if args and kwargs:
         raise ValueError("Can't specify both positional and keyword args")
     args_safe = tuple(map(conditional_websafe, args))
-    kwargs_gen = ((k, conditional_websafe(v)) for (k, v) in kwargs.iteritems())
+    kwargs_gen = ((k, conditional_websafe(v)) for (k, v) in kwargs.items())
     kwargs_safe = dict(kwargs_gen)
 
     format_args = args_safe or kwargs_safe

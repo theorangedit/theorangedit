@@ -53,13 +53,13 @@ try:
     from r2.lib.base import abort
     from r2.models.link import Link
     from r2.models.subreddit import DefaultSR, Subreddit
-except Exception, e:
+except Exception as e:
     if g.debug:
         # if debug mode, let the error filter up to pylons to be handled
         raise e
     else:
         # production environment: protect the code integrity!
-        print "HuffmanEncodingError: make sure your python compiles before deploying, stupid!"
+        print("HuffmanEncodingError: make sure your python compiles before deploying, stupid!")
         # kill this app
         os._exit(1)
 
@@ -201,7 +201,7 @@ class ErrorController(RedditController):
             takedown = request.GET.get('takedown', '')
             error_name = request.GET.get('error_name', '')
 
-            if isinstance(c.user, basestring):
+            if isinstance(c.user, str):
                 # somehow requests are getting here with c.user unset
                 c.user_is_loggedin = False
                 c.user = UnloggedUser(browser_langs=None)
@@ -209,7 +209,7 @@ class ErrorController(RedditController):
             if srname:
                 c.site = Subreddit._by_name(srname)
 
-            if request.GET.has_key('allow_framing'):
+            if ('allow_framing' in request.GET):
                 c.allow_framing = bool(request.GET['allow_framing'] == '1')
 
             if (error_name == 'IN_TIMEOUT' and

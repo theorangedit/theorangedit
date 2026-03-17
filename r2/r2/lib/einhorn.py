@@ -83,7 +83,7 @@ class EinhornSyncWorker(SyncWorker):
 
 def run_gunicorn_worker():
     if not einhorn.is_worker():
-        print >> sys.stderr, "This process does not appear to be running under Einhorn."
+        print("This process does not appear to be running under Einhorn.", file=sys.stderr)
         sys.exit(1)
 
     app = PasterApplication()

@@ -20,7 +20,7 @@
 # Inc. All Rights Reserved.
 ###############################################################################
 
-import cPickle as pickle
+import pickle as pickle
 from datetime import datetime, timedelta
 import functools
 import httplib
@@ -390,8 +390,8 @@ def _encode_query(query, faceting, size, start, rank, return_fields):
     facet_sort = []
     if faceting:
         params["facet"] = "true"
-        params["facet.field"] = ",".join(faceting.iterkeys())
-        for facet, options in faceting.iteritems():
+        params["facet.field"] = ",".join(faceting.keys())
+        for facet, options in faceting.items():
             facet_limit.append(options.get("count", 20))
             if "sort" in options:
                 if not options['sort'].split()[-1] in ['asc', 'desc']:
@@ -402,7 +402,7 @@ def _encode_query(query, faceting, size, start, rank, return_fields):
         params["facet.sort"] = params["facet.sort"] or 'score desc' 
     if return_fields:
         params["qf"] = ",".join(return_fields)
-    encoded_query = urllib.urlencode(params)
+    encoded_query = urllib.parse.urlencode(params)
     if getattr(g, 'solr_version', '1').startswith('4'):
         path = '/solr/%s/select?%s' % \
             (getattr(g, 'solr_core', 'collection1'), encoded_query)
@@ -436,7 +436,7 @@ class SolrSearchUploader(object):
         field = etree.SubElement(doc, "field", name='id')
         field.text = thing._fullname
 
-        for field_name, value in self.fields(thing).iteritems():
+        for field_name, value in self.fields(thing).items():
             field = etree.SubElement(doc, "field", name=field_name)
             field.text = safe_xml_str(value)
 
@@ -549,10 +549,10 @@ class SolrSearchUploader(object):
                     delta=len(warnings))
 
             if not quiet:
-                print "%s Changes: +%i -%i" % (self.__class__.__name__,
+                print("%s Changes: +%i -%i" % (self.__class__.__name__,)
                                                adds, deletes)
                 if len(warnings):
-                    print "%s Warnings: %s" % (self.__class__.__name__,
+                    print("%s Warnings: %s" % (self.__class__.__name__,)
                                                "; ".join(warnings))
 
         return cs_time    
@@ -603,8 +603,8 @@ def chunk_xml(xml, depth=0):
         yield data
     else:
         depth += 1
-        print "WARNING: Chunking (depth=%s)" % depth
-        half = len(xml) / 2
+        print("WARNING: Chunking (depth=%s)" % depth)
+        half = len(xml) // 2
         left_half = xml # for ease of reading
         right_half = etree.Element(root)
         # etree magic simultaneously removes the elements from one tree
@@ -725,7 +725,7 @@ def _rebuild_link_index(start_at=None, sleeptime=1, cls=Link,
             try:
                 uploader.inject()
             except httplib.HTTPException as err:
-                print "Got %s, sleeping %s secs" % (err, x)
+                print("Got %s, sleeping %s secs" % (err, x))
                 time.sleep(x)
                 continue
             else:
@@ -733,7 +733,7 @@ def _rebuild_link_index(start_at=None, sleeptime=1, cls=Link,
         else:
             raise err
         last_update = chunk[-1]
-        print "last updated %s" % last_update._fullname
+        print("last updated %s" % last_update._fullname)
         time.sleep(sleeptime)
 
 
@@ -746,7 +746,7 @@ rebuild_subreddit_index = functools.partial(_rebuild_link_index,
 
 def test_run_link(start_link, count=1000):
     '''Inject `count` number of links, starting with `start_link`'''
-    if isinstance(start_link, basestring):
+    if isinstance(start_link, str):
         start_link = int(start_link, 36)
     links = Link._byID(range(start_link - count, start_link), data=True,
                        return_dict=False)

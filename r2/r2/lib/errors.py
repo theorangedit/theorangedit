@@ -201,7 +201,7 @@ def add_error_codes(new_codes):
     yet translated, so they can be declared before pylons.i18n is ready.
 
     """
-    for code, message in new_codes.iteritems():
+    for code, message in new_codes.items():
         error_list[code] = _(message)
         errors[code] = code
 
@@ -249,7 +249,7 @@ class ErrorSet(object):
     def __contains__(self, pair):
         """Expects an (error_name, field_name) tuple and checks to
         see if it's in the errors list."""
-        return self.errors.has_key(pair)
+        return (pair in self.errors)
 
     def get(self, name, default=None):
         return self.errors.get(name, default)
@@ -288,7 +288,7 @@ class ErrorSet(object):
     def remove(self, pair):
         """Expects an (error_name, field_name) tuple and removes it
         from the errors list."""
-        if self.errors.has_key(pair):
+        if (pair in self.errors):
             del self.errors[pair]
 
 

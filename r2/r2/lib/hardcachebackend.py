@@ -84,7 +84,7 @@ class HardCacheBackend(object):
             engines_by_enginename[enginename] = table
 
         self.mapping = {}
-        for category, enginenames in enginenames_by_category.iteritems():
+        for category, enginenames in enginenames_by_category.items():
             self.mapping[category] = [ engines_by_enginename[e]
                                        for e in enginenames]
 
@@ -182,7 +182,7 @@ class HardCacheBackend(object):
             self.profile_stop(prof)
             return value
 
-        except sa.exc.IntegrityError, e:
+        except sa.exc.IntegrityError as e:
             self.profile_stop(prof)
             return self.get(category, ids, force_write_table=True)
 

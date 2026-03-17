@@ -50,7 +50,7 @@ class CookieAuthenticationProvider(AuthenticationProvider):
         quoted_session_cookie = request.cookies.get(g.login_cookie)
         if not quoted_session_cookie:
             return None
-        session_cookie = urllib.unquote(quoted_session_cookie)
+        session_cookie = urllib.parse.unquote(quoted_session_cookie)
 
         try:
             uid, timestr, hash = session_cookie.split(",")

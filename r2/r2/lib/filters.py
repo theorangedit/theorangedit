@@ -61,9 +61,9 @@ try:
         uwebsafe_json as c_websafe_json
     def spaceCompress(text):
         try:
-            text = unicode(text, 'utf-8')
+            text = str(text, 'utf-8')
         except TypeError:
-            text = unicode(text)
+            text = str(text)
         return uspace_compress(text)
 except ImportError:
     c_websafe      = python_websafe
@@ -91,10 +91,10 @@ except ImportError:
         return res
 
 
-class _Unsafe(unicode):
+class _Unsafe(str):
     # Necessary so Wrapped instances with these can get cached
     def cache_key(self, style):
-        return unicode(self)
+        return str(self)
 
 
 def unsafe(text=''):
@@ -118,7 +118,7 @@ def conditional_websafe(text = ''):
         return _Unsafe(text)
     elif text is None:
         return ""
-    elif text.__class__ != unicode:
+    elif text.__class__ != str:
         text = _force_unicode(text)
     return c_websafe(text)
 
@@ -286,7 +286,7 @@ def generate_table_of_contents(soup, prefix):
             continue
         
         # Convert html entities to avoid ugly header ids
-        aid = unicode(BeautifulSoup(contents, convertEntities=BeautifulSoup.XML_ENTITIES))
+        aid = str(BeautifulSoup(contents, convertEntities=BeautifulSoup.XML_ENTITIES))
         # Prefix with PREFIX_ to avoid ID conflict with the rest of the page
         aid = u'%s_%s' % (prefix, aid.replace(" ", "_").lower())
         # Convert down to ascii replacing special characters with hex

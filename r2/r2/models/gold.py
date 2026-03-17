@@ -177,7 +177,7 @@ class GildingsByThing(tdb_cassandra.View):
     @classmethod
     def get_gilder_ids(cls, thing):
         columns = cls.get_time_sorted_columns(thing._fullname)
-        return [int(account_id, 36) for account_id in columns.iterkeys()]
+        return [int(account_id, 36) for account_id in columns.keys()]
 
     @classmethod
     def create(cls, user, things):
@@ -210,7 +210,7 @@ class GildingsByDay(tdb_cassandra.View):
         key = cls._rowkey(date)
         columns = cls.get_time_sorted_columns(key)
         gildings = []
-        for name, json_blob in columns.iteritems():
+        for name, json_blob in columns.items():
             timestamp = convert_uuid_to_time(name)
             date = datetime.utcfromtimestamp(timestamp).replace(tzinfo=g.tz)
 
@@ -611,7 +611,7 @@ def creddits_lock(user):
 
 PENNIES_PER_SERVER_SECOND = {
     datetime.strptime(datestr, "%Y/%m/%d").date(): v
-    for datestr, v in g.live_config['pennies_per_server_second'].iteritems()
+    for datestr, v in g.live_config['pennies_per_server_second'].items()
 }
 
 

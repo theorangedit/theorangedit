@@ -33,8 +33,8 @@ from utils import string2js, read_http_date
 
 import re, hashlib
 from Cookie import CookieError
-from urllib import quote
-import urllib2
+from urllib.parse import quote
+import urllib.request as urllib2
 import sys
 
 
@@ -205,7 +205,7 @@ class BaseController(WSGIController):
 
         if u.is_reddit_url():
             # make sure to pass the port along if not 80
-            if not kw.has_key('port'):
+            if not ('port' in kw):
                 kw['port'] = request.port
 
             # make sure the extensions agree with the current page

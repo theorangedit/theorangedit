@@ -87,8 +87,8 @@ cpdef double _confidence(int ups, int downs):
 cdef int up_range = 400
 cdef int down_range = 100
 cdef list _confidences = []
-for ups in xrange(up_range):
-    for downs in xrange(down_range):
+for ups in range(up_range):
+    for downs in range(down_range):
         _confidences.append(_confidence(ups, downs))
 def confidence(int ups, int downs):
     if ups + downs == 0:

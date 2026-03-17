@@ -26,7 +26,7 @@ from pylons.i18n import ungettext, _
 import math
 
 cpdef str to_base(long q, str alphabet):
-    if q < 0: raise ValueError, "must supply a positive integer"
+    if q < 0: raise ValueError("must supply a positive integer")
     cdef long l
     cdef long r
     l = len(alphabet)
@@ -56,7 +56,7 @@ cdef _strips(str direction, text, remove):
         if text.endswith(remove):   
             return text[:-len(remove)]
     else: 
-        raise ValueError, "Direction needs to be r or l."
+        raise ValueError("Direction needs to be r or l.")
     return text
 
 cpdef rstrips(text, remove):
@@ -146,7 +146,7 @@ cpdef timeinterval_fromstr(str interval):
         num, period = parts
         num = int(num)
     else:
-        raise ValueError, 'format should be ([num] second|minute|etc)'
+        raise ValueError('format should be ([num] second|minute|etc)')
     period = rstrips(period, 's')
 
     d = timeintervald[period]
@@ -254,7 +254,7 @@ cdef map_keys(keys, mapfn, str prefix):
 
 cdef unmap_keys(mapped_keys, km):
     cdef dict ret = {}
-    for key, value in mapped_keys.iteritems():
+    for key, value in mapped_keys.items():
         ret[km[key]] = value
     return ret
 

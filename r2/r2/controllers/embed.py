@@ -35,7 +35,7 @@ from pylons import app_globals as g
 
 from BeautifulSoup import BeautifulSoup, Tag
 
-from urllib2 import HTTPError
+from urllib.request import HTTPError
 
 @memoize("renderurl_cached", time=60)
 def renderurl_cached(path):
@@ -47,10 +47,10 @@ def renderurl_cached(path):
 
     try:
         return fp, proxyurl(u)
-    except HTTPError, e:
+    except HTTPError as e:
         if e.code != 404:
-            print "error %s" % e.code
-            print e.fp.read()
+            print("error %s" % e.code)
+            print(e.fp.read())
         return (None, None)
 
 class EmbedController(RedditController):
@@ -63,10 +63,10 @@ class EmbedController(RedditController):
 
         # Replace all links to "/wiki/help/..." with "/help/..."
         for link in output.findAll('a'):
-            if link.has_key('href') and link['href'].startswith("/wiki/help"):
+            if ('href' in link) and link['href'].startswith("/wiki/help"):
                 link['href'] = link['href'][5:]
 
-        output = SC_OFF + unicode(output) + SC_ON
+        output = SC_OFF + str(output) + SC_ON
 
         return HelpPage(_("help"),
                         content = Embed(content=output),

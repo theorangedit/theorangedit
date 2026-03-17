@@ -128,7 +128,7 @@ def consume_link_vote_queue(qname="vote_link_q"):
         hook = hooks.get_hook('vote.validate_vote_data')
         if hook.call_until_return(msg=msg, vote_data=vote_data) is False:
             # Corrupt records in the queue. Ignore them.
-            print "Ignoring invalid vote by %s on %s %s" % (
+            print("Ignoring invalid vote by %s on %s %s" % ()
                     vote_data.get('user_id', '<unknown>'),
                     vote_data.get('thing_fullname', '<unknown>'),
                     vote_data)
@@ -144,7 +144,7 @@ def consume_link_vote_queue(qname="vote_link_q"):
         # that the vote state and cached query are consistent
         lock_key = "vote-%s-%s" % (user._id36, link._fullname)
         with g.make_lock("voting", lock_key, timeout=5):
-            print "Processing vote by %s on %s %s" % (user, link, vote_data)
+            print("Processing vote by %s on %s %s" % (user, link, vote_data))
 
             try:
                 vote = Vote(
@@ -210,7 +210,7 @@ def consume_author_query_queue(qname="author_query_q", limit=1000):
 
         link_names = {msg.body for msg in msgs}
         links = Link._by_fullname(link_names, return_dict=False)
-        print 'Processing %r' % (links,)
+        print('Processing %r' % (links,))
 
         links_by_author_id = defaultdict(list)
         for link in links:
@@ -218,7 +218,7 @@ def consume_author_query_queue(qname="author_query_q", limit=1000):
 
         authors_by_id = Account._byID(links_by_author_id.keys())
 
-        for author_id, links in links_by_author_id.iteritems():
+        for author_id, links in links_by_author_id.items():
             with g.stats.get_timer("link_vote_processor.author_queries"):
                 author = authors_by_id[author_id]
                 add_queries(
@@ -256,7 +256,7 @@ def consume_subreddit_query_queue(qname="subreddit_query_q", limit=1000):
 
         link_names = {msg.body for msg in msgs}
         links = Link._by_fullname(link_names, return_dict=False)
-        print 'Processing %r' % (links,)
+        print('Processing %r' % (links,))
 
         links_by_sr_id = defaultdict(list)
         for link in links:
@@ -264,7 +264,7 @@ def consume_subreddit_query_queue(qname="subreddit_query_q", limit=1000):
 
         srs_by_id = Subreddit._byID(links_by_sr_id.keys(), stale=True)
 
-        for sr_id, links in links_by_sr_id.iteritems():
+        for sr_id, links in links_by_sr_id.items():
             with g.stats.get_timer("link_vote_processor.subreddit_queries"):
                 sr = srs_by_id[sr_id]
                 add_queries(
@@ -306,7 +306,7 @@ def consume_domain_query_queue(qname="domain_query_q", limit=1000):
 
         link_names = {msg.body for msg in msgs}
         links = Link._by_fullname(link_names, return_dict=False)
-        print 'Processing %r' % (links,)
+        print('Processing %r' % (links,))
 
         links_by_domain = defaultdict(list)
         for link in links:
@@ -316,7 +316,7 @@ def consume_domain_query_queue(qname="domain_query_q", limit=1000):
             for domain in parsed.domain_permutations():
                 links_by_domain[domain].append(link)
 
-        for d, links in links_by_domain.iteritems():
+        for d, links in links_by_domain.items():
             with g.stats.get_timer("link_vote_processor.domain_queries"):
                 add_queries(
                     queries=[
@@ -342,7 +342,7 @@ def consume_comment_vote_queue(qname="vote_comment_q"):
         hook = hooks.get_hook('vote.validate_vote_data')
         if hook.call_until_return(msg=msg, vote_data=vote_data) is False:
             # Corrupt records in the queue. Ignore them.
-            print "Ignoring invalid vote by %s on %s %s" % (
+            print("Ignoring invalid vote by %s on %s %s" % ()
                     vote_data.get('user_id', '<unknown>'),
                     vote_data.get('thing_fullname', '<unknown>'),
                     vote_data)
@@ -354,7 +354,7 @@ def consume_comment_vote_queue(qname="vote_comment_q"):
         user = Account._byID(vote_data.pop("user_id"))
         comment = Comment._by_fullname(vote_data.pop("thing_fullname"))
 
-        print "Processing vote by %s on %s %s" % (user, comment, vote_data)
+        print("Processing vote by %s on %s %s" % (user, comment, vote_data))
 
         try:
             vote = Vote(

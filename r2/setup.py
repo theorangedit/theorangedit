@@ -33,7 +33,7 @@ commands = {}
 try:
     from Cython.Build import cythonize
 except ImportError:
-    print "Cannot find Cython. Skipping Cython build."
+    print("Cannot find Cython. Skipping Cython build.")
     pyx_extensions = []
 else:
     pyx_files = []
@@ -48,7 +48,7 @@ else:
 try:
     from baseplate.integration.thrift.command import ThriftBuildPyCommand
 except ImportError:
-    print "Cannot find Baseplate. Skipping Thrift build."
+    print("Cannot find Baseplate. Skipping Thrift build.")
 else:
     commands["build_py"] = ThriftBuildPyCommand
 

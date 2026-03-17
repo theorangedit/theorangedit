@@ -2,7 +2,7 @@ from datetime import datetime, timedelta
 from dateutil.parser import parse as date_parse
 import pytz
 import string
-from urllib import quote, unquote
+from urllib.parse import quote, unquote
 
 from pylons import app_globals as g
 
@@ -174,6 +174,6 @@ class LoId(object):
         hook = hooks.get_hook("loid.to_dict")
         hook.call(loid=self, data=d)
         if prefix:
-            d = {"{}{}".format(prefix, k): v for k, v in d.iteritems()}
+            d = {"{}{}".format(prefix, k): v for k, v in d.items()}
 
         return d

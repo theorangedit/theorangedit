@@ -20,8 +20,6 @@
 # Inc. All Rights Reserved.
 ###############################################################################
 
-from __future__ import absolute_import
-
 import random, string
 
 from pylons import app_globals as g
