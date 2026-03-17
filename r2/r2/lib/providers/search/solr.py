@@ -650,7 +650,7 @@ class SolrLinkUploader(SolrSearchUploader):
     types = (Link,)
 
     def __init__(self, solr_host=None, solr_port=None, fullnames=None):
-        super(SolrLinkUploader, self).__init__(fullnames=fullnames)
+        super().__init__(fullnames=fullnames)
         self.accounts = {}
         self.srs = {}
 
@@ -661,7 +661,7 @@ class SolrLinkUploader(SolrSearchUploader):
         return LinkFields(thing, account, sr).fields()
 
     def batch_lookups(self):
-        super(SolrLinkUploader, self).batch_lookups()
+        super().batch_lookups()
         author_ids = [thing.author_id for thing in self.things
                       if hasattr(thing, 'author_id')]
         try:

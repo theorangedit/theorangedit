@@ -410,7 +410,7 @@ class LabeledMultiJsonTemplate(LabeledMultiDescriptionJsonTemplate):
     del _data_attrs_["id"]
 
     def __init__(self, expand_srs=False):
-        super(LabeledMultiJsonTemplate, self).__init__()
+        super().__init__()
         self.expand_srs = expand_srs
 
     def kind(self, wrapped):
@@ -438,7 +438,7 @@ class LabeledMultiJsonTemplate(LabeledMultiDescriptionJsonTemplate):
         elif attr == "display_name":
             return thing.display_name or thing.name
         else:
-            super_ = super(LabeledMultiJsonTemplate, self)
+            super_ = super()
             return super_.thing_attr(thing, attr)
 
 

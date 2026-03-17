@@ -407,18 +407,18 @@ class PromoCampaign(Thing):
         return "campaign:"
 
     def __getattr__(self, attr):
-        val = super(PromoCampaign, self).__getattr__(attr)
+        val = super().__getattr__(attr)
 
         if (attr == 'total_budget_pennies' and hasattr(self, 'bid') and
                 not getattr(self, 'bid_migrated', False)):
-            old_bid = int(super(PromoCampaign, self).__getattr__('bid') * 100)
+            old_bid = int(super().__getattr__('bid') * 100)
             self.total_budget_pennies = old_bid
             self.bid_migrated = True
             return self.total_budget_pennies
 
         if (attr == 'bid_pennies' and hasattr(self, 'cpm') and
                 not getattr(self, 'cpm_migrated', False)):
-            old_cpm = super(PromoCampaign, self).__getattr__('cpm')
+            old_cpm = super().__getattr__('cpm')
             self.bid_pennies = old_cpm
             self.cpm_migrated = True
             return self.bid_pennies

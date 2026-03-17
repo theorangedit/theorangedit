@@ -269,7 +269,7 @@ class PermissionsDataSource(DataSource):
 
     @property
     def dependencies(self):
-        dependencies = set(super(PermissionsDataSource, self).dependencies)
+        dependencies = set(super().dependencies)
         for permission_set in self.permission_sets.values():
             dependencies.add(inspect.getsourcefile(permission_set))
         return list(dependencies)

@@ -1156,7 +1156,7 @@ def make_or_admin_secret_cls(base_cls):
             if secret and constant_time_compare(secret,
                                                 g.secrets["ADMINSECRET"]):
                 return True
-            super(VOrAdminSecret, self).run()
+            super().run()
 
             if request.method.upper() != "GET":
                 VModhash(fatal=True).run(request.POST.get("uh"))
@@ -1239,7 +1239,7 @@ class VVerifiedSponsor(VSponsor):
     def run(self, *args, **kwargs):
         VVerifiedUser().run()
 
-        return super(VVerifiedSponsor, self).run(*args, **kwargs)
+        return super().run(*args, **kwargs)
 
 
 class VEmployee(VVerifiedUser):
@@ -1255,7 +1255,7 @@ class VSrModerator(Validator):
         # If True, abort rather than setting an error
         self.fatal = fatal
         self.perms = utils.tup(perms)
-        super(VSrModerator, self).__init__(*a, **kw)
+        super().__init__(*a, **kw)
 
     def run(self):
         if not (c.user_is_loggedin
@@ -1617,7 +1617,7 @@ class VPassword(Validator):
 
 class VPasswordChange(VPassword):
     def run(self, password, verify):
-        base = super(VPasswordChange, self).run(password)
+        base = super().run(password)
 
         if self.has_errors:
             return base
@@ -2325,12 +2325,12 @@ class VShareRatelimit(VRatelimitImproved):
         event_id_fn=lambda: request.ip)
 
     def __init__(self):
-        super(VShareRatelimit, self).__init__(
+        super().__init__(
             user_limit=self.USER_LIMIT, ip_limit=self.IP_LIMIT)
 
     @classmethod
     def ratelimit(cls):
-        super(VShareRatelimit, cls).ratelimit(
+        super().ratelimit(
             user_limit=cls.USER_LIMIT, ip_limit=cls.IP_LIMIT)
 
 
@@ -2952,7 +2952,7 @@ class VOAuth2ClientDeveloper(VOAuth2ClientID):
     default_param_doc = _("an app developed by the user")
 
     def run(self, client_id):
-        client = super(VOAuth2ClientDeveloper, self).run(client_id)
+        client = super().run(client_id)
         if not client or not client.has_developer(c.user):
             return self.error()
         return client
@@ -3101,7 +3101,7 @@ class VValidatedJSON(VJSON):
 
     class PartialObject(Object):
         def run(self, data):
-            super_ = super(VValidatedJSON.PartialObject, self)
+            super_ = super()
             return super_.run(data, ignore_missing=True)
 
     def __init__(self, param, spec, **kw):

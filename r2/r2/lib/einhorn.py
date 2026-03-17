@@ -57,7 +57,7 @@ from gunicorn.workers.sync import SyncWorker
 class EinhornSyncWorker(SyncWorker):
     def __init__(self, cfg, app):
         listener = einhorn.get_socket()
-        super(EinhornSyncWorker, self).__init__(
+        super().__init__(
             age=0,
             ppid=os.getppid(),
             sockets=[listener],

@@ -578,7 +578,7 @@ class SponsorListingController(PromoteListingController):
             if self.sort in ('house', 'fraud'):
                 menus.append(managed_menu)
         else:
-            menus = super(SponsorListingController, self).menus
+            menus = super().menus
             menus.append(managed_menu)
 
         if self.sort == 'live_promos':

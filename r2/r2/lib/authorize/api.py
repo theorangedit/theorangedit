@@ -81,7 +81,7 @@ class AuthorizeNetException(Exception):
                      "<cardCode>omitted</cardCode>",
                      msg)
         self.code = code
-        super(AuthorizeNetException, self).__init__(msg)
+        super().__init__(msg)
 
 
 class TransactionError(Exception):
@@ -94,7 +94,7 @@ class DuplicateTransactionError(TransactionError):
         self.transaction_id = transaction_id
         message = ('DuplicateTransactionError with transaction_id %d' %
                    transaction_id)
-        super(DuplicateTransactionError, self).__init__(message)
+        super().__init__(message)
 
 
 class AuthorizationHoldNotFound(Exception): pass

@@ -62,7 +62,7 @@ class RedditDetectorBase(DetectorBase):
             return match.group('version')
 
     def detect(self, agent, result):
-        detected = super(RedditDetectorBase, self).detect(agent, result)
+        detected = super().detect(agent, result)
 
         if not detected or not self.agent_regex:
             return detected

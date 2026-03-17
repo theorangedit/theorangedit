@@ -249,7 +249,7 @@ class LinkUploader(CloudSearchUploader):
     types = (Link,)
 
     def __init__(self, doc_api, fullnames=None, version_offset=_VERSION_OFFSET):
-        super(LinkUploader, self).__init__(doc_api, fullnames, version_offset)
+        super().__init__(doc_api, fullnames, version_offset)
         self.accounts = {}
         self.srs = {}
 
@@ -260,7 +260,7 @@ class LinkUploader(CloudSearchUploader):
         return LinkFields(thing, account, sr).fields()
 
     def batch_lookups(self):
-        super(LinkUploader, self).batch_lookups()
+        super().batch_lookups()
         author_ids = [thing.author_id for thing in self.things
                       if hasattr(thing, 'author_id')]
         try:

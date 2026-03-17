@@ -423,7 +423,7 @@ class ListingWithPromos(SubredditListingController):
                 show_promo = True
 
         def organic_keep_fn(item):
-            base_keep_fn = super(ListingWithPromos, self).keep_fn()
+            base_keep_fn = super().keep_fn()
             would_keep = base_keep_fn(item)
             return would_keep and item.fresh
 
@@ -534,7 +534,7 @@ class HotController(ListingWithPromos):
         }
 
     def content(self):
-        content = super(HotController, self).content()
+        content = super().content()
 
         if c.render_style == "html":
             stack = None

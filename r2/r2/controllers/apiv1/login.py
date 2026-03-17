@@ -40,7 +40,7 @@ from r2.lib.validator import (
 class APIv1LoginController(RedditController):
 
     def pre(self):
-        super(APIv1LoginController, self).pre()
+        super().pre()
         c.extension = "json"
         set_extension(request.environ, "json")
 

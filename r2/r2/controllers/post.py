@@ -176,7 +176,7 @@ class PostController(ApiController):
     @csrf_exempt
     @validate(dest = VDestination(default = "/"))
     def POST_login(self, dest, *a, **kw):
-        super(PostController, self).POST_login(*a, **kw)
+        super().POST_login(*a, **kw)
         c.render_style = "html"
         response.content_type = "text/html"
 
@@ -189,7 +189,7 @@ class PostController(ApiController):
     @csrf_exempt
     @validate(dest = VDestination(default = "/"))
     def POST_reg(self, dest, *a, **kw):
-        super(PostController, self).POST_register(*a, **kw)
+        super().POST_register(*a, **kw)
         c.render_style = "html"
         response.content_type = "text/html"
 

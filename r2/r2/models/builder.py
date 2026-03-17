@@ -594,10 +594,10 @@ class ActionBuilder(IDBuilder):
             self.actions[id] = action
         self.query = ids
 
-        super(ActionBuilder, self).init_query()
+        super().init_query()
 
     def thing_lookup(self, names):
-        items = super(ActionBuilder, self).thing_lookup(names)
+        items = super().thing_lookup(names)
 
         for item in items:
             if item._fullname in self.actions:
@@ -1880,7 +1880,7 @@ class UserMessageBuilder(MessageBuilder):
                     message.to_id == c.user._id and message.del_on_recipient):
                 return False
 
-        return super(UserMessageBuilder, self)._viewable_message(message)
+        return super()._viewable_message(message)
 
     def get_tree(self):
         if self.parent:

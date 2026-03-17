@@ -1077,7 +1077,7 @@ class DebugFooter(Templated):
 
 class AccountActivityBox(Templated):
     def __init__(self):
-        super(AccountActivityBox, self).__init__()
+        super().__init__()
 
 
 class RedditFooter(CachedTemplate):
@@ -1324,7 +1324,7 @@ class PrefApps(Templated):
     def __init__(self, my_apps, developed_apps):
         self.my_apps = my_apps
         self.developed_apps = developed_apps
-        super(PrefApps, self).__init__()
+        super().__init__()
 
     def render_developed_app(self, app, collapsed):
         base_template = self.template()
@@ -1913,7 +1913,7 @@ class LinkInfoPage(Reddit):
         ))
 
     def build_popup_panes(self):
-        panes = super(LinkInfoPage, self).build_popup_panes()
+        panes = super().build_popup_panes()
 
         if self.link.locked:
             panes.append(Popup('locked-popup', LockedInterstitial()))
@@ -2594,7 +2594,7 @@ class InfoBar(Templated):
 class RedditInfoBar(InfoBar):
     def __init__(self, message='', extra_class='', show_icon=False):
         self.show_icon = show_icon
-        super(RedditInfoBar, self).__init__(
+        super().__init__(
             message=message,
             extra_class=extra_class,
         )
@@ -2728,7 +2728,7 @@ class InTimeoutInterstitial(BannedInterstitial):
     def __init__(self, timeout_days_remaining=0, hide_message=False):
         self.timeout_days_remaining = timeout_days_remaining
         self.hide_message = hide_message
-        super(InTimeoutInterstitial, self).__init__()
+        super().__init__()
 
 
 class PrivateInterstitial(Interstitial):
@@ -2769,7 +2769,7 @@ class ArchivedInterstitial(Interstitial):
     def __init__(self):
         days = g.ARCHIVE_AGE.days
         months = days // 30
-        super(ArchivedInterstitial, self).__init__(
+        super().__init__(
             archive_age_months=months,
         )
 
@@ -3029,7 +3029,7 @@ class SubredditStylesheetBase(Templated):
         raw_images = ImagesByWikiPage.get_images(c.site, "config/stylesheet")
         images = {name: make_url_protocol_relative(url)
                   for name, url in raw_images.items()}
-        super(SubredditStylesheetBase, self).__init__(
+        super().__init__(
             images=images,
             stylesheet_contents=stylesheet_contents,
             **kwargs
@@ -3040,7 +3040,7 @@ class SubredditStylesheet(SubredditStylesheetBase):
     """form for editing or creating subreddit stylesheets"""
     def __init__(self, site=None, stylesheet_contents=''):
         allow_image_upload = site and not site.quarantine
-        super(SubredditStylesheet, self).__init__(
+        super().__init__(
             stylesheet_contents=stylesheet_contents,
             site=site,
             allow_image_upload=allow_image_upload,
@@ -3414,7 +3414,7 @@ class SubredditReportForm(CachedTemplate):
 
 class ReportFormTemplates(Templated):
     def __init__(self):
-        super(ReportFormTemplates, self).__init__(
+        super().__init__(
             system_rules=SITEWIDE_RULES,
             rules_page_link="/help/contentpolicy",
         )
@@ -3463,7 +3463,7 @@ class Promo_Email(Templated):
             locale = c.locale or g.locale
             self.printable_total_budget = format_currency(
                 kwargs['total_budget_dollars'], 'USD', locale=locale)
-        super(Promo_Email, self).__init__(*args, **kwargs)
+        super().__init__(*args, **kwargs)
 
 class SuspiciousPaymentEmail(Templated):
     def __init__(self, user, link):
@@ -4024,7 +4024,7 @@ class ModToolsPage(Reddit):
     """A mod tool page."""
 
     def __init__(self, **kwargs):
-        super(ModToolsPage, self).__init__(
+        super().__init__(
             page_classes=['modtools-page'],
             **kwargs
         )
@@ -4888,7 +4888,7 @@ class MediaPreview(Templated):
         self.width = media_object["width"]
         self.id36 = id36
         self.url = url
-        super(MediaPreview, self).__init__(**kwargs)
+        super().__init__(**kwargs)
 
 
 class SelfTextChild(LinkChild):
@@ -5404,7 +5404,7 @@ class TryCompact(Reddit):
 
 class AccountActivityPage(BoringPage):
     def __init__(self):
-        super(AccountActivityPage, self).__init__(_("account activity"))
+        super().__init__(_("account activity"))
 
     def content(self):
         return UserIPHistory()
@@ -5420,12 +5420,12 @@ class UserIPHistory(Templated):
                 for ip in self.ips
                 if not ip_address(ip[0]).is_private
             ]
-        super(UserIPHistory, self).__init__()
+        super().__init__()
 
 class ApiHelp(Templated):
     def __init__(self, api_docs, *a, **kw):
         self.api_docs = api_docs
-        super(ApiHelp, self).__init__(*a, **kw)
+        super().__init__(*a, **kw)
 
 
 class AwardReceived(Templated):

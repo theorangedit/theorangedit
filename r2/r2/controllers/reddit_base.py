@@ -302,7 +302,7 @@ async def set_subreddit():
     elif '+' in sr_name:
         name_filter = lambda name: Subreddit.is_valid_name(name,
             allow_language_srs=True)
-        sr_names = list(filter(name_filter, sr_name.split('+')))
+        sr_names = [name for name in sr_name.split('+') if name_filter(name)]
         srs = (await Subreddit._by_names(sr_names)).values()
         if All in srs:
             c.site = All

@@ -589,14 +589,14 @@ class CommentSortMenu(SortMenu):
 
     def __init__(self, *args, **kwargs):
         self.suggested_sort = kwargs.pop('suggested_sort', None)
-        super(CommentSortMenu, self).__init__(*args, **kwargs)
+        super().__init__(*args, **kwargs)
 
     @classmethod
     def visible_options(cls):
         return set(cls._options) - set(cls.hidden_options)
 
     def make_title(self, attr):
-        title = super(CommentSortMenu, self).make_title(attr)
+        title = super().make_title(attr)
         if attr == self.suggested_sort:
             return title + ' ' + _('(suggested)')
         else:
@@ -613,7 +613,7 @@ class SearchSortMenu(SortMenu):
         return ['hot']
 
     def make_buttons(self):
-        buttons = super(SearchSortMenu, self).make_buttons()
+        buttons = super().make_buttons()
         if feature.is_enabled('link_relevancy'):
             button = self.button_cls('relevance2', 'relevance2', self.name)
             buttons.append(button)
