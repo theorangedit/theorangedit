@@ -26,36 +26,113 @@ import re
 
 from collections import Counter
 
+import re as _re
 import mistune as _mistune
+
+# ---------------------------------------------------------------------------
+# Reddit-flavored Markdown plugins for mistune
+#
+# Extends standard Markdown with the same shortcuts snudown supported:
+#   /r/subreddit   -> link
+#   /u/username    -> link
+#   u/username     -> link  (no leading slash)
+#   ^superscript^  -> <sup>
+#   >!spoiler!<    -> <span class="spoiler">
+# ---------------------------------------------------------------------------
+
+def _plugin_reddit(md):
+    """Mistune plugin adding Reddit-specific inline syntax."""
+
+    # /r/subreddit  or  /u/username
+    SLASH_PATTERN = r'(?<!\w)(/[ru]/\w{1,25})(?=[^\w/]|$)'
+    # u/username without leading slash
+    U_PATTERN = r'(?<!\w)(u/\w{1,25})(?=[^\w/]|$)'
+    # ^superscript^  (non-greedy, no spaces, no nesting for simplicity)
+    SUP_PATTERN = r'\^(\S+)\^'
+    # >!spoiler!<
+    SPOILER_PATTERN = r'>!(.+?)!<'
+
+    def parse_slash_link(inline, m, state):
+        text = m.group(1)
+        return 'slash_link', text
+
+    def parse_u_link(inline, m, state):
+        text = m.group(1)
+        return 'u_link', text
+
+    def parse_superscript(inline, m, state):
+        text = m.group(1)
+        return 'superscript', text
+
+    def parse_spoiler(inline, m, state):
+        text = m.group(1)
+        return 'spoiler', text
+
+    def render_slash_link(text):
+        return '<a href="/%s">%s</a>' % (text.lstrip('/'), text)
+
+    def render_u_link(text):
+        return '<a href="/%s">%s</a>' % (text, text)
+
+    def render_superscript(text):
+        return '<sup>%s</sup>' % _mistune.escape(text)
+
+    def render_spoiler(text):
+        return '<span class="spoiler">%s</span>' % _mistune.escape(text)
+
+    md.inline.register('slash_link', SLASH_PATTERN, parse_slash_link, before='link')
+    md.inline.register('u_link', U_PATTERN, parse_u_link, before='link')
+    md.inline.register('superscript', SUP_PATTERN, parse_superscript, before='emphasis')
+    md.inline.register('spoiler', SPOILER_PATTERN, parse_spoiler, before='emphasis')
+
+    if md.renderer and md.renderer.NAME == 'html':
+        md.renderer.register('slash_link', render_slash_link)
+        md.renderer.register('u_link', render_u_link)
+        md.renderer.register('superscript', render_superscript)
+        md.renderer.register('spoiler', render_spoiler)
+
 
 # ---------------------------------------------------------------------------
 # snudown compatibility shim — backed by mistune
 #
 # snudown.markdown(text_bytes, nofollow, target, renderer=RENDERER_WIKI)
-# returns HTML bytes. We accept the same call signature and return str.
+# returns str (original snudown returned bytes; callers have been updated).
 # ---------------------------------------------------------------------------
 
+_REDDIT_PLUGINS = ['strikethrough', 'table', 'url', _plugin_reddit]
+
 class _SnudownCompat:
-    """Drop-in for snudown using mistune as the backend."""
+    """Drop-in for snudown using mistune as the backend.
+
+    Supports all syntax familiar from Reddit:
+      - Standard Markdown (bold, italic, headers, lists, code, blockquote)
+      - ~~strikethrough~~
+      - | tables |
+      - bare URL autolinking
+      - /r/subreddit and /u/username autolinks
+      - ^superscript^
+      - >!spoiler!<
+      - nofollow / target attributes on all links
+    """
 
     RENDERER_WIKI = 'wiki'
 
     def __init__(self):
         self._html = _mistune.create_markdown(
             escape=False,
-            plugins=['strikethrough', 'table', 'url'],
+            plugins=_REDDIT_PLUGINS,
         )
         self._wiki = _mistune.create_markdown(
             escape=False,
-            plugins=['strikethrough', 'table', 'url'],
+            plugins=_REDDIT_PLUGINS,
         )
 
     def markdown(self, text, nofollow=False, target=None, renderer=None):
         """Render Reddit-flavored Markdown to HTML.
 
-        text    -- bytes or str
-        nofollow -- if True, add rel="nofollow" to links (handled post-render)
-        target   -- link target attribute value (handled post-render)
+        text     -- bytes or str
+        nofollow -- add rel="nofollow" to all links
+        target   -- set target attribute on all links
         renderer -- RENDERER_WIKI for wiki mode; None for standard
         """
         if isinstance(text, bytes):
@@ -65,8 +142,6 @@ class _SnudownCompat:
         html = md(text)
 
         if nofollow or target:
-            # Post-process links to add nofollow / target
-            import re
             def _fix_link(m):
                 attrs = m.group(1)
                 if nofollow and 'nofollow' not in attrs:
@@ -74,7 +149,7 @@ class _SnudownCompat:
                 if target and 'target=' not in attrs:
                     attrs += ' target="%s"' % target
                 return '<a ' + attrs.strip() + '>'
-            html = re.sub(r'<a\s+([^>]*)>', _fix_link, html)
+            html = _re.sub(r'<a\s+([^>]*)>', _fix_link, html)
 
         return html
 
