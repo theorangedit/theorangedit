@@ -162,13 +162,13 @@ class FrontController(RedditController):
         count=VCount('count'),
         listing_only=VBoolean('listing_only'),
     )
-    def GET_details(self, thing, oldid36, after, before, count, listing_only):
+    async def GET_details(self, thing, oldid36, after, before, count, listing_only):
         """The (now deprecated) details page.  Content on this page
         has been subsubmed by the presence of the LinkInfoBar on the
         rightbox, so it is only useful for Admin-only wizardry."""
         if not thing:
             try:
-                link = Link._byID36(oldid36)
+                link = await Link._byID36(oldid36)
                 return self.redirect('/details/' + link._fullname)
             except (NotFound, ValueError):
                 abort(404)
@@ -228,7 +228,7 @@ class FrontController(RedditController):
              uri='/comments/{article}',
              uses_site=True,
              supports_rss=True)
-    def GET_comments(
+    async def GET_comments(
         self, article, comment, context, sort, limit, depth,
             showedits=True, showmore=True, sr_detail=False):
         """Get the comment tree for a given Link `article`.
@@ -255,7 +255,7 @@ class FrontController(RedditController):
         if comment and comment.link_id != article._id:
             return self.abort404()
 
-        sr = Subreddit._byID(article.sr_id, True)
+        sr = await Subreddit._byID(article.sr_id, True)
 
         if sr.name == g.takedown_sr:
             request.environ['REDDIT_TAKEDOWN'] = article._fullname
@@ -569,7 +569,7 @@ class FrontController(RedditController):
 
     @require_oauth2_scope("modconfig")
     @api_doc(api_section.moderation, uses_site=True)
-    def GET_stylesheet(self):
+    async def GET_stylesheet(self):
         """Redirect to the subreddit's stylesheet if one exists.
 
         See also: [/api/subreddit_stylesheet](#POST_api_subreddit_stylesheet).
@@ -577,7 +577,7 @@ class FrontController(RedditController):
         """
         # de-stale the subreddit object so we don't poison downstream caches
         if not isinstance(c.site, FakeSubreddit):
-            c.site = Subreddit._byID(c.site._id, data=True, stale=False)
+            c.site = await Subreddit._byID(c.site._id, data=True, stale=False)
 
         url = Reddit.get_subreddit_stylesheet_url(c.site)
         if url:
@@ -612,7 +612,7 @@ class FrontController(RedditController):
     )
     @api_doc(api_section.moderation, uses_site=True,
              uri="/about/log", supports_rss=True)
-    def GET_moderationlog(self, num, after, reverse, count, mod, action):
+    async def GET_moderationlog(self, num, after, reverse, count, mod, action):
         """Get a list of recent moderation actions.
 
         Moderator actions taken within a subreddit are logged. This listing is
@@ -640,17 +640,17 @@ class FrontController(RedditController):
             mod = []
             for name in modnames:
                 try:
-                    mod.append(Account._by_name(name, allow_deleted=True))
+                    mod.append(await Account._by_name(name, allow_deleted=True))
                 except NotFound:
                     continue
             mod = mod or None
 
         if isinstance(c.site, (MultiReddit, ModSR)):
-            srs = Subreddit._byID(c.site.sr_ids, return_dict=False)
+            srs = await Subreddit._byID(c.site.sr_ids, return_dict=False)
 
             # grab all moderators
             mod_ids = set(Subreddit.get_all_mod_ids(srs))
-            mods = Account._byID(mod_ids, data=True)
+            mods = await Account._byID(mod_ids, data=True)
 
             pane = self._make_moderationlog(srs, num, after, reverse, count,
                                             mod=mod, action=action)
@@ -658,7 +658,7 @@ class FrontController(RedditController):
             return self.abort404()
         else:
             mod_ids = c.site.moderators
-            mods = Account._byID(mod_ids, data=True)
+            mods = await Account._byID(mod_ids, data=True)
 
             pane = self._make_moderationlog(c.site, num, after, reverse, count,
                                             mod=mod, action=action)
@@ -895,11 +895,11 @@ class FrontController(RedditController):
         name=nop('name'),
         timeout=VNotInTimeout(),
     )
-    def GET_flairlisting(self, num, after, reverse, count, name, timeout):
+    async def GET_flairlisting(self, num, after, reverse, count, name, timeout):
         user = None
         if name:
             try:
-                user = Account._by_name(name)
+                user = await Account._by_name(name)
             except NotFound:
                 c.errors.add(errors.USER_DOESNT_EXIST, field='name')
 
@@ -989,7 +989,7 @@ class FrontController(RedditController):
         num=VInt("num",
             min=1, max=Subreddit.MAX_STICKIES, num_default=1, coerce=True),
     )
-    def GET_sticky(self, num):
+    async def GET_sticky(self, num):
         """Redirect to one of the posts stickied in the current subreddit
 
         The "num" argument can be used to select a specific sticky, and will
@@ -1004,7 +1004,7 @@ class FrontController(RedditController):
             fullname = c.site.sticky_fullnames[num-1]
         except IndexError:
             abort(404)
-        sticky = Link._by_fullname(fullname, data=True)
+        sticky = await Link._by_fullname(fullname, data=True)
         self.redirect(sticky.make_permalink_slow())
 
     def GET_awards(self):
@@ -1518,11 +1518,11 @@ class FrontController(RedditController):
 
     @validate(VUser(),
               token=VOneTimeToken(AwardClaimToken, "code"))
-    def GET_confirm_award_claim(self, token):
+    async def GET_confirm_award_claim(self, token):
         if not token:
             abort(403)
 
-        award = Award._by_fullname(token.awardfullname)
+        award = await Award._by_fullname(token.awardfullname)
         trophy = FakeTrophy(c.user, award, token.description, token.url)
         content = ConfirmAwardClaim(trophy=trophy, user=c.user.name,
                                     token=token)
@@ -1531,13 +1531,13 @@ class FrontController(RedditController):
     @validate(VUser(),
               VModhash(),
               token=VOneTimeToken(AwardClaimToken, "code"))
-    def POST_claim_award(self, token):
+    async def POST_claim_award(self, token):
         if not token:
             abort(403)
 
         token.consume()
 
-        award = Award._by_fullname(token.awardfullname)
+        award = await Award._by_fullname(token.awardfullname)
         trophy, preexisting = Trophy.claim(c.user, token.uid, award,
                                            token.description, token.url)
         redirect = '/awards/received?trophy=' + trophy._id36
@@ -1611,7 +1611,7 @@ class FormsController(RedditController):
     @validate(VUser(),
               token=VOneTimeToken(EmailVerificationToken, "key"),
               dest=VDestination(default="/prefs/update?verified=true"))
-    def GET_verify_email(self, token, dest):
+    async def GET_verify_email(self, token, dest):
         fail_msg = None
         if token and token.user_id != c.user._fullname:
             fail_msg = strings.email_verify_wrong_user
@@ -1625,7 +1625,7 @@ class FormsController(RedditController):
             # successful verification!
             token.consume()
             c.user.email_verified = True
-            c.user._commit()
+            await c.user._commit()
             Award.give_if_needed("verified_email", c.user)
             return self.redirect(dest)
 
@@ -1639,7 +1639,7 @@ class FormsController(RedditController):
 
     @validate(token=VOneTimeToken(PasswordResetToken, "key"),
               key=nop("key"))
-    def GET_resetpassword(self, token, key):
+    async def GET_resetpassword(self, token, key):
         """page hit once a user has been sent a password reset email
         to verify their identity before allowing them to update their
         password."""
@@ -1651,7 +1651,7 @@ class FormsController(RedditController):
         elif not token:
             return self.redirect("/password?expired=true")
 
-        token_user = Account._by_fullname(token.user_id, data=True)
+        token_user = await Account._by_fullname(token.user_id, data=True)
 
         return BoringPage(
             _("reset password"),
@@ -1666,7 +1666,7 @@ class FormsController(RedditController):
         user_id36=nop('user'),
         provided_mac=nop('key')
     )
-    def GET_unsubscribe_emails(self, user_id36, provided_mac):
+    async def GET_unsubscribe_emails(self, user_id36, provided_mac):
         from r2.lib.utils import constant_time_compare
 
         expected_mac = generate_notification_email_unsubscribe_token(user_id36)
@@ -1677,9 +1677,9 @@ class FormsController(RedditController):
             )
             request.environ["usable_error_content"] = error_page.render()
             self.abort404()
-        user = Account._byID36(user_id36, data=True)
+        user = await Account._byID36(user_id36, data=True)
         user.pref_email_messages = False
-        user._commit()
+        await user._commit()
 
         return BoringPage(_('emails unsubscribed'),
                           content=MessageNotificationEmailsUnsubscribe()).render()
@@ -1881,12 +1881,12 @@ class FormsController(RedditController):
               email=ValidEmail("email"),
               edit=VBoolean("edit", default=False),
     )
-    def GET_gold(self, is_payment, goldtype, period, months, num_creddits,
+    async def GET_gold(self, is_payment, goldtype, period, months, num_creddits,
                  signed, recipient, giftmessage, thing, email, edit):
         VNotInTimeout().run(action_name="pageview", details_text="gold",
             target=thing)
         if thing:
-            thing_sr = Subreddit._byID(thing.sr_id, data=True)
+            thing_sr = await Subreddit._byID(thing.sr_id, data=True)
             if (thing._deleted or
                     thing._spam or
                     not thing_sr.can_view(c.user) or
@@ -1923,7 +1923,7 @@ class FormsController(RedditController):
                 start_over = True
 
             if thing:
-                recipient = Account._byID(thing.author_id, data=True)
+                recipient = await Account._byID(thing.author_id, data=True)
                 if recipient._deleted:
                     thing = None
                     recipient = None

@@ -376,9 +376,9 @@ class SubredditListingController(ListingController):
 class ListingWithPromos(SubredditListingController):
     show_organic = False
 
-    def make_requested_ad(self, requested_ad):
+    async def make_requested_ad(self, requested_ad):
         try:
-            link = Link._by_fullname(requested_ad, data=True)
+            link = await Link._by_fullname(requested_ad, data=True)
         except NotFound:
             self.abort404()
 
@@ -518,7 +518,7 @@ class HotController(ListingWithPromos):
             return c.site.get_links('hot', 'all')
 
     @classmethod
-    def trending_info(cls):
+    async def trending_info(cls):
         if not c.user.pref_show_trending:
             return None
 
@@ -527,7 +527,7 @@ class HotController(ListingWithPromos):
         if not trending_data:
             return None
 
-        link = Link._byID(trending_data['link_id'], data=True, stale=True)
+        link = await Link._byID(trending_data['link_id'], data=True, stale=True)
         return {
             'subreddit_names': trending_data['subreddit_names'],
             'comment_url': trending_data['permalink'],
@@ -922,7 +922,7 @@ class UserController(ListingController):
                                        'overview', 'submitted', 'comments',
                                        'upvoted', 'downvoted', 'hidden',
                                        'saved', 'gilded']])
-    def GET_listing(self, where, vuser, sort, time, show, **env):
+    async def GET_listing(self, where, vuser, sort, time, show, **env):
         # the validator will ensure that vuser is a valid account
         if not vuser:
             return self.abort404()
@@ -1004,7 +1004,7 @@ class UserController(ListingController):
             srname = request.GET.get('sr')
             if srname and c.user.gold:
                 try:
-                    sr = Subreddit._by_name(srname)
+                    sr = await Subreddit._by_name(srname)
                 except NotFound:
                     sr = None
             else:
@@ -1185,7 +1185,7 @@ class MessageController(ListingController):
 
         return w
 
-    def builder(self):
+    async def builder(self):
         if (self.where == 'messages' or
             (self.where in ("moderator", "multi") and self.subwhere != "unread")):
             root = c.user
@@ -1211,7 +1211,7 @@ class MessageController(ListingController):
             skip = False
             if self.message:
                 if self.message.first_message:
-                    parent = Message._byID(self.message.first_message,
+                    parent = await Message._byID(self.message.first_message,
                                            data=True)
                 else:
                     parent = self.message
@@ -1223,7 +1223,7 @@ class MessageController(ListingController):
                 # Make sure we use the subreddit message builder for modmail,
                 # because the per-user cache will be wrong if more than two
                 # parties are involved in the thread.
-                root = Subreddit._byID(parent.sr_id)
+                root = await Subreddit._byID(parent.sr_id)
                 message_cls = SrMessageBuilder
 
             enable_threaded = (
@@ -1287,7 +1287,7 @@ class MessageController(ListingController):
 
         return pane
 
-    def query(self):
+    async def query(self):
         if self.where == 'messages':
             q = queries.get_inbox_messages(c.user)
         elif self.where == 'comments':
@@ -1307,7 +1307,7 @@ class MessageController(ListingController):
         elif self.where == 'moderator' and self.subwhere == 'unread':
             if c.default_sr:
                 srids = Subreddit.reverse_moderator_ids(c.user)
-                srs = [sr for sr in Subreddit._byID(srids, data=False,
+                srs = [sr for sr in await Subreddit._byID(srids, data=False,
                                                     return_dict=False)
                        if sr.is_moderator_with_perms(c.user, 'mail')]
                 q = queries.get_unread_subreddit_messages_multi(srs)
@@ -1317,7 +1317,7 @@ class MessageController(ListingController):
             if c.have_mod_messages and self.mark != 'false':
                 c.have_mod_messages = False
                 c.user.modmsgtime = False
-                c.user._commit()
+                await c.user._commit()
             # the query is handled by the builder on the moderator page
             return
         else:

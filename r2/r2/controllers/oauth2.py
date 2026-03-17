@@ -196,7 +196,7 @@ class OAuth2FrontendController(RedditController):
               authorize = VRequired("authorize", errors.OAUTH2_ACCESS_DENIED),
               response_type = VOneOf("response_type", ("code", "token"),
                                      default="code"))
-    def POST_authorize(self, authorize, client, redirect_uri, scope, state,
+    async def POST_authorize(self, authorize, client, redirect_uri, scope, state,
                        duration, response_type):
         """Endpoint for OAuth2 authorization."""
 
@@ -213,19 +213,21 @@ class OAuth2FrontendController(RedditController):
                                         as_fragment=(response_type == "token"))
 
         if response_type == "code":
-            code = OAuth2AuthorizationCode._new(client._id, redirect_uri,
-                                            c.user._id36, scope,
-                                            duration == "permanent")
+            code = await OAuth2AuthorizationCode.create(
+                account_id=c.user._id,
+                data={'client_id': client._id, 'redirect_uri': redirect_uri,
+                      'user_id': c.user._id36, 'scope': str(scope),
+                      'permanent': duration == "permanent"},
+            )
             resp = {"code": code._id, "state": state}
             final_redirect = _update_redirect_uri(redirect_uri, resp)
             g.stats.simple_event('oauth2.POST_authorize.authorization_code_create')
         elif response_type == "token":
             device_id = get_device_id(client)
-            token = OAuth2AccessToken._new(
-                client_id=client._id,
-                user_id=c.user._id36,
-                scope=scope,
-                device_id=device_id,
+            token = await OAuth2AccessToken.create(
+                account_id=c.user._id,
+                data={'client_id': client._id, 'user_id': c.user._id36,
+                      'scope': str(scope), 'device_id': device_id},
             )
             resp = OAuth2AccessController._make_new_token_response(token)
             resp["state"] = state
@@ -258,29 +260,32 @@ class OAuth2FrontendController(RedditController):
             message += '\n\n' + strings.gold_benefits_msg
             send_system_message(c.user, subject, message, add_to_sent=False)
             c.user.has_used_mobile_app = True
-            c.user._commit()
+            await c.user._commit()
 
         return self.redirect(final_redirect, code=302)
 
 class OAuth2AccessController(MinimalController):
     handles_csrf = True
 
-    def pre(self):
+    async def pre(self):
         if g.disallow_db_writes:
             abort(403)
 
         set_extension(request.environ, "json")
-        MinimalController.pre(self)
+        await MinimalController.pre(self)
         require_https()
         if request.method != "OPTIONS":
-            c.oauth2_client = self._get_client_auth()
+            c.oauth2_client = await self._get_client_auth()
 
-    def _get_client_auth(self):
+    async def _get_client_auth(self):
         auth = request.headers.get("Authorization")
         try:
             client_id, client_secret = parse_http_basic(auth)
             require(client_id)
-            client = OAuth2Client.get_token(client_id)
+            try:
+                client = await OAuth2Client._byID(client_id)
+            except Exception:
+                client = None
             require(client)
             if client.is_confidential():
                 require(client_secret)
@@ -594,7 +599,7 @@ class OAuth2AccessController(MinimalController):
         token_id=nop("token"),
         token_hint=VOneOf("token_type_hint", ("access_token", "refresh_token")),
     )
-    def POST_revoke_token(self, token_id, token_hint):
+    async def POST_revoke_token(self, token_id, token_hint):
         '''Revoke an OAuth2 access or refresh token.
 
         token_type_hint is optional, and hints to the server
@@ -614,28 +619,30 @@ class OAuth2AccessController(MinimalController):
         if not token_id:
             return
 
+        from r2.models.token import NotFound as TokenNotFound
         types = (OAuth2AccessToken, OAuth2RefreshToken)
         if token_hint == "refresh_token":
             types = reversed(types)
 
+        token = None
         for token_type in types:
             try:
-                token = token_type._byID(token_id)
-            except tdb_cassandra.NotFound:
+                token = await token_type._byID(token_id)
+                break
+            except (TokenNotFound, Exception):
                 g.stats.simple_event(
-                    'oauth2.POST_revoke_token.cass_not_found.%s'
+                    'oauth2.POST_revoke_token.not_found.%s'
                     % token_type.__name__)
                 continue
-            else:
-                break
-        else:
+
+        if token is None:
             # No Token found. The given token ID is already gone
             # or never existed. Either way, from the client's perspective,
             # the passed in token is no longer valid.
             return
 
         if constant_time_compare(token.client_id, c.oauth2_client._id):
-            token.revoke()
+            await token._commit()
         else:
             # RFC 7009 is not clear on how to handle this case.
             # Given that a malicious client could do much worse things
