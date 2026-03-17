@@ -1,36 +1,34 @@
-## The contents of this file are subject to the Common Public Attribution
-## License Version 1.0. (the "License"); you may not use this file except in
-## compliance with the License. You may obtain a copy of the License at
-## http://code.reddit.com/LICENSE. The License is based on the Mozilla Public
-## License Version 1.1, but Sections 14 and 15 have been added to cover use of
-## software over a computer network and provide for limited attribution for the
-## Original Developer. In addition, Exhibit A has been modified to be
-## consistent with Exhibit B.
-##
-## Software distributed under the License is distributed on an "AS IS" basis,
-## WITHOUT WARRANTY OF ANY KIND, either express or implied. See the License for
-## the specific language governing rights and limitations under the License.
-##
-## The Original Code is reddit.
-##
-## The Original Developer is the Initial Developer.  The Initial Developer of
-## the Original Code is reddit Inc.
-##
-## All portions of the code written by reddit are Copyright (c) 2006-2015
-## reddit Inc. All Rights Reserved.
-###############################################################################
+{# The contents of this file are subject to the Common Public Attribution #}
+{# License Version 1.0. (the "License"); you may not use this file except in #}
+{# compliance with the License. You may obtain a copy of the License at #}
+{# http://code.reddit.com/LICENSE. The License is based on the Mozilla Public #}
+{# License Version 1.1, but Sections 14 and 15 have been added to cover use of #}
+{# software over a computer network and provide for limited attribution for the #}
+{# Original Developer. In addition, Exhibit A has been modified to be #}
+{# consistent with Exhibit B. #}
+{# #}
+{# Software distributed under the License is distributed on an "AS IS" basis, #}
+{# WITHOUT WARRANTY OF ANY KIND, either express or implied. See the License for #}
+{# the specific language governing rights and limitations under the License. #}
+{# #}
+{# The Original Code is reddit. #}
+{# #}
+{# The Original Developer is the Initial Developer.  The Initial Developer of #}
+{# the Original Code is reddit Inc. #}
+{# #}
+{# All portions of the code written by reddit are Copyright (c) 2006-2015 #}
+{# reddit Inc. All Rights Reserved. #}
+{############################################################################## #}
 
 
-<%!
-   from r2.lib import js
-   from r2.lib.template_helpers import format_number
-%>
+{# template import (inject via context): from r2.lib import js #}
+{# template import (inject via context): from r2.lib.template_helpers import format_number #}
 
-<%namespace name="pr" file="promotelinkbase.html" />
-<%namespace file="utils.html" import="plain_link" />
-<%namespace name="utils" file="utils.html"/>
+{# TODO namespace: <%namespace name="pr" file="promotelinkbase.html" /> #}
+{% from "utils.html" import plain_link %}
+{# TODO namespace: <%namespace name="utils" file="utils.html"/> #}
 
-${unsafe(js.use('sponsored'))}
+{{ js.use('sponsored') | safe }}
 
 <div class="sponsored-page">
   <div class="dashboard reporting-dashboard">
@@ -43,14 +41,14 @@ ${unsafe(js.use('sponsored'))}
     <div class="dashboard-content">
       <div class="editor">
         <div class="editor-group">
-          ${pr.scheduling_field()}
-          <%utils:line_field title="${_('grouping')}" css_class="rounded timing-field">
+          {{ pr.scheduling_field() }}
+          {{ utils.line_field(title="{{ _('grouping') }}", css_class="rounded timing-field") }}
             <select id="grouping" name="grouping">
-              <option value="total" ${"" if thing.group_by_date else "selected='selected'"}>total</option>
-              <option value="day" ${"selected='selected'" if thing.group_by_date else ""}>daily</option>
+              <option value="total" {{ "" if thing.group_by_date else "selected='selected'" }}>total</option>
+              <option value="day" {{ "selected='selected'" if thing.group_by_date else "" }}>daily</option>
             </select>
-          </%utils:line_field>
-          ${pr.reporting_field(link_text=thing.link_text, owner=thing.owner_name)}
+          {% endcall %}
+          {{ pr.reporting_field(link_text=thing.link_text, owner=thing.owner_name) }}
         </div>
         <footer class="buttons">
           <button name="submit" onclick="r.sponsored.submit_reporting_form()">submit</button>
@@ -68,14 +66,14 @@ ${unsafe(js.use('sponsored'))}
   });
 </script>
 
-%if thing.link_report:
+{% if thing.link_report %}
 <h1>links</h1>
 <table id="link-report" class="promote-report-table">
   <thead>
     <tr>
-      %if thing.group_by_date:
+      {% if thing.group_by_date %}
         <th>date</th>
-      %endif
+      {% endif %}
       <th>id</th>
       <th>owner</th>
       <th>comments</th>
@@ -86,32 +84,32 @@ ${unsafe(js.use('sponsored'))}
     </tr>
   </thead>
   <tbody>
-    %for row in thing.link_report:
+    {% for row in thing.link_report %}
     <tr>
-      %if thing.group_by_date:
-        <td class="text">${row['date']}</d>
-      %endif
-      <td class="text">${row['id36']}</td>
-      <td class="text">${row['owner']}</td>
-      <td>${format_number(row['comments'])}</td>
-      <td>${format_number(row['upvotes'])}</td>
-      <td>${format_number(row['downvotes'])}</td>
-      <td>${format_number(row['clicks'])}</td>
-      <td>${format_number(row['impressions'])}</td>
+      {% if thing.group_by_date %}
+        <td class="text">{{ row['date'] }}</d>
+      {% endif %}
+      <td class="text">{{ row['id36'] }}</td>
+      <td class="text">{{ row['owner'] }}</td>
+      <td>{{ format_number(row['comments']) }}</td>
+      <td>{{ format_number(row['upvotes']) }}</td>
+      <td>{{ format_number(row['downvotes']) }}</td>
+      <td>{{ format_number(row['clicks']) }}</td>
+      <td>{{ format_number(row['impressions']) }}</td>
     </tr>
-    %endfor
+    {% endfor %}
   </tbody>
 </table>
-%endif
+{% endif %}
 
-%if thing.campaign_report:
+{% if thing.campaign_report %}
 <h1>campaigns</h1>
 <table id="campaign-report" class="promote-report-table">
   <thead>
     <tr>
-      %if thing.group_by_date:
+      {% if thing.group_by_date %}
         <th class="blank"/>
-      %endif
+      {% endif %}
       <th class="blank"/>
       <th class="blank"/>
       <th class="blank"/>
@@ -122,9 +120,9 @@ ${unsafe(js.use('sponsored'))}
       <th colspan="2">total</th>
     </tr>
     <tr>
-      %if thing.group_by_date:
+      {% if thing.group_by_date %}
         <th>date</th>
-      %endif
+      {% endif %}
       <th>link id</th>
       <th>owner</th>
       <th>campaign id</th>
@@ -139,46 +137,46 @@ ${unsafe(js.use('sponsored'))}
     </tr>
   </thead>
   <tbody>
-    %for row in thing.campaign_report:
+    {% for row in thing.campaign_report %}
     <tr>
-      %if thing.group_by_date:
-        <td class="text">${row['date']}</td>
-      %endif
-      <td class="text">${row['link']}</td>
-      <td class="text">${row['owner']}</td>
-      <td class="text">${row['campaign']}</td>
-      <td class="text">${row['target']}</td>
-      <td>${row['bid']}</td>
-      <td>${format_number(row['fp_clicks'])}</td>
-      <td>${format_number(row['fp_impressions'])}</td>
-      <td>${format_number(row['sr_clicks'])}</td>
-      <td>${format_number(row['sr_impressions'])}</td>
-      <td>${format_number(row['total_clicks'])}</td>
-      <td>${format_number(row['total_impressions'])}</td>
+      {% if thing.group_by_date %}
+        <td class="text">{{ row['date'] }}</td>
+      {% endif %}
+      <td class="text">{{ row['link'] }}</td>
+      <td class="text">{{ row['owner'] }}</td>
+      <td class="text">{{ row['campaign'] }}</td>
+      <td class="text">{{ row['target'] }}</td>
+      <td>{{ row['bid'] }}</td>
+      <td>{{ format_number(row['fp_clicks']) }}</td>
+      <td>{{ format_number(row['fp_impressions']) }}</td>
+      <td>{{ format_number(row['sr_clicks']) }}</td>
+      <td>{{ format_number(row['sr_impressions']) }}</td>
+      <td>{{ format_number(row['total_clicks']) }}</td>
+      <td>{{ format_number(row['total_impressions']) }}</td>
     </tr>
-    %endfor
+    {% endfor %}
     <tr class="total">
-      %if thing.group_by_date:
+      {% if thing.group_by_date %}
         <td></td>
-      %endif
+      {% endif %}
       <td></td>
       <td></td>
       <td></td>
       <td></td>
-      <td>${thing.campaign_report_totals['bid']}</td>
-      <td>${format_number(thing.campaign_report_totals['fp_clicks'])}</td>
-      <td>${format_number(thing.campaign_report_totals['fp_imps'])}</td>
-      <td>${format_number(thing.campaign_report_totals['sr_clicks'])}</td>
-      <td>${format_number(thing.campaign_report_totals['sr_imps'])}</td>
-      <td>${format_number(thing.campaign_report_totals['total_clicks'])}</td>
-      <td>${format_number(thing.campaign_report_totals['total_imps'])}</td>
+      <td>{{ thing.campaign_report_totals['bid'] }}</td>
+      <td>{{ format_number(thing.campaign_report_totals['fp_clicks']) }}</td>
+      <td>{{ format_number(thing.campaign_report_totals['fp_imps']) }}</td>
+      <td>{{ format_number(thing.campaign_report_totals['sr_clicks']) }}</td>
+      <td>{{ format_number(thing.campaign_report_totals['sr_imps']) }}</td>
+      <td>{{ format_number(thing.campaign_report_totals['total_clicks']) }}</td>
+      <td>{{ format_number(thing.campaign_report_totals['total_imps']) }}</td>
     </tr>
   </tbody>
 </table>
-%endif
+{% endif %}
 
-%if thing.csv_url:
+{% if thing.csv_url %}
 <div class="promote-report-csv">
-  ${plain_link(unsafe("download as csv"), thing.csv_url)}
+  {{ plain_link(unsafe("download as csv"), thing.csv_url) }}
 </div>
-%endif
+{% endif %}

@@ -1,33 +1,30 @@
-## The contents of this file are subject to the Common Public Attribution
-## License Version 1.0. (the "License"); you may not use this file except in
-## compliance with the License. You may obtain a copy of the License at
-## http://code.reddit.com/LICENSE. The License is based on the Mozilla Public
-## License Version 1.1, but Sections 14 and 15 have been added to cover use of
-## software over a computer network and provide for limited attribution for the
-## Original Developer. In addition, Exhibit A has been modified to be
-## consistent with Exhibit B.
-##
-## Software distributed under the License is distributed on an "AS IS" basis,
-## WITHOUT WARRANTY OF ANY KIND, either express or implied. See the License for
-## the specific language governing rights and limitations under the License.
-##
-## The Original Code is reddit.
-##
-## The Original Developer is the Initial Developer.  The Initial Developer of
-## the Original Code is reddit Inc.
-##
-## All portions of the code written by reddit are Copyright (c) 2006-2015
-## reddit Inc. All Rights Reserved.
-###############################################################################
+{# The contents of this file are subject to the Common Public Attribution #}
+{# License Version 1.0. (the "License"); you may not use this file except in #}
+{# compliance with the License. You may obtain a copy of the License at #}
+{# http://code.reddit.com/LICENSE. The License is based on the Mozilla Public #}
+{# License Version 1.1, but Sections 14 and 15 have been added to cover use of #}
+{# software over a computer network and provide for limited attribution for the #}
+{# Original Developer. In addition, Exhibit A has been modified to be #}
+{# consistent with Exhibit B. #}
+{# #}
+{# Software distributed under the License is distributed on an "AS IS" basis, #}
+{# WITHOUT WARRANTY OF ANY KIND, either express or implied. See the License for #}
+{# the specific language governing rights and limitations under the License. #}
+{# #}
+{# The Original Code is reddit. #}
+{# #}
+{# The Original Developer is the Initial Developer.  The Initial Developer of #}
+{# the Original Code is reddit Inc. #}
+{# #}
+{# All portions of the code written by reddit are Copyright (c) 2006-2015 #}
+{# reddit Inc. All Rights Reserved. #}
+{############################################################################## #}
 
-<%!
-  from r2.lib.filters import keep_space
-  from r2.lib.template_helpers import add_sr, static
-  import os
-
-%>
-<%namespace file="utils.html" import="error_field, image_upload"/>
-<%namespace file="subredditstylesheetbase.html" import="make_li"/>
+{# template import (inject via context): from r2.lib.filters import keep_space #}
+{# template import (inject via context): from r2.lib.template_helpers import add_sr, static #}
+{# template import (inject via context): import os #}
+{% from "utils.html" import error_field, image_upload %}
+{% from "subredditstylesheetbase.html" import make_li %}
 
 <div class="stylesheet-customize-container">
   <form
@@ -36,10 +33,10 @@
      class="pretty-form sr-form"
      action="/post/subreddit_stylesheet" method="post" >
     
-  <input type="hidden" name="r"  value="${thing.site.name}" />
+  <input type="hidden" name="r"  value="{{ thing.site.name }}" />
   <input type="hidden" name="op"  value="" />
 
-  <h2>${_("stylesheet")}</h2>
+  <h2>{{ _("stylesheet") }}</h2>
   <div class="sheets">
     <div class="col">
       <div>
@@ -49,14 +46,14 @@
            id="stylesheet_contents"
            name="stylesheet_contents"
            >
-          ${keep_space(thing.stylesheet_contents) or ''}
+          {{ keep_space(thing.stylesheet_contents) or '' }}
         </textarea>
         <div>
-            <label for="reason">${_('reason for revision')}</label>
+            <label for="reason">{{ _('reason for revision') }}</label>
             <input type="text" name="reason" maxlength="256">
-            % if thing.site.prev_stylesheet:
-                <span class="btn right"><a target="_blank" href="${add_sr("/wiki/revisions/config/stylesheet/")}">${_("see previous versions")}</a></span>
-            % endif
+            {% if thing.site.prev_stylesheet %}
+                <span class="btn right"><a target="_blank" href="{{ add_sr("/wiki/revisions/config/stylesheet/") }}">{{ _("see previous versions") }}</a></span>
+            {% endif %}
         </div>
       </div>
     </div>
@@ -64,17 +61,17 @@
     <div class="buttons">
       <button class="btn" name="save" type="submit" 
              onclick="this.form.op.value='save'; return true;">
-        ${_('save')}
+        {{ _('save') }}
       </button>
       <button class="btn" name="preview" type="submit" 
              onclick="this.form.op.value='preview'; return true;">
-        ${_('preview')}
+        {{ _('preview') }}
       </button>
       <span class="status error"></span>
     </div>
   </div>
   <div class="errors" style="display:none">
-    <h2>${_("errors")}</h2>
+    <h2>{{ _("errors") }}</h2>
     <ul><li></li>
       <!-- populated from AJAX requests to /api/subreddit_stylesheet -->
     </ul>
@@ -83,54 +80,54 @@
   </form>
 
   <div id="preview-table" style="display:none">
-    <h2><a name="preview">${_("preview")}</a></h2>
+    <h2><a name="preview">{{ _("preview") }}</a></h2>
     <table>
       <tr>
-        <th>${_("normal link")}</th>
+        <th>{{ _("normal link") }}</th>
         <td id="preview_link_normal"></td>
       </tr>
       <tr>
-        <th>${_("compressed link")}</th>
+        <th>{{ _("compressed link") }}</th>
         <td id="preview_link_compressed"></td>
       </tr>
       <tr>
-        <th>${_("link with thumbnail")}</th>
+        <th>{{ _("link with thumbnail") }}</th>
         <td id="preview_link_media"></td>
       </tr>
       <tr>
-        <th>${_("stickied link")}</th>
+        <th>{{ _("stickied link") }}</th>
         <td id="preview_link_stickied"></td>
       </tr>
       <tr>
-        <th>${_("comment")}</th>
+        <th>{{ _("comment") }}</th>
         <td id="preview_comment"></td>
       </tr>
       <tr>
-        <th>${_("gilded comment")}</th>
+        <th>{{ _("gilded comment") }}</th>
         <td id="preview_comment_gilded"></td>
       </tr>
     </table>
   </div>
 
-  %if thing.allow_image_upload:
+  {% if thing.allow_image_upload %}
     <div id="images">
-      <h2><a name="images">${_("images")}</a></h2>
+      <h2><a name="images">{{ _("images") }}</a></h2>
 
-    <%call expr="image_upload('/api/upload_sr_img', '', 
+    {% call image_upload('/api/upload_sr_img', '', 
                                 onchange='return file_changed(this)',
-                                label = _('image file'), ask_type=True)">
+                                label = _('image file'), ask_type=True) %}
       
       <br/>
-      <label for="img-name">${_("new image name:")}</label>
+      <label for="img-name">{{ _("new image name:") }}</label>
       <input id="img-name" name="name" value="" type="text"/>
-      ${error_field("BAD_CSS_NAME", "name")}
+      {{ error_field("BAD_CSS_NAME", "name") }}
       <br/>
       <span class="little gray">
-        ${_("(image names should consist of alphanumeric characters and '-' only)")}
+        {{ _("(image names should consist of alphanumeric characters and '-' only)") }}
       </span>
-    </%call>
+    {% endcall %}
   <p class="error">
-    ${_("Note: any changes to images here will be reflected immediately on reload and cannot be undone.")}
+    {{ _("Note: any changes to images here will be reflected immediately on reload and cannot be undone.") }}
   </p>
       <script type="text/javascript">
         /* <![CDATA[ */
@@ -188,16 +185,16 @@
       /* ]]> */
       </script>
       <ul id="image-preview-list" class="image-list">
-        ${make_li(prototype=True)}
-        %for name, url in thing.images.iteritems():
-           ${make_li(name=name, img=url)}
-        %endfor
+        {{ make_li(prototype=True) }}
+        {% for name, url in thing.images.items() %}
+           {{ make_li(name=name, img=url) }}
+        {% endfor %}
       </ul>
 
       <iframe src="about:blank" width="600" height="200" style="display: none;"
               name="upload-iframe" id="upload-iframe"></iframe>
       
     </div>
-  %endif
+  {% endif %}
 </div>
 

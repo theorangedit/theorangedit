@@ -25,7 +25,6 @@ from collections import defaultdict
 
 from utils import to36, tup, iters
 from wrapped import Wrapped, StringTemplate, CacheStub, Templated
-from mako.template import Template
 from r2.config import feature
 from r2.config.extensions import get_api_subtype
 from r2.lib import hooks
@@ -79,7 +78,7 @@ class ObjectTemplate(StringTemplate):
         return self.update(kw).d
 
 
-class JsonTemplate(Template):
+class JsonTemplate:
     def __init__(self): pass
 
     def render(self, thing = None, *a, **kw):

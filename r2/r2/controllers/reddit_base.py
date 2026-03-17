@@ -38,7 +38,6 @@ import urllib.parse as urlparse
 import babel.core
 import pylibmc
 
-from mako.filters import url_escape
 from r2.lib.context import request, response
 from r2.lib.context import c
 from r2.lib.app_globals import g

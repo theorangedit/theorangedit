@@ -20,61 +20,127 @@
 # Inc. All Rights Reserved.
 ###############################################################################
 
-
-import hashlib
 import inspect
 
-from mako.exceptions import TemplateLookupException
-from mako.template import Template as mTemplate
 from r2.lib.app_globals import g
 
 
-NULL_TEMPLATE = mTemplate("")
-NULL_TEMPLATE.is_null = True
+class _NullTemplate:
+    """Stub returned when no template is found; renders empty string."""
+    is_null = True
+
+    def render(self, **kw):
+        return ''
+
+
+NULL_TEMPLATE = _NullTemplate()
+
+
+class _Jinja2TemplateWrapper:
+    """
+    Thin wrapper around a Jinja2 Template that exposes the same
+    ``template.render(thing=obj, **kw)`` interface the rest of the
+    codebase expects.
+
+    The Jinja2 template is rendered with the request context variables
+    (g, c, request) injected automatically so templates can reference
+    them without explicit imports.
+    """
+    is_null = False
+
+    def __init__(self, jinja_template, filename=None):
+        self._tmpl = jinja_template
+        self.filename = filename
+
+    def render(self, thing=None, **kw):
+        from r2.lib.context import c, request
+        from r2.lib.i18n import _, ungettext, N_, get_lang
+        from r2.lib.template_helpers import (
+            static, add_sr, get_domain,
+        )
+        from r2.lib.filters import unsafe, safemarkdown, websafe
+
+        ctx = dict(
+            thing=thing,
+            g=g,
+            c=c,
+            request=request,
+            # i18n
+            _=_,
+            ungettext=ungettext,
+            N_=N_,
+            get_lang=get_lang,
+            # common helpers
+            static=static,
+            add_sr=add_sr,
+            get_domain=get_domain,
+            unsafe=unsafe,
+            safemarkdown=safemarkdown,
+            websafe=websafe,
+            # builtins
+            getattr=getattr,
+            hasattr=hasattr,
+            isinstance=isinstance,
+            len=len,
+            str=str,
+            int=int,
+            list=list,
+            dict=dict,
+            enumerate=enumerate,
+            sorted=sorted,
+            zip=zip,
+            range=range,
+        )
+        ctx.update(kw)
+        return self._tmpl.render(**ctx)
+
 
 class tp_manager:
-    def __init__(self, template_cls=mTemplate):
+    def __init__(self):
         self.templates = {}
-        self.Template = template_cls
         self.cache_override_styles = set()
 
     def add_handler(self, name, style, handler):
+        """Register a JSON template handler for a given class name + style."""
         key = (name.lower(), style.lower())
         self.templates[key] = handler
-
-        # a template has been manually specified for this style so record that
-        # we should override g.reload_templates when retrieving templates
         self.cache_override_styles.add(style.lower())
 
-    def cache_template(self, cls, style, template):
-        use_cache = not g.reload_templates
-        if use_cache:
-            if (not hasattr(template, "hash") and
-                    getattr(template, "filename", None)):
-                with open(template.filename, 'r') as handle:
-                    template.hash = hashlib.sha1(handle.read()).hexdigest()
-            key = (cls.__name__.lower(), style)
-            self.templates[key] = template
+    def _get_jinja_template(self, cls, style):
+        """
+        Look up a Jinja2 template file for ``cls`` at style ``style``.
+
+        Template files are named ``<classname>.<style>`` (e.g. ``link.html``).
+        Walks the MRO to find the closest match.
+        """
+        jinja_env = getattr(g, 'jinja_env', None)
+        if jinja_env is None:
+            return None
+
+        classes = [cls] + list(inspect.getmro(cls)[1:])
+        for klass in classes:
+            filename = '/%s.%s' % (klass.__name__.lower(), style)
+            try:
+                tmpl = jinja_env.get_template(filename)
+                return _Jinja2TemplateWrapper(tmpl, filename=filename)
+            except Exception:
+                continue
+        return None
 
     def get_template(self, cls, style):
         name = cls.__name__.lower()
-        use_cache = not g.reload_templates
+        use_cache = not getattr(g, 'reload_templates', False)
 
         if use_cache or style.lower() in self.cache_override_styles:
             key = (name, style)
-            template = self.templates.get(key)
-            if template:
-                return template
+            tmpl = self.templates.get(key)
+            if tmpl:
+                return tmpl
 
-        filename = "/%s.%s" % (name, style)
-        try:
-            template = g.mako_lookup.get_template(filename)
-        except TemplateLookupException:
-            return
-
-        self.cache_template(cls, style, template)
-
-        return template
+        tmpl = self._get_jinja_template(cls, style)
+        if tmpl and use_cache:
+            self.templates[(name, style)] = tmpl
+        return tmpl
 
     def get(self, thing, style):
         if not isinstance(thing, type(object)):
@@ -85,18 +151,16 @@ class tp_manager:
         if template:
             return template
 
-        # walk back through base classes to find a template
+        # Walk MRO for a matching template
         for cls in inspect.getmro(thing)[1:]:
             template = self.get_template(cls, style)
             if template:
                 break
         else:
-            # didn't find a template, use the null template
             template = NULL_TEMPLATE
 
-        # cache template for thing so we don't need to introspect on subsequent
-        # calls
-        self.cache_template(thing, style, template)
+        # Cache so we skip the MRO walk next time
+        if not getattr(g, 'reload_templates', False):
+            self.templates[(thing.__name__.lower(), style)] = template
 
         return template
-

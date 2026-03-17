@@ -50,7 +50,7 @@ from r2.lib.utils import reddit_agent_parser
 
 from babel.dates import TIMEDELTA_UNITS
 from BeautifulSoup import BeautifulSoup, SoupStrainer
-from mako.filters import url_escape
+from urllib.parse import quote as url_escape
 from r2.lib.context import request, config
 from r2.lib.context import c
 from r2.lib.app_globals import g

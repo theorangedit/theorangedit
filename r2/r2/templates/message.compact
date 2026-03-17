@@ -1,62 +1,60 @@
-## The contents of this file are subject to the Common Public Attribution
-## License Version 1.0. (the "License"); you may not use this file except in
-## compliance with the License. You may obtain a copy of the License at
-## http://code.reddit.com/LICENSE. The License is based on the Mozilla Public
-## License Version 1.1, but Sections 14 and 15 have been added to cover use of
-## software over a computer network and provide for limited attribution for the
-## Original Developer. In addition, Exhibit A has been modified to be
-## consistent with Exhibit B.
-##
-## Software distributed under the License is distributed on an "AS IS" basis,
-## WITHOUT WARRANTY OF ANY KIND, either express or implied. See the License for
-## the specific language governing rights and limitations under the License.
-##
-## The Original Code is reddit.
-##
-## The Original Developer is the Initial Developer.  The Initial Developer of
-## the Original Code is reddit Inc.
-##
-## All portions of the code written by reddit are Copyright (c) 2006-2015
-## reddit Inc. All Rights Reserved.
-###############################################################################
+{# The contents of this file are subject to the Common Public Attribution #}
+{# License Version 1.0. (the "License"); you may not use this file except in #}
+{# compliance with the License. You may obtain a copy of the License at #}
+{# http://code.reddit.com/LICENSE. The License is based on the Mozilla Public #}
+{# License Version 1.1, but Sections 14 and 15 have been added to cover use of #}
+{# software over a computer network and provide for limited attribution for the #}
+{# Original Developer. In addition, Exhibit A has been modified to be #}
+{# consistent with Exhibit B. #}
+{# #}
+{# Software distributed under the License is distributed on an "AS IS" basis, #}
+{# WITHOUT WARRANTY OF ANY KIND, either express or implied. See the License for #}
+{# the specific language governing rights and limitations under the License. #}
+{# #}
+{# The Original Code is reddit. #}
+{# #}
+{# The Original Developer is the Initial Developer.  The Initial Developer of #}
+{# the Original Code is reddit Inc. #}
+{# #}
+{# All portions of the code written by reddit are Copyright (c) 2006-2015 #}
+{# reddit Inc. All Rights Reserved. #}
+{############################################################################## #}
 
-<%!
-    from r2.lib.pages import WrappedUser
-    from r2.lib.filters import safemarkdown, websafe, conditional_websafe
-    from r2.models import Account
-    from r2.lib.template_helpers import format_html
-%>
-<%namespace file="printable.html" import="arrow, score"/>
-<%namespace file="utils.html" import="plain_link" />
-<%namespace file="utils.compact" import="icon_button" />
-<%namespace file="printablebuttons.html" import="simple_button"/>
+{# template import (inject via context): from r2.lib.pages import WrappedUser #}
+{# template import (inject via context): from r2.lib.filters import safemarkdown, websafe, conditional_websafe #}
+{# template import (inject via context): from r2.models import Account #}
+{# template import (inject via context): from r2.lib.template_helpers import format_html #}
+{% from "printable.html" import arrow, score %}
+{% from "utils.html" import plain_link %}
+{% from "utils.compact" import icon_button %}
+{% from "printablebuttons.html" import simple_button %}
 
-<div class="thing message id-${thing._fullname} ${'unread' if thing.new else ''}">
+<div class="thing message id-{{ thing._fullname }} {{ 'unread' if thing.new else '' }}">
   <p class="subject">
-    %if getattr(thing, "is_parent", False):
-       %if thing.sr_id:
+    {% if getattr(thing, "is_parent", False) %}
+       {% if thing.sr_id %}
          <span class="correspondent reddit rounded">
-           <a href="${thing.subreddit.path}message/moderator/inbox.compact">
-             /r/${thing.subreddit.name}
+           <a href="{{ thing.subreddit.path }}message/moderator/inbox.compact">
+             /r/{{ thing.subreddit.name }}
            </a>
          </span>
-       %else:
+       {% else %}
          <span class="correspondent rounded">
-           <%
+           {# TODO multi-line code block:
               corr = thing.author if thing.user_is_recipient else thing.to
-            %>
-           ${WrappedUser(corr)}
+           #}
+           {{ WrappedUser(corr) }}
          </span>
-       %endif
-    %endif
-    ${thing.subject}
-  %if thing.was_comment:
-   <a href="${thing.link_permalink}.compact" class="title">${thing.link_title}</a>
-  %endif
+       {% endif %}
+    {% endif %}
+    {{ thing.subject }}
+  {% if thing.was_comment %}
+   <a href="{{ thing.link_permalink }}.compact" class="title">{{ thing.link_title }}</a>
+  {% endif %}
  </p>
 
   <div class="entry">
-  <%
+  {# TODO multi-line code block:
     substitutions = {}
 
     if thing.sr_id:
@@ -73,32 +71,32 @@
 
     taglinetext = conditional_websafe(thing.taglinetext).replace(' ', '&nbsp;')
     taglinetext = format_html(taglinetext, **substitutions)
-  %>
+  #}
 
     <div class="tagline">
-      ${taglinetext}
+      {{ taglinetext }}
     </div>
     <a href="javascript:void(0)" class="options_link"></a>
-    ${unsafe(safemarkdown(thing.body))}
+    {{ safemarkdown(thing.body) | safe }}
     <div class="clear options_expando hidden">
-        <%
+        {# TODO multi-line code block:
             is_author = (c.user_is_loggedin and thing.author and c.user._fullname == thing.author._fullname)
-        %>
-        %if c.user_is_loggedin:
-            ${icon_button("Reply", "reply-icon", outer_class="reply-button", onclick="return reply(this)")}
-        %endif
-        ${icon_button("Permalink", "permalink-icon", thing.permalink + ".compact")}
-        %if thing.was_comment:
-            ${icon_button("Context", "context-icon", thing.permalink + ".compact?context=3")}
-        %endif
-        ${icon_button("Unread", "unread-icon", onclick="change_state(this, 'unread_message', unread_thing, true)" )}
+        #}
+        {% if c.user_is_loggedin %}
+            {{ icon_button("Reply", "reply-icon", outer_class="reply-button", onclick="return reply(this)") }}
+        {% endif %}
+        {{ icon_button("Permalink", "permalink-icon", thing.permalink + ".compact") }}
+        {% if thing.was_comment %}
+            {{ icon_button("Context", "context-icon", thing.permalink + ".compact?context=3") }}
+        {% endif %}
+        {{ icon_button("Unread", "unread-icon", onclick="change_state(this, 'unread_message', unread_thing, true)" ) }}
        </div>
   </div>
   <div style="clear: both;"></div>
   <div class="child">
-    %if thing.childlisting:
-      ${thing.childlisting}
-    %endif
+    {% if thing.childlisting %}
+      {{ thing.childlisting }}
+    {% endif %}
   </div>
 </div>
 
