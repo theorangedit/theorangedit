@@ -485,7 +485,10 @@ def _set_media(link, force=False, **kwargs):
         hooks.get_hook("scraper.set_media").call(link=link)
 
         if media.media_object or media.secure_media_object:
-            amqp.add_item("new_media_embed", link._fullname)
+            import asyncio
+            asyncio.get_event_loop().create_task(
+                amqp.add_item("new_media_embed", link._fullname.encode())
+            )
 
 
 def force_thumbnail(link, image_data, file_type=".jpg"):
@@ -1011,10 +1014,9 @@ def _fetch_embedly_services():
     ]
 
 
-def run():
-    @g.stats.amqp_processor('scraper_q')
-    def process_link(msg):
-        fname = msg.body
+async def run():
+    async def process_link(msg):
+        fname = msg.body.decode() if isinstance(msg.body, bytes) else msg.body
         link = Link._by_fullname(fname, data=True)
 
         try:
@@ -1027,4 +1029,4 @@ def run():
             print("Error fetching %s" % fname)
             print(traceback.format_exc())
 
-    amqp.consume_items('scraper_q', process_link)
+    await amqp.consume_items('scraper_q', process_link)

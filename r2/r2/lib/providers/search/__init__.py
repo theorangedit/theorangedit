@@ -40,5 +40,5 @@ class SearchProvider(object):
     def sorts(self):
         raise NotImplementedError
 
-    def run_changed(self):
+    async def run_changed(self):
         raise NotImplementedError

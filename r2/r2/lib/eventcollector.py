@@ -1156,7 +1156,7 @@ def _get_reason(response):
             getattr(response.raw, "reason", "{unknown}"))
 
 
-def process_events(g, timeout=5.0, **kw):
+async def process_events(g, timeout=5.0, **kw):
     publisher = EventPublisher(
         g.events_collector_url,
         g.secrets["events_collector_key"],
@@ -1174,17 +1174,16 @@ def process_events(g, timeout=5.0, **kw):
         timeout=timeout,
     )
 
-    @g.stats.amqp_processor("event_collector")
-    def processor(msgs, chan):
+    async def processor(msgs, chan):
         events = []
         test_events = []
 
         for msg in msgs:
-            headers = msg.properties.get("application_headers", {})
+            headers = getattr(msg, 'headers', {}) or {}
             truncatable_field = headers.get("truncatable_field")
 
             event = PublishableEvent(msg.body, truncatable_field)
-            if msg.delivery_info["routing_key"] == "event_collector_test":
+            if msg.routing_key == "event_collector_test":
                 test_events.append(event)
             else:
                 events.append(event)
@@ -1208,8 +1207,8 @@ def process_events(g, timeout=5.0, **kw):
                 # queue to get them out of here, since they'll always fail
                 if response.status_code == 413:
                     for event in sent:
-                        amqp.add_item("event_collector_failed", event)
+                        await amqp.add_item("event_collector_failed", event)
                 else:
                     response.raise_for_status()
 
-    amqp.handle_items("event_collector", processor, **kw)
+    await amqp.handle_items("event_collector", processor, **kw)

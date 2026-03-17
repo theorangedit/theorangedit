@@ -353,15 +353,15 @@ def _run_changed(msgs, chan):
             msgs[-1].delivery_info.get('message_count', 'unknown')))
 
 
-def run_changed(drain=False, min_size=500, limit=1000, sleep_time=10,
+async def run_changed(drain=False, min_size=500, limit=1000, sleep_time=10,
                 use_safe_get=False, verbose=False):
     '''Run by `cron` (through `paster run`) on a schedule to send Things to
         Amazon CloudSearch
-    
+
     '''
     if use_safe_get:
         CloudSearchUploader.use_safe_get = True
-    amqp.handle_items('cloudsearch_changes', _run_changed, min_size=min_size,
+    await amqp.handle_items('cloudsearch_changes', _run_changed, min_size=min_size,
                       limit=limit, drain=drain, sleep_time=sleep_time,
                       verbose=verbose)
 
@@ -817,12 +817,12 @@ class CloudSearchProvider(SearchProvider):
 
     SubredditSearchQuery = CloudSearchSubredditSearchQuery
 
-    def run_changed(self, drain=False, min_size=int(getattr(g, 'SOLR_MIN_BATCH', 500)), limit=1000, sleep_time=10, 
+    async def run_changed(self, drain=False, min_size=int(getattr(g, 'SOLR_MIN_BATCH', 500)), limit=1000, sleep_time=10,
             use_safe_get=False, verbose=False):
         '''Run by `cron` (through `paster run`) on a schedule to send Things to Cloud
         '''
         if use_safe_get:
             CloudSearchUploader.use_safe_get = True
-        amqp.handle_items('cloudsearch_changes', _run_changed, min_size=min_size,
+        await amqp.handle_items('cloudsearch_changes', _run_changed, min_size=min_size,
                           limit=limit, drain=drain, sleep_time=sleep_time,
                           verbose=verbose)

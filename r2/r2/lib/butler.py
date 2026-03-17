@@ -120,13 +120,10 @@ def monitor_mentions(comment):
         notify_mention(account, comment)
 
 
-def run():
-    @g.stats.amqp_processor("butler_q")
-    def process_message(msg):
-        fname = msg.body
+async def run():
+    async def process_message(msg):
+        fname = msg.body.decode() if isinstance(msg.body, bytes) else msg.body
         item = Thing._by_fullname(fname, data=True)
         monitor_mentions(item)
 
-    amqp.consume_items("butler_q",
-                       process_message,
-                       verbose=True)
+    await amqp.consume_items("butler_q", process_message, verbose=True)

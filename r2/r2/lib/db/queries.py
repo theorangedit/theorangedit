@@ -20,6 +20,7 @@
 # Inc. All Rights Reserved.
 ###############################################################################
 
+import asyncio
 import collections
 from copy import deepcopy, copy
 import pickle as pickle
@@ -1727,14 +1728,13 @@ def add_all_users():
 
 # amqp queue processing functions
 
-def run_new_comments(limit=1000):
+async def run_new_comments(limit=1000):
     """Add new incoming comments to the /comments page"""
     # this is done as a queue because otherwise the contention for the
     # lock on the query would be very high
 
-    @g.stats.amqp_processor('newcomments_q')
-    def _run_new_comments(msgs, chan):
-        fnames = [msg.body for msg in msgs]
+    async def _run_new_comments(msgs, chan):
+        fnames = [msg.body.decode() if isinstance(msg.body, bytes) else msg.body for msg in msgs]
 
         comments = Comment._by_fullname(fnames, data=True, return_dict=False)
         add_queries([get_all_comments()],
@@ -1745,24 +1745,23 @@ def run_new_comments(limit=1000):
             add_queries([_get_sr_comments(srid)],
                         insert_items=sr_comments)
 
-    amqp.handle_items('newcomments_q', _run_new_comments, limit=limit)
+    await amqp.handle_items('newcomments_q', _run_new_comments, limit=limit)
 
-def run_commentstree(qname="commentstree_q", limit=400):
+async def run_commentstree(qname="commentstree_q", limit=400):
     """Add new incoming comments to their respective comments trees"""
 
-    @g.stats.amqp_processor(qname)
-    def _run_commentstree(msgs, chan):
-        comments = Comment._by_fullname([msg.body for msg in msgs],
-                                        data = True, return_dict = False)
+    async def _run_commentstree(msgs, chan):
+        fnames = [msg.body.decode() if isinstance(msg.body, bytes) else msg.body for msg in msgs]
+        comments = Comment._by_fullname(fnames, data=True, return_dict=False)
         print('Processing %r' % (comments,))
 
         if comments:
             add_comments(comments)
 
-    # High velocity threads put additional pressure on Cassandra.
+    # High velocity threads see larger batches
     if qname == "commentstree_fastlane_q":
         limit = max(1000, limit)
-    amqp.handle_items(qname, _run_commentstree, limit=limit)
+    await amqp.handle_items(qname, _run_commentstree, limit=limit)
 
 
 def _by_type(items):
@@ -1852,34 +1851,34 @@ def get_likes(user, requested_items):
     return res
 
 
-def consume_mark_all_read():
-    @g.stats.amqp_processor('markread_q')
-    def process_mark_all_read(msg):
-        user = Account._by_fullname(msg.body)
+async def consume_mark_all_read():
+    async def process_mark_all_read(msg):
+        fname = msg.body.decode() if isinstance(msg.body, bytes) else msg.body
+        user = Account._by_fullname(fname)
         inbox_fullnames = get_unread_inbox(user)
         for inbox_chunk in in_chunks(inbox_fullnames, size=100):
             things = Thing._by_fullname(inbox_chunk, return_dict=False)
             unread_handler(things, user, unread=False)
 
-    amqp.consume_items('markread_q', process_mark_all_read)
+    await amqp.consume_items('markread_q', process_mark_all_read)
 
 
-def consume_deleted_accounts():
-    @g.stats.amqp_processor('del_account_q')
-    def process_deleted_accounts(msg):
-        account = Thing._by_fullname(msg.body)
+async def consume_deleted_accounts():
+    async def process_deleted_accounts(msg):
+        fname = msg.body.decode() if isinstance(msg.body, bytes) else msg.body
+        account = Thing._by_fullname(fname)
         assert isinstance(account, Account)
 
         if account.has_stripe_subscription:
             from r2.controllers.ipn import cancel_stripe_subscription
             cancel_stripe_subscription(account.gold_subscr_id)
 
-        # Mark their link submissions for updating on cloudsearch
+        # Mark their link submissions for updating on search
         query = LinksByAccount._cf.xget(account._id36)
         for link_id36, unused in query:
             fullname = Link._fullname_from_id36(link_id36)
-            msg = pickle.dumps({"fullname": fullname})
-            amqp.add_item("search_changes", msg, message_id=fullname,
+            payload = pickle.dumps({"fullname": fullname})
+            await amqp.add_item("search_changes", payload, message_id=fullname,
                 delivery_mode=amqp.DELIVERY_TRANSIENT)
 
-    amqp.consume_items('del_account_q', process_deleted_accounts)
+    await amqp.consume_items('del_account_q', process_deleted_accounts)

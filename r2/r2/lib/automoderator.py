@@ -1499,13 +1499,12 @@ class Rule(object):
         return message[:10000]
 
 
-def run():
-    @g.stats.amqp_processor("automoderator_q")
-    def process_message(msg):
+async def run():
+    async def process_message(msg):
         if not ACCOUNT:
             return
 
-        fullname = msg.body
+        fullname = msg.body.decode() if isinstance(msg.body, bytes) else msg.body
         with g.make_lock("automoderator", "automod_" + fullname, timeout=5):
             item = Thing._by_fullname(fullname, data=True)
             if not isinstance(item, (Link, Comment)):
@@ -1560,4 +1559,4 @@ def run():
                 print("Error on %s from /%s/%s" % (item, g.brander_community_abbr, subreddit.name))
                 print(traceback.format_exc())
 
-    amqp.consume_items('automoderator_q', process_message, verbose=False)
+    await amqp.consume_items('automoderator_q', process_message, verbose=False)

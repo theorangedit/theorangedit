@@ -20,6 +20,7 @@
 # Inc. All Rights Reserved.
 ###############################################################################
 
+import asyncio
 from collections import defaultdict
 from datetime import datetime
 import json
@@ -100,7 +101,7 @@ def cast_vote(user, thing, direction, **data):
     elif isinstance(thing, Comment):
         queue = "vote_comment_q"
 
-    amqp.add_item(queue, vote_dump)
+    asyncio.get_event_loop().create_task(amqp.add_item(queue, vote_dump.encode()))
 
 
 def update_user_liked(vote):
@@ -122,17 +123,16 @@ def update_user_liked(vote):
             m.insert(get_disliked(vote.user), [vote])
 
 
-def consume_link_vote_queue(qname="vote_link_q"):
-    @g.stats.amqp_processor(qname)
-    def process_message(msg):
+async def consume_link_vote_queue(qname="vote_link_q"):
+    async def process_message(msg):
         vote_data = json.loads(msg.body)
         hook = hooks.get_hook('vote.validate_vote_data')
         if hook.call_until_return(msg=msg, vote_data=vote_data) is False:
             # Corrupt records in the queue. Ignore them.
-            print("Ignoring invalid vote by %s on %s %s" % ()
+            print("Ignoring invalid vote by %s on %s %s" % (
                     vote_data.get('user_id', '<unknown>'),
                     vote_data.get('thing_fullname', '<unknown>'),
-                    vote_data)
+                    vote_data))
             return
 
         timer = g.stats.get_timer("link_vote_processor")
@@ -158,7 +158,7 @@ def consume_link_vote_queue(qname="vote_link_q"):
                 )
             except TypeError as e:
                 # a vote on an invalid type got in the queue, just skip it
-                g.log.exception("Invalid type: %r", e.message)
+                g.log.exception("Invalid type: %r", e)
                 return
 
             vote.commit()
@@ -170,14 +170,14 @@ def consume_link_vote_queue(qname="vote_link_q"):
         vote_valid = vote.is_automatic_initial_vote or vote.effects.affects_score
         link_valid = not (link._spam or link._deleted)
         if vote_valid and link_valid:
-            add_to_author_query_q(link)
-            add_to_subreddit_query_q(link)
-            add_to_domain_query_q(link)
+            await add_to_author_query_q(link)
+            await add_to_subreddit_query_q(link)
+            await add_to_domain_query_q(link)
 
         timer.stop()
         timer.flush()
 
-    amqp.consume_items(qname, process_message, verbose=False)
+    await amqp.consume_items(qname, process_message, verbose=False)
 
 
 # these sorts can be changed by voting - we don't need to do "new" since that's
@@ -185,31 +185,21 @@ def consume_link_vote_queue(qname="vote_link_q"):
 SORTS = ["hot", "top", "controversial"]
 
 
-def add_to_author_query_q(link):
+async def add_to_author_query_q(link):
     if g.shard_author_query_queues:
         author_shard = link.author_id % 10
         queue_name = "author_query_%s_q" % author_shard
     else:
         queue_name = "author_query_q"
-    amqp.add_item(queue_name, link._fullname)
+    await amqp.add_item(queue_name, link._fullname.encode())
 
 
-def consume_author_query_queue(qname="author_query_q", limit=1000):
-    @g.stats.amqp_processor(qname)
-    def process_message(msgs, chan):
-        """Update get_submitted(), the Links by author precomputed query.
-
-        get_submitted() is a CachedResult which is stored in permacache. To
-        update these objects we need to do a read-modify-write which requires
-        obtaining a lock. Sharding these updates by author allows us to run
-        multiple consumers (but ideally just one per shard) to avoid lock
-        contention.
-
-        """
-
+async def consume_author_query_queue(qname="author_query_q", limit=1000):
+    async def process_message(msgs, chan):
+        """Update get_submitted(), the Links by author precomputed query."""
         from r2.lib.db.queries import add_queries, get_submitted
 
-        link_names = {msg.body for msg in msgs}
+        link_names = {msg.body.decode() if isinstance(msg.body, bytes) else msg.body for msg in msgs}
         links = Link._by_fullname(link_names, return_dict=False)
         print('Processing %r' % (links,))
 
@@ -228,34 +218,24 @@ def consume_author_query_queue(qname="author_query_q", limit=1000):
                     insert_items=links,
                 )
 
-    amqp.handle_items(qname, process_message, limit=limit)
+    await amqp.handle_items(qname, process_message, limit=limit)
 
 
-def add_to_subreddit_query_q(link):
+async def add_to_subreddit_query_q(link):
     if g.shard_subreddit_query_queues:
         subreddit_shard = link.sr_id % 10
         queue_name = "subreddit_query_%s_q" % subreddit_shard
     else:
         queue_name = "subreddit_query_q"
-    amqp.add_item(queue_name, link._fullname)
+    await amqp.add_item(queue_name, link._fullname.encode())
 
 
-def consume_subreddit_query_queue(qname="subreddit_query_q", limit=1000):
-    @g.stats.amqp_processor(qname)
-    def process_message(msgs, chan):
-        """Update get_links(), the Links by Subreddit precomputed query.
-
-        get_links() is a CachedResult which is stored in permacache. To
-        update these objects we need to do a read-modify-write which requires
-        obtaining a lock. Sharding these updates by subreddit allows us to run
-        multiple consumers (but ideally just one per shard) to avoid lock
-        contention.
-
-        """
-
+async def consume_subreddit_query_queue(qname="subreddit_query_q", limit=1000):
+    async def process_message(msgs, chan):
+        """Update get_links(), the Links by Subreddit precomputed query."""
         from r2.lib.db.queries import add_queries, get_links
 
-        link_names = {msg.body for msg in msgs}
+        link_names = {msg.body.decode() if isinstance(msg.body, bytes) else msg.body for msg in msgs}
         links = Link._by_fullname(link_names, return_dict=False)
         print('Processing %r' % (links,))
 
@@ -273,10 +253,10 @@ def consume_subreddit_query_queue(qname="subreddit_query_q", limit=1000):
                     insert_items=links,
                 )
 
-    amqp.handle_items(qname, process_message, limit=limit)
+    await amqp.handle_items(qname, process_message, limit=limit)
 
 
-def add_to_domain_query_q(link):
+async def add_to_domain_query_q(link):
     parsed = UrlParser(link.url)
     if not parsed.domain_permutations():
         # no valid domains found
@@ -287,25 +267,15 @@ def add_to_domain_query_q(link):
         queue_name = "domain_query_%s_q" % domain_shard
     else:
         queue_name = "domain_query_q"
-    amqp.add_item(queue_name, link._fullname)
+    await amqp.add_item(queue_name, link._fullname.encode())
 
 
-def consume_domain_query_queue(qname="domain_query_q", limit=1000):
-    @g.stats.amqp_processor(qname)
-    def process_message(msgs, chan):
-        """Update get_domain_links(), the Links by domain precomputed query.
-
-        get_domain_links() is a CachedResult which is stored in permacache. To
-        update these objects we need to do a read-modify-write which requires
-        obtaining a lock. Sharding these updates by domain allows us to run
-        multiple consumers (but ideally just one per shard) to avoid lock
-        contention.
-
-        """
-
+async def consume_domain_query_queue(qname="domain_query_q", limit=1000):
+    async def process_message(msgs, chan):
+        """Update get_domain_links(), the Links by domain precomputed query."""
         from r2.lib.db.queries import add_queries, get_domain_links
 
-        link_names = {msg.body for msg in msgs}
+        link_names = {msg.body.decode() if isinstance(msg.body, bytes) else msg.body for msg in msgs}
         links = Link._by_fullname(link_names, return_dict=False)
         print('Processing %r' % (links,))
 
@@ -325,12 +295,11 @@ def consume_domain_query_queue(qname="domain_query_q", limit=1000):
                     insert_items=links,
                 )
 
-    amqp.handle_items(qname, process_message, limit=limit)
+    await amqp.handle_items(qname, process_message, limit=limit)
 
 
-def consume_comment_vote_queue(qname="vote_comment_q"):
-    @g.stats.amqp_processor(qname)
-    def process_message(msg):
+async def consume_comment_vote_queue(qname="vote_comment_q"):
+    async def process_message(msg):
         from r2.lib.comment_tree import write_comment_scores
         from r2.lib.db.queries import (
             add_queries,
@@ -343,10 +312,10 @@ def consume_comment_vote_queue(qname="vote_comment_q"):
         hook = hooks.get_hook('vote.validate_vote_data')
         if hook.call_until_return(msg=msg, vote_data=vote_data) is False:
             # Corrupt records in the queue. Ignore them.
-            print("Ignoring invalid vote by %s on %s %s" % ()
+            print("Ignoring invalid vote by %s on %s %s" % (
                     vote_data.get('user_id', '<unknown>'),
                     vote_data.get('thing_fullname', '<unknown>'),
-                    vote_data)
+                    vote_data))
             return
 
         timer = g.stats.get_timer("comment_vote_processor")
@@ -368,7 +337,7 @@ def consume_comment_vote_queue(qname="vote_comment_q"):
             )
         except TypeError as e:
             # a vote on an invalid type got in the queue, just skip it
-            g.log.exception("Invalid type: %r", e.message)
+            g.log.exception("Invalid type: %r", e)
             return
 
         vote.commit()
@@ -414,4 +383,4 @@ def consume_comment_vote_queue(qname="vote_comment_q"):
         timer.stop()
         timer.flush()
 
-    amqp.consume_items(qname, process_message, verbose=False)
+    await amqp.consume_items(qname, process_message, verbose=False)

@@ -822,13 +822,13 @@ class SolrSearchProvider(SearchProvider):
 
     SubredditSearchQuery = SolrSubredditSearchQuery
     
-    def run_changed(self, drain=False, min_size=int(getattr(g, 'solr_min_batch', 500)), limit=1000, sleep_time=10, 
+    async def run_changed(self, drain=False, min_size=int(getattr(g, 'solr_min_batch', 500)), limit=1000, sleep_time=10,
             use_safe_get=False, verbose=False):
         '''Run by `cron` (through `paster run`) on a schedule to send Things to Solr
         '''
         if use_safe_get:
             SolrSearchUploader.use_safe_get = True
-        amqp.handle_items('cloudsearch_changes', _run_changed, min_size=min_size,
+        await amqp.handle_items('cloudsearch_changes', _run_changed, min_size=min_size,
                           limit=limit, drain=drain, sleep_time=sleep_time,
                           verbose=verbose)
 
