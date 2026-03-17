@@ -132,12 +132,17 @@ url = None
 # Public helpers used by middleware to set up per-request context
 # ---------------------------------------------------------------------------
 
-def reset_request_context(starlette_request, starlette_response):
+def reset_request_context(starlette_request, starlette_response, db=None):
     """
     Called at the start of each request by RequestContextMiddleware.
     Binds Starlette request/response objects into ContextVars.
+    If db (AsyncSession) is provided it is stored as c.db for use by
+    async validators and service calls during the request.
     """
     _request_var.set(starlette_request)
     _response_var.set(starlette_response)
-    _tmpl_context_var.set(_RequestContext())
+    ctx = _RequestContext()
+    _tmpl_context_var.set(ctx)
     _session_var.set(SimpleNamespace())
+    if db is not None:
+        ctx.db = db

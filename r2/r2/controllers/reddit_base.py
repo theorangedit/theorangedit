@@ -882,7 +882,7 @@ class MinimalController(BaseController):
             if type_ == "oauth":
                 g.stats.count_string("oauth.{}".format(event_type), client_id)
 
-    def pre(self):
+    async def pre(self):
         action = request.environ["pylons.routes_dict"].get("action")
         if action:
             if not self._get_action_handler():
@@ -1194,8 +1194,8 @@ class OAuth2OnlyController(OAuth2ResourceController):
     # so CSRF prevention is unnecessary.
     handles_csrf = True
 
-    def pre(self):
-        OAuth2ResourceController.pre(self)
+    async def pre(self):
+        await OAuth2ResourceController.pre(self)
         if request.method != "OPTIONS":
             self.authenticate_with_token()
             self.set_up_user_context()
@@ -1205,7 +1205,7 @@ class OAuth2OnlyController(OAuth2ResourceController):
         abort_with_error(error, error.code or 400)
 
 
-class RedditController(OAuth2ResourceController):
+class RedditController(OAuth2ResourceController):  # noqa: E302
 
     @staticmethod
     def login(user, rem=False):
@@ -1248,7 +1248,7 @@ class RedditController(OAuth2ResourceController):
     def disable_admin_mode(user):
         c.cookies[g.admin_cookie] = Cookie(value='', expires=DELETE)
 
-    def pre(self):
+    async def pre(self):
         record_timings = g.admin_cookie in request.cookies or g.debug
         admin_bar_eligible = response.content_type == 'text/html'
         if admin_bar_eligible and record_timings:
@@ -1257,7 +1257,7 @@ class RedditController(OAuth2ResourceController):
         # set up stuff needed in base templates at error time here.
         c.js_preload = JSPreload()
 
-        MinimalController.pre(self)
+        await MinimalController.pre(self)
 
         # Set IE to always use latest rendering engine
         response.headers["X-UA-Compatible"] = "IE=edge"
@@ -1287,9 +1287,9 @@ class RedditController(OAuth2ResourceController):
         if not c.user:
             if c.extension != "rss":
                 if not g.read_only_mode:
-                    c.user = g.auth_provider.get_authenticated_account()
+                    c.user = await g.auth_provider.get_authenticated_account()
 
-                    if c.user and c.user._deleted:
+                    if c.user and getattr(c.user, 'is_deleted', False):
                         c.user = None
                 else:
                     c.user = None

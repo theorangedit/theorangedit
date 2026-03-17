@@ -64,6 +64,53 @@ import re, inspect
 from itertools import chain
 from functools import wraps
 
+# Fullname type-code constants (replacing Thing._type_prefix / _type_id mapping)
+# t1=comment, t2=account, t3=link, t4=message, t5=subreddit
+_FULLNAME_SERVICES = {
+    't3': ('links', 'get_by_id'),
+    't1': ('comments', 'get_by_id'),
+    't2': ('accounts', 'get_by_id'),
+    't4': ('messages', 'get_by_id'),
+    't5': ('subreddits', 'get_by_id'),
+}
+
+
+async def _by_fullname(db, fullnames, ignore_missing=False):
+    """Resolve one or more fullnames to ORM objects using the service layer."""
+    import importlib
+    single = isinstance(fullnames, str)
+    if single:
+        fullnames = [fullnames]
+
+    results = []
+    for fullname in fullnames:
+        try:
+            type_code, id36 = fullname.split('_', 1)
+            thing_id = int(id36, 36)
+        except (ValueError, AttributeError):
+            if not ignore_missing:
+                return None
+            continue
+
+        entry = _FULLNAME_SERVICES.get(type_code)
+        if entry is None:
+            if not ignore_missing:
+                return None
+            continue
+
+        module_name, fn_name = entry
+        svc = importlib.import_module(f'r2.services.{module_name}')
+        obj = await getattr(svc, fn_name)(db, thing_id)
+        if obj is None:
+            if not ignore_missing:
+                return None
+            continue
+        results.append(obj)
+
+    if single:
+        return results[0] if results else None
+    return results
+
 
 def can_view_link_comments(article):
     return (article.subreddit_slow.can_view(c.user) and
@@ -103,8 +150,8 @@ class Validator(object):
             param_info[param] = None
         return param_info
 
-    def __call__(self, url):
-        self.has_errors = False
+    def _extract_params(self, url):
+        """Extract raw parameter values from the current request."""
         a = []
         if self.param:
             for p in utils.tup(self.param):
@@ -128,8 +175,16 @@ class Validator(object):
                 else:
                     val = self.default
                 a.append(val)
+        return a
+
+    async def __call__(self, url):
+        self.has_errors = False
+        a = self._extract_params(url)
         try:
-            return self.run(*a)
+            result = self.run(*a)
+            if inspect.isawaitable(result):
+                result = await result
+            return result
         except TypeError as e:
             if str(e).startswith('run() takes'):
                 # Prepend our class name so we know *which* run()
@@ -157,12 +212,12 @@ def build_arg_list(fn, env):
                 kw[name] = env[name]
     return kw
 
-def _make_validated_kw(fn, simple_vals, param_vals, env):
+async def _make_validated_kw(fn, simple_vals, param_vals, env):
     for validator in simple_vals:
-        validator(env)
+        await validator(env)
     kw = build_arg_list(fn, env)
     for var, validator in param_vals.items():
-        kw[var] = validator(env)
+        kw[var] = await validator(env)
     return kw
 
 def set_api_docs(fn, simple_vals, param_vals, extra_vals=None):
@@ -196,9 +251,9 @@ def validate(*simple_vals, **param_vals):
     """
     def val(fn):
         @wraps(fn)
-        def newfn(self, *a, **env):
+        async def newfn(self, *a, **env):
             try:
-                kw = _make_validated_kw(fn, simple_vals, param_vals, env)
+                kw = await _make_validated_kw(fn, simple_vals, param_vals, env)
             except RedditError as err:
                 self.on_validation_error(err)
 
@@ -206,7 +261,10 @@ def validate(*simple_vals, **param_vals):
                 self.on_validation_error(c.errors[err])
 
             try:
-                return fn(self, *a, **kw)
+                result = fn(self, *a, **kw)
+                if inspect.isawaitable(result):
+                    result = await result
+                return result
             except RedditError as err:
                 self.on_validation_error(err)
 
@@ -228,7 +286,7 @@ def api_validate(response_type=None, add_api_type_doc=False):
         def _api_validate(*simple_vals, **param_vals):
             def val(fn):
                 @wraps(fn)
-                def newfn(self, *a, **env):
+                async def newfn(self, *a, **env):
                     renderstyle = request.params.get("renderstyle")
                     if renderstyle:
                         c.render_style = api_type(renderstyle)
@@ -248,9 +306,12 @@ def api_validate(response_type=None, add_api_type_doc=False):
                     response.content_type = responder.content_type
 
                     try:
-                        kw = _make_validated_kw(fn, simple_vals, param_vals, env)
-                        return response_function(self, fn, responder,
-                                                 simple_vals, param_vals, *a, **kw)
+                        kw = await _make_validated_kw(fn, simple_vals, param_vals, env)
+                        result = response_function(self, fn, responder,
+                                                   simple_vals, param_vals, *a, **kw)
+                        if inspect.isawaitable(result):
+                            result = await result
+                        return result
                     except UserRequiredException:
                         responder.send_failure(errors.USER_REQUIRED)
                         return self.api_wrapper(responder.make_response())
@@ -391,16 +452,30 @@ class VThing(Validator):
         self.thingclass = thingclass
         self.redirect = redirect
 
-    def run(self, thing_id):
+    async def run(self, thing_id):
         if thing_id:
             try:
-                tid = int(thing_id, 36)
-                thing = self.thingclass._byID(tid, True)
-                if thing.__class__ != self.thingclass:
-                    raise TypeError("Expected %s, got %s" %
-                                    (self.thingclass, thing.__class__))
+                from r2.lib.utils import from36
+                from r2.services import links as link_svc
+                from r2.services import comments as comment_svc
+                from r2.services import accounts as account_svc
+                tid = from36(thing_id)
+                db = c.db
+                # Dispatch to the appropriate service by class name
+                cls_name = self.thingclass.__name__
+                if cls_name == 'Link':
+                    thing = await link_svc.get_by_id(db, tid)
+                elif cls_name == 'Comment':
+                    thing = await comment_svc.get_by_id(db, tid)
+                elif cls_name == 'Account':
+                    thing = await account_svc.get_by_id(db, tid)
+                else:
+                    # Fallback: try legacy _byID if still available
+                    thing = self.thingclass._byID(tid, True)
+                if thing is None:
+                    raise LookupError("not found")
                 return thing
-            except (NotFound, ValueError):
+            except (LookupError, ValueError):
                 if self.redirect:
                     abort(404, 'page not found')
                 else:
@@ -448,34 +523,45 @@ class VTrophy(VThing):
         VThing.__init__(self, param, Trophy, redirect=redirect, *a, **kw)
 
 class VMessage(Validator):
-    def run(self, message_id):
+    async def run(self, message_id):
         if message_id:
             try:
-                aid = int(message_id, 36)
-                return Message._byID(aid, True)
-            except (NotFound, ValueError):
+                from r2.lib.utils import from36
+                from r2.services import messages as msg_svc
+                aid = from36(message_id)
+                msg = await msg_svc.get_by_id(c.db, aid)
+                if msg is None:
+                    abort(404, 'page not found')
+                return msg
+            except ValueError:
                 abort(404, 'page not found')
 
 
 class VCommentID(Validator):
-    def run(self, cid):
+    async def run(self, cid):
         if cid:
             try:
-                cid = int(cid, 36)
-                return Comment._byID(cid, True)
-            except (NotFound, ValueError):
+                from r2.lib.utils import from36
+                from r2.services import comments as comment_svc
+                cid = from36(cid)
+                return await comment_svc.get_by_id(c.db, cid)
+            except (LookupError, ValueError):
                 pass
 
 class VMessageID(Validator):
-    def run(self, cid):
+    async def run(self, cid):
         if cid:
             try:
-                cid = int(cid, 36)
-                m = Message._byID(cid, True)
+                from r2.lib.utils import from36
+                from r2.services import messages as msg_svc
+                cid = from36(cid)
+                m = await msg_svc.get_by_id(c.db, cid)
+                if m is None:
+                    return None
                 if not m.can_view_slow():
                     abort(403, 'forbidden')
                 return m
-            except (NotFound, ValueError):
+            except (LookupError, ValueError):
                 pass
 
 class VCount(Validator):
@@ -730,20 +816,20 @@ class VSRByName(Validator):
         self.return_srname = return_srname
         Validator.__init__(self, sr_name)
 
-    def run(self, sr_name):
+    async def run(self, sr_name):
         if not sr_name:
             if self.required:
                 self.set_error(errors.BAD_SR_NAME, code=400)
         else:
+            from r2.services import subreddits as sr_svc
             sr_name = sr_path_rx.sub('\g<name>', sr_name.strip())
-            try:
-                sr = Subreddit._by_name(sr_name)
-                if self.return_srname:
-                    return sr.name
-                else:
-                    return sr
-            except NotFound:
+            sr = await sr_svc.get_by_name(c.db, sr_name)
+            if sr is None:
                 self.set_error(errors.SUBREDDIT_NOEXIST, code=400)
+            elif self.return_srname:
+                return sr.name
+            else:
+                return sr
 
     def param_docs(self):
         return {
@@ -762,11 +848,12 @@ class VSRByNames(Validator):
         self.required = required
         Validator.__init__(self, sr_names_csv)
 
-    def run(self, sr_names_csv):
+    async def run(self, sr_names_csv):
         if sr_names_csv:
+            from r2.services import subreddits as sr_svc
             sr_names = [sr_path_rx.sub('\g<name>', s.strip())
                         for s in sr_names_csv.split(',')]
-            return Subreddit._by_name(sr_names)
+            return await sr_svc.get_by_names(c.db, sr_names)
         elif self.required:
             self.set_error(errors.BAD_SR_NAME, code=400)
         return {}
@@ -894,38 +981,20 @@ class VByName(Validator):
 
         Validator.__init__(self, param, **kw)
 
-    def run(self, items):
-        if self.backend == 'cassandra':
-            # tdb_cassandra.Thing objects can't use the regex
-            if items and self.multiple:
-                items = [item for item in self.splitter.split(items)]
-                if self.limit and len(items) > self.limit:
-                    return self.set_error(errors.TOO_MANY_THING_IDS)
-            if items:
-                try:
-                    return tdb_cassandra.Thing._by_fullname(
-                        items,
-                        ignore_missing=self.ignore_missing,
-                        return_dict=False,
-                    )
-                except tdb_cassandra.NotFound:
-                    pass
-        else:
-            if items and self.multiple:
-                items = [item for item in self.splitter.split(items)
-                         if item and self.re.match(item)]
-                if self.limit and len(items) > self.limit:
-                    return self.set_error(errors.TOO_MANY_THING_IDS)
-            if items and (self.multiple or self.re.match(items)):
-                try:
-                    return Thing._by_fullname(
-                        items,
-                        return_dict=False,
-                        ignore_missing=self.ignore_missing,
-                        data=True,
-                    )
-                except NotFound:
-                    pass
+    async def run(self, items):
+        if items and self.multiple:
+            items = [item for item in self.splitter.split(items)
+                     if item and self.re.match(item)]
+            if self.limit and len(items) > self.limit:
+                return self.set_error(errors.TOO_MANY_THING_IDS)
+        if items and (self.multiple or self.re.match(items)):
+            result = await _by_fullname(
+                c.db,
+                items,
+                ignore_missing=self.ignore_missing,
+            )
+            if result is not None:
+                return result
 
         return self.set_error(self._error)
 
@@ -1819,30 +1888,30 @@ class VExistingUname(VRequired):
         self.allow_deleted = allow_deleted
         VRequired.__init__(self, item, errors.NO_USER, *a, **kw)
 
-    def run(self, name):
+    async def run(self, name):
+        from r2.services import accounts as account_svc
         if name:
             name = name.strip()
         if name and name.startswith('~') and c.user_is_admin:
             try:
                 user_id = int(name[1:])
-                return Account._byID(user_id, True)
-            except (NotFound, ValueError):
+                account = await account_svc.get_by_id(c.db, user_id)
+                if account is None:
+                    self.error(errors.USER_DOESNT_EXIST)
+                return account
+            except ValueError:
                 self.error(errors.USER_DOESNT_EXIST)
 
         # make sure the name satisfies our user name regexp before
         # bothering to look it up.
         name = chkuser(name)
         if name:
-            try:
-                return Account._by_name(name)
-            except NotFound:
-                if self.allow_deleted:
-                    try:
-                        return Account._by_name(name, allow_deleted=True)
-                    except NotFound:
-                        pass
-
+            account = await account_svc.get_by_name(c.db, name)
+            if account is None and self.allow_deleted:
+                account = await account_svc.get_by_name(c.db, name, allow_deleted=True)
+            if account is None:
                 self.error(errors.USER_DOESNT_EXIST)
+            return account
         else:
             self.error()
 
@@ -1852,7 +1921,8 @@ class VExistingUname(VRequired):
         }
 
 class VMessageRecipient(VExistingUname):
-    def run(self, name):
+    async def run(self, name):
+        from r2.services import subreddits as sr_svc
         if not name:
             return self.error()
         is_subreddit = False
@@ -1870,27 +1940,23 @@ class VMessageRecipient(VExistingUname):
             abort(403, 'forbidden')
 
         if is_subreddit:
-            try:
-                s = Subreddit._by_name(name)
-                if isinstance(s, FakeSubreddit):
-                    raise NotFound("fake subreddit")
-                if s._spam:
-                    raise NotFound("banned subreddit")
-                if s.is_muted(c.user) and not c.user_is_admin:
-                    self.set_error(errors.USER_MUTED)
-                return s
-            except NotFound:
+            s = await sr_svc.get_by_name(c.db, name)
+            if s is None or getattr(s, 'is_spam', False):
                 self.set_error(errors.SUBREDDIT_NOEXIST)
+            elif hasattr(s, 'is_muted') and s.is_muted(c.user) and not c.user_is_admin:
+                self.set_error(errors.USER_MUTED)
+            else:
+                return s
         else:
-            account = VExistingUname.run(self, name)
-            if account and account._id in c.user.enemies:
+            account = await VExistingUname.run(self, name)
+            if account and hasattr(c.user, 'enemies') and account.id in c.user.enemies:
                 self.set_error(errors.USER_BLOCKED)
             else:
                 return account
 
 class VUserWithEmail(VExistingUname):
-    def run(self, name):
-        user = VExistingUname.run(self, name)
+    async def run(self, name):
+        user = await VExistingUname.run(self, name)
         if not user or not hasattr(user, 'email') or not user.email:
             return self.error(errors.NO_EMAIL_FOR_USER)
         return user

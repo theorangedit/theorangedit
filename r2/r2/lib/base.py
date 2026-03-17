@@ -30,10 +30,27 @@ import urllib.request as urllib2
 from r2.lib.context import request, session, config, response
 from r2.lib.context import c
 from r2.lib.app_globals import g
-from r2.lib.base import WSGIController
 from r2.lib.i18n import N_, _, ungettext, get_lang
-from r2.lib.base import abort
 from starlette.exceptions import HTTPException
+
+
+class WSGIController:
+    """Minimal async-capable controller base replacing Pylons WSGIController."""
+
+    async def pre(self):
+        """Called before the action handler. Override in subclasses."""
+        pass
+
+    async def post(self):
+        """Called after the action handler. Override in subclasses."""
+        pass
+
+    def on_validation_error(self, error):
+        from r2.lib.errors import RedditError
+        if isinstance(error, RedditError):
+            abort(error.code or 400, error.message)
+        else:
+            abort(400, str(error))
 
 from r2.lib.filters import spaceCompress, _force_unicode
 from r2.lib.template_helpers import get_domain

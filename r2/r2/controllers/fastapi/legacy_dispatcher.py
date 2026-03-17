@@ -10,21 +10,28 @@ As controllers are ported to native FastAPI routers (in this package) they
 are removed from the Routes map and this dispatcher stops seeing them.
 """
 
+import inspect
+
 from fastapi import APIRouter, Request
-from fastapi.responses import Response, JSONResponse
+from fastapi.responses import Response
 from starlette.exceptions import HTTPException
 
 router = APIRouter()
 
 
-def _dispatch(request: Request, path: str):
+async def _dispatch(request: Request, path: str):
     """
     Look up the controller + action for ``path`` in the Routes map and call
     the appropriate method.
 
+    Opens an AsyncSession, stores it as c.db, runs pre() / handler / post(),
+    and commits (or rolls back) the session before returning.
+
     Returns a Starlette Response or raises HTTPException.
     """
     from r2.lib.app_globals import g
+    from r2.lib.context import c
+    from r2.lib.db.engine import AsyncSessionLocal
     from r2 import controllers as ctrl_module
 
     routes_map = getattr(g, '_routes_map', None)
@@ -62,19 +69,40 @@ def _dispatch(request: Request, path: str):
     handler_name = meth + '_' + action_name
     controller = controller_cls()
 
-    # Run pre() hook (sets up c.user, c.site, etc.)
-    if hasattr(controller, 'pre'):
-        controller.pre()
+    async with AsyncSessionLocal() as db:
+        # Attach the DB session to the request context so validators and
+        # service functions can access it via c.db without extra arguments.
+        c.db = db
 
-    handler = getattr(controller, handler_name, None)
-    if handler is None:
-        raise HTTPException(status_code=404)
+        try:
+            # Run pre() hook (sets up c.user, c.site, etc.)
+            if hasattr(controller, 'pre'):
+                pre = controller.pre()
+                if inspect.isawaitable(pre):
+                    await pre
 
-    result = handler(**{k: v for k, v in match.items()
-                        if k not in ('controller', 'action')})
+            handler = getattr(controller, handler_name, None)
+            if handler is None:
+                raise HTTPException(status_code=404)
 
-    if hasattr(controller, 'post'):
-        controller.post()
+            action_kwargs = {k: v for k, v in match.items()
+                             if k not in ('controller', 'action')}
+            result = handler(**action_kwargs)
+            if inspect.isawaitable(result):
+                result = await result
+
+            if hasattr(controller, 'post'):
+                post = controller.post()
+                if inspect.isawaitable(post):
+                    await post
+
+            await db.commit()
+        except HTTPException:
+            await db.rollback()
+            raise
+        except Exception:
+            await db.rollback()
+            raise
 
     if result is None:
         return Response(status_code=200)
@@ -92,4 +120,4 @@ def _dispatch(request: Request, path: str):
 @router.api_route("/{path:path}", methods=["GET", "POST", "PUT", "DELETE",
                                             "PATCH", "HEAD", "OPTIONS"])
 async def legacy_catch_all(request: Request, path: str = ""):
-    return _dispatch(request, '/' + path)
+    return await _dispatch(request, '/' + path)

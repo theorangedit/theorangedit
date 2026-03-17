@@ -22,7 +22,7 @@
 
 import urllib
 
-from r2.lib.context import request
+from r2.lib.context import c, request
 from r2.lib.app_globals import g
 
 from r2.lib.configparse import ConfigValue
@@ -31,9 +31,7 @@ from r2.lib.utils import constant_time_compare
 
 
 class CookieAuthenticationProvider(AuthenticationProvider):
-    """An authentication provider that uses standard HTTP cookies.
-
-    """
+    """An authentication provider that uses standard HTTP cookies."""
 
     config = {
         ConfigValue.str: [
@@ -44,8 +42,8 @@ class CookieAuthenticationProvider(AuthenticationProvider):
     def is_logout_allowed(self):
         return True
 
-    def get_authenticated_account(self):
-        from r2.models import Account, NotFound
+    async def get_authenticated_account(self):
+        from r2.services import accounts as account_svc
 
         quoted_session_cookie = request.cookies.get(g.login_cookie)
         if not quoted_session_cookie:
@@ -55,15 +53,13 @@ class CookieAuthenticationProvider(AuthenticationProvider):
         try:
             uid, timestr, hash = session_cookie.split(",")
             uid = int(uid)
-        except:
+        except Exception:
             return None
 
-        try:
-            account = Account._byID(uid, data=True)
-        except NotFound:
+        account = await account_svc.get_by_id(c.db, uid)
+        if account is None or account.is_deleted:
             return None
 
-        expected_cookie = account.make_cookie(timestr)
-        if not constant_time_compare(session_cookie, expected_cookie):
+        if not account_svc.validate_cookie(account, session_cookie):
             return None
         return account
