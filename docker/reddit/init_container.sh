@@ -14,20 +14,42 @@ while ! nc -vz $CASSANDRA_HOST $CASSANDRA_PORT; do
     sleep 1
 done
 
-# init cassandra
-python <<END
-import pycassa
-sys = pycassa.SystemManager("$CASSANDRA_HOST:$CASSANDRA_PORT")
+# init cassandra keyspace and column families
+python3 <<END
+from cassandra.cluster import Cluster
+from cassandra.policies import RoundRobinPolicy
 
-if "reddit" not in sys.list_keyspaces():
-    print "creating keyspace 'reddit'"
-    sys.create_keyspace("reddit", "SimpleStrategy", {"replication_factor": "1"})
-    print "done"
+cluster = Cluster(["$CASSANDRA_HOST"], port=$CASSANDRA_PORT,
+                  load_balancing_policy=RoundRobinPolicy())
+session = cluster.connect()
 
-if "permacache" not in sys.get_keyspace_column_families("reddit"):
-    print "creating column family 'permacache'"
-    sys.create_column_family("reddit", "permacache")
-    print "done"
+keyspaces = [r.keyspace_name for r in session.execute(
+    "SELECT keyspace_name FROM system_schema.keyspaces")]
+
+if "reddit" not in keyspaces:
+    print("creating keyspace 'reddit'")
+    session.execute("""
+        CREATE KEYSPACE reddit
+        WITH replication = {'class': 'SimpleStrategy', 'replication_factor': '1'}
+    """)
+    print("done")
+
+session.set_keyspace("reddit")
+
+tables = [r.table_name for r in session.execute(
+    "SELECT table_name FROM system_schema.tables WHERE keyspace_name='reddit'")]
+
+if "permacache" not in tables:
+    print("creating table 'permacache'")
+    session.execute("""
+        CREATE TABLE permacache (
+            key text PRIMARY KEY,
+            value blob
+        )
+    """)
+    print("done")
+
+cluster.shutdown()
 END
 
 # wait for postgres
@@ -47,7 +69,7 @@ REDDIT_INIT_ONCE="/home/reddit/install-complete"
 if [ ! -e $REDDIT_INIT_ONCE ]; then
     echo "Initializing reddit with inject_configuration_data()..."
     touch $REDDIT_INIT_ONCE
-    reddit-run $REDDIT_HOME/src/reddit/scripts/inject_test_data.py -c 'inject_configuration_data()'
+    cd /home/reddit/src/reddit/r2 && python3 scripts/inject_test_data.py inject_configuration_data
 fi
 
 # start cron service

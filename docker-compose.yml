@@ -28,9 +28,9 @@ services:
     restart: always
 
   cassandra:
-    image: cassandra:2.0
+    image: cassandra:4.1
     ports:
-      - 9160:9160
+      - 9042:9042
     volumes:
       # can alternatively be a named volume
       - ./volumes/cassandra:/var/lib/cassandra
@@ -83,19 +83,17 @@ services:
 
   reddit:
     build:
-      context: docker/reddit
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: docker/reddit/Dockerfile
     ports:
       - 8001:8001
       - 9000:9000
       - 8082:8082
+    environment:
+      CASSANDRA_PORT: 9042
     volumes:
       # starts empty so bind mount can replace container directory, can alternatively be a named volume
       - ./volumes/media:/srv/www/media
-      # persist existing development.update and future changes
-      - reddit_r2_data:/home/reddit/src/reddit/r2
-      # persist existing cron and future changes
-      - reddit_cron_data:/etc/cron.d
     restart: always
     depends_on:
       - postgres
@@ -105,7 +103,3 @@ services:
       - rabbitmq
       - zookeeper
       - solr
-
-volumes:
-  reddit_r2_data:
-  reddit_cron_data:
