@@ -734,8 +734,7 @@ class CacheChain(CacheUtils, local):
     def debug(self, key):
         print("Looking up [%r]" % key)
         for i, c in enumerate(self.caches):
-            print("[%d] %10s has value [%r]" % (i, c.__class__.__name__,)
-                                                c.get(key))
+            print("[%d] %10s has value [%r]" % (i, c.__class__.__name__, c.get(key)))
 
     def reset(self):
         # the first item in a cache chain is a LocalCache
