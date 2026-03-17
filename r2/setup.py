@@ -81,9 +81,10 @@ setup(
         "pylibmc>=1.6.1",    # was pinned to 1.2.2; 1.6+ has Python 3 support
         "redis[hiredis]>=5.0",  # async Redis client for listing cache (Phase 10)
 
-        # --- AMQP (TODO: migrate amqplib API -> pika API) ---
-        # "amqplib",         # Python 2 only
-        "pika>=1.3",         # Python 3 AMQP client; API differs from amqplib
+        # --- AMQP ---
+        # "amqplib",         # Python 2 only; removed in Phase 11
+        # "pika>=1.3",       # sync pika replaced by aio-pika in Phase 11
+        "aio-pika>=9.0",     # async AMQP 0-9-1 client (Phase 11)
 
         # --- Cryptography ---
         # "pycrypto",        # deprecated; pycryptodome (below) covers everything

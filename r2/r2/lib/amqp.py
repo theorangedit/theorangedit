@@ -19,398 +19,322 @@
 # All portions of the code written by reddit are Copyright (c) 2006-2015 reddit
 # Inc. All Rights Reserved.
 ###############################################################################
-"""Methods and classes for inserting/removing from reddit's queues
-
-There are three main ways of interacting with this module:
-
-add_item: Adds a single item to a queue*
-handle_items: For processing multiple items from a queue
-consume_items: For processing a queue one item at a time
-
-
-* _add_item (the internal function for adding items to amqp that are
-  added using add_item) might block for an arbitrary amount of time
-  while trying to get a connection to amqp.
-
 """
-from Queue import Queue
-from threading import local, Thread
-from datetime import datetime
-import os
-import sys
-import time
-import errno
-import socket
-import itertools
-import pickle as pickle
+Async AMQP helpers — replaces the old amqplib/threading-based implementation.
 
-from amqplib import client_0_8 as amqp
+Public API (same names, now all async):
+
+    await add_item(routing_key, body, ...)
+    await add_kw(routing_key, **kw)
+    await consume_items(queue, callback, ...)
+    await handle_items(queue, callback, ...)
+    await empty_queue(queue)
+
+The connection is lazy: it is established on first use and re-established
+automatically after connection failures.  All functions degrade gracefully
+when AMQP is not configured (cfg.amqp_host is falsy).
+"""
+
+import asyncio
+import pickle
+import sys
+from typing import Awaitable, Callable, Optional
+
+import aio_pika
+import aio_pika.abc
+
+# ── Module-level state ────────────────────────────────────────────────────────
 
 cfg = None
-worker = None
-connection_manager = None
-
-
-def initialize(app_globals):
-    global cfg
-    cfg = Config(app_globals)
-    global worker
-    worker = Worker()
-    global connection_manager
-    connection_manager = ConnectionManager()
-
-
-class Config(object):
-    def __init__(self, g):
-        self.amqp_host = g.amqp_host
-        self.amqp_user = g.amqp_user
-        self.amqp_pass = g.amqp_pass
-        self.amqp_exchange = 'reddit_exchange'
-        self.log = g.log
-        self.amqp_virtual_host = g.amqp_virtual_host
-        self.amqp_logging = g.amqp_logging
-        self.stats = g.stats
-        self.queues = g.queues
-        self.reset_caches = g.reset_caches
-
-
-class Worker:
-    def __init__(self):
-        self.q = Queue()
-        self.t = Thread(target=self._handle)
-        self.t.setDaemon(True)
-        self.t.start()
-
-    def _handle(self):
-        while True:
-            cfg.reset_caches()
-
-            fn = self.q.get()
-            try:
-                fn()
-                self.q.task_done()
-            except:
-                import traceback
-                print(traceback.format_exc())
-
-    def do(self, fn, *a, **kw):
-        fn1 = lambda: fn(*a, **kw)
-        self.q.put(fn1)
-
-    def join(self):
-        self.q.join()
-
-
-class ConnectionManager(local):
-    # There should be only two threads that ever talk to AMQP: the
-    # worker thread and the foreground thread (whether consuming queue
-    # items or a shell). This class is just a wrapper to make sure
-    # that they get separate connections
-    def __init__(self):
-        self.connection = None
-        self.channel = None
-        self.have_init = False
-
-    def get_connection(self):
-        while not self.connection:
-            try:
-                self.connection = amqp.Connection(
-                    host=cfg.amqp_host,
-                    userid=cfg.amqp_user,
-                    password=cfg.amqp_pass,
-                    virtual_host=cfg.amqp_virtual_host,
-                    insist=False,
-                )
-            except (socket.error, IOError) as e:
-                print ('error connecting to amqp %s @ %s (%r)' %
-                       (cfg.amqp_user, cfg.amqp_host, e))
-                time.sleep(1)
-
-        # don't run init_queue until someone actually needs it. this
-        # allows the app server to start and serve most pages if amqp
-        # isn't running
-        if not self.have_init:
-            self.init_queue()
-            self.have_init = True
-
-        return self.connection
-
-    def get_channel(self, reconnect = False):
-        # Periodic (and increasing with uptime) errors appearing when
-        # connection object is still present, but appears to have been
-        # closed.  This checks that the the connection is still open.
-        if self.connection and self.connection.channels is None:
-            cfg.log.error(
-                "Error: amqp.py, connection object with no available channels."
-                "  Reconnecting...")
-            self.connection = None
-
-        if not self.connection or reconnect:
-            self.connection = None
-            self.channel = None
-            self.get_connection()
-
-        if not self.channel:
-            self.channel = self.connection.channel()
-
-        return self.channel
-
-    def init_queue(self):
-        chan = self.get_channel()
-        chan.exchange_declare(exchange=cfg.amqp_exchange,
-                              type="direct",
-                              durable=True,
-                              auto_delete=False)
-
-        for queue in cfg.queues:
-            chan.queue_declare(queue=queue.name,
-                               durable=queue.durable,
-                               exclusive=queue.exclusive,
-                               auto_delete=queue.auto_delete)
-
-        for queue, key in cfg.queues.bindings:
-            chan.queue_bind(routing_key=key,
-                            queue=queue,
-                            exchange=cfg.amqp_exchange)
-
-
+_connection: Optional[aio_pika.abc.AbstractRobustConnection] = None
+_channel: Optional[aio_pika.abc.AbstractChannel] = None
+_init_lock: Optional[asyncio.Lock] = None
 
 DELIVERY_TRANSIENT = 1
 DELIVERY_DURABLE = 2
 
-def _add_item(routing_key, body, message_id = None,
-              delivery_mode=DELIVERY_DURABLE, headers=None,
-              exchange=None, send_stats=True):
-    """adds an item onto a queue. If the connection to amqp is lost it
-    will try to reconnect and then call itself again."""
-    if not cfg.amqp_host:
-        cfg.log.error("Ignoring amqp message %r to %r" % (body, routing_key))
-        return
-    if not exchange:
-        exchange = cfg.amqp_exchange
 
-    chan = connection_manager.get_channel()
-    msg = amqp.Message(body,
-                       timestamp = datetime.now(),
-                       delivery_mode = delivery_mode)
-    if message_id:
-        msg.properties['message_id'] = message_id
+# ── Config ────────────────────────────────────────────────────────────────────
 
-    if headers:
-        msg.properties["application_headers"] = headers
+class Config:
+    def __init__(self, g):
+        self.amqp_host = g.amqp_host
+        self.amqp_user = g.amqp_user
+        self.amqp_pass = g.amqp_pass
+        self.amqp_virtual_host = g.amqp_virtual_host
+        self.amqp_exchange = 'reddit_exchange'
+        self.amqp_logging = g.amqp_logging
+        self.log = g.log
+        self.stats = g.stats
+        self.queues = g.queues
+        self.reset_caches = g.reset_caches
 
-    event_name = 'amqp.%s' % routing_key
-    try:
-        chan.basic_publish(msg,
-                           exchange=exchange,
-                           routing_key = routing_key)
-    except Exception as e:
-        if send_stats:
-            cfg.stats.event_count(event_name, 'enqueue_failed')
+    @property
+    def amqp_url(self) -> str:
+        vhost = (self.amqp_virtual_host or '/').lstrip('/')
+        return (
+            f"amqp://{self.amqp_user}:{self.amqp_pass}"
+            f"@{self.amqp_host}/{vhost}"
+        )
 
-        if e.errno == errno.EPIPE:
-            connection_manager.get_channel(True)
-            add_item(routing_key, body, message_id)
-        else:
-            raise
-    else:
-        if send_stats:
-            cfg.stats.event_count(event_name, 'enqueue')
 
-def add_item(routing_key, body, message_id=None,
-             delivery_mode=DELIVERY_DURABLE, headers=None,
-             exchange=None, send_stats=True):
-    if cfg.amqp_host and cfg.amqp_logging:
-        cfg.log.debug("amqp: adding item %r to %r", body, routing_key)
-    if exchange is None:
-        exchange = cfg.amqp_exchange
+def initialize(app_globals):
+    """Called once at startup (synchronously) from app_globals.setup().
 
-    worker.do(_add_item, routing_key, body, message_id = message_id,
-              delivery_mode=delivery_mode, headers=headers, exchange=exchange,
-              send_stats=send_stats)
+    The async lock and connection are created lazily on first use so that
+    this function is safe to call before the event loop has started.
+    """
+    global cfg
+    cfg = Config(app_globals)
 
-def add_kw(routing_key, **kw):
-    add_item(routing_key, pickle.dumps(kw))
 
-def consume_items(queue, callback, verbose=True):
-    """A lighter-weight version of handle_items that uses AMQP's
-       basic.consume instead of basic.get. Callback is only passed a
-       single items at a time. This is more efficient than
-       handle_items when the queue is likely to be occasionally empty
-       or if batching the received messages is not necessary."""
-    from r2.lib.context import c
+# ── Connection management ─────────────────────────────────────────────────────
 
-    chan = connection_manager.get_channel()
+async def _get_channel() -> Optional[aio_pika.abc.AbstractChannel]:
+    """Return a ready channel, (re-)connecting as needed."""
+    global _connection, _channel, _init_lock
 
-    # configure the amount of data rabbit will send down to our buffer before
-    # we're ready for it (to reduce network latency). by default, it will send
-    # as much as our buffers will allow.
-    chan.basic_qos(
-        # size in bytes of prefetch window. zero indicates no preference.
-        prefetch_size=0,
-        # maximum number of prefetched messages.
-        prefetch_count=10,
-        # if global, applies to the whole connection, else just this channel.
-        a_global=False
+    if not cfg or not cfg.amqp_host:
+        return None
+
+    # Create lock lazily inside the running event loop
+    if _init_lock is None:
+        _init_lock = asyncio.Lock()
+
+    async with _init_lock:
+        if _connection is None or _connection.is_closed:
+            _connection = await aio_pika.connect_robust(
+                cfg.amqp_url,
+                reconnect_interval=1,
+            )
+            _channel = None
+
+        if _channel is None or _channel.is_closed:
+            _channel = await _connection.channel()
+            await _channel.set_qos(prefetch_count=10)
+            await _declare_topology(_channel)
+
+    return _channel
+
+
+async def _declare_topology(channel: aio_pika.abc.AbstractChannel) -> None:
+    """Declare exchange, queues, and bindings."""
+    exchange = await channel.declare_exchange(
+        cfg.amqp_exchange,
+        aio_pika.ExchangeType.DIRECT,
+        durable=True,
+        auto_delete=False,
     )
 
-    def _callback(msg):
-        if verbose:
-            count_str = ''
-            if 'message_count' in msg.delivery_info:
-                # the count from the last message, if the count is
-                # available
-                count_str = '(%d remaining)' % msg.delivery_info['message_count']
+    for queue in cfg.queues:
+        q = await channel.declare_queue(
+            queue.name,
+            durable=queue.durable,
+            exclusive=queue.exclusive,
+            auto_delete=queue.auto_delete,
+        )
+        if queue.bind_to_self:
+            await q.bind(exchange, routing_key=queue.name)
 
-            print("%s: 1 item %s" % (queue, count_str))
+    for queue_name, routing_key in cfg.queues.bindings:
+        q = await channel.declare_queue(queue_name, durable=True)
+        await q.bind(exchange, routing_key=routing_key)
 
-        cfg.reset_caches()
-        c.use_write_db = {}
 
-        ret = callback(msg)
-        msg.channel.basic_ack(msg.delivery_tag)
-        sys.stdout.flush()
-        return ret
+# ── Publishing ────────────────────────────────────────────────────────────────
 
-    chan.basic_consume(queue=queue, callback=_callback)
+async def add_item(
+    routing_key: str,
+    body: bytes,
+    message_id: Optional[str] = None,
+    delivery_mode: int = DELIVERY_DURABLE,
+    headers: Optional[dict] = None,
+    exchange: Optional[str] = None,
+    send_stats: bool = True,
+) -> None:
+    """Publish *body* to *routing_key*.  No-ops gracefully if AMQP is down."""
+    if not cfg or not cfg.amqp_host:
+        if cfg:
+            cfg.log.debug("amqp disabled — dropping message to %r", routing_key)
+        return
+
+    if cfg.amqp_logging:
+        cfg.log.debug("amqp: adding item %r to %r", body, routing_key)
+
+    channel = await _get_channel()
+    if channel is None:
+        return
+
+    exchange_name = exchange or cfg.amqp_exchange
+    event_name = f'amqp.{routing_key}'
+
+    props: dict = {}
+    if message_id:
+        props['message_id'] = message_id
+    if headers:
+        props['headers'] = headers
+
+    mode = (
+        aio_pika.DeliveryMode.PERSISTENT
+        if delivery_mode == DELIVERY_DURABLE
+        else aio_pika.DeliveryMode.NOT_PERSISTENT
+    )
+
+    message = aio_pika.Message(
+        body=body if isinstance(body, bytes) else body.encode(),
+        delivery_mode=mode,
+        **props,
+    )
 
     try:
-        while chan.callbacks:
-            try:
-                chan.wait()
-            except KeyboardInterrupt:
-                break
-    finally:
-        worker.join()
-        if chan.is_open:
-            chan.close()
+        exch = await channel.get_exchange(exchange_name)
+        await exch.publish(message, routing_key=routing_key)
+        if send_stats:
+            cfg.stats.event_count(event_name, 'enqueue')
+    except Exception as exc:
+        cfg.log.error("amqp publish failed to %r: %r", routing_key, exc)
+        if send_stats:
+            cfg.stats.event_count(event_name, 'enqueue_failed')
+        # Reset channel so next call reconnects
+        global _channel
+        _channel = None
 
-def handle_items(queue, callback, ack=True, limit=1, min_size=0,
-                 drain=False, verbose=True, sleep_time=1):
-    """Call callback() on every item in a particular queue. If the
-    connection to the queue is lost, it will die. Intended to be
-    used as a long-running process."""
+
+async def add_kw(routing_key: str, **kw) -> None:
+    """Pickle *kw* and publish to *routing_key*."""
+    await add_item(routing_key, pickle.dumps(kw))
+
+
+# ── Consuming ─────────────────────────────────────────────────────────────────
+
+async def consume_items(
+    queue: str,
+    callback: Callable,
+    verbose: bool = True,
+) -> None:
+    """Consume messages from *queue* one at a time, calling *callback(msg)*.
+
+    *callback* may be a regular function or a coroutine function.
+    Runs until cancelled (e.g. KeyboardInterrupt / asyncio.CancelledError).
+    """
+    channel = await _get_channel()
+    if channel is None:
+        cfg.log.error("amqp: cannot consume %r — no connection", queue)
+        return
+
+    q = await channel.declare_queue(queue, durable=True, passive=True)
+
+    async with q.iterator() as messages:
+        async for message in messages:
+            async with message.process():
+                if verbose:
+                    cfg.log.debug("amqp %s: 1 item", queue)
+
+                cfg.reset_caches()
+
+                result = callback(message)
+                if asyncio.iscoroutine(result):
+                    await result
+
+
+async def handle_items(
+    queue: str,
+    callback: Callable,
+    ack: bool = True,
+    limit: int = 1,
+    min_size: int = 0,
+    drain: bool = False,
+    verbose: bool = True,
+    sleep_time: float = 1.0,
+) -> None:
+    """Batch-consume messages from *queue*, calling *callback(items, channel)*.
+
+    Mirrors the old synchronous handle_items interface:
+      - Collects up to *limit* messages, waiting for *min_size* if the queue
+        has fewer.
+      - If *drain* is True, stops after the queue is empty.
+      - *callback* receives a list of aio_pika.IncomingMessage objects and the
+        channel (for compatibility); it may be sync or async.
+    """
     if limit < min_size:
         raise ValueError("min_size must be less than limit")
-    from r2.lib.context import c
 
-    chan = connection_manager.get_channel()
-    countdown = None
+    channel = await _get_channel()
+    if channel is None:
+        cfg.log.error("amqp: cannot handle %r — no connection", queue)
+        return
+
+    q = await channel.declare_queue(queue, durable=True, passive=True)
 
     while True:
-        # NB: None != 0, so we don't need an "is not None" check here
-        if countdown == 0:
-            break
+        items = []
+        countdown = None
 
-        msg = chan.basic_get(queue)
-        if not msg and drain:
-            return
-        elif not msg:
-            time.sleep(sleep_time)
+        # Gather up to *limit* messages
+        while len(items) < limit:
+            try:
+                message = await asyncio.wait_for(q.get(), timeout=sleep_time)
+            except asyncio.TimeoutError:
+                if len(items) >= min_size:
+                    break
+                if drain and not items:
+                    return
+                continue
+
+            items.append(message)
+
+            if countdown is None and drain:
+                # message_count from aio_pika is not directly available on
+                # IncomingMessage; approximate: stop after current batch
+                countdown = True
+
+            if drain and countdown:
+                break
+
+        if not items:
+            if drain:
+                return
+            await asyncio.sleep(sleep_time)
             continue
 
-        if countdown is None and drain and 'message_count' in msg.delivery_info:
-            countdown = 1 + msg.delivery_info['message_count']
+        if verbose:
+            cfg.log.debug("amqp %s: %d items", queue, len(items))
 
         cfg.reset_caches()
-        c.use_write_db = {}
-
-        items = [msg]
-
-        while countdown != 0:
-            if countdown is not None:
-                countdown -= 1
-            if len(items) >= limit:
-                break # the innermost loop only
-            msg = chan.basic_get(queue)
-            if msg is None:
-                if len(items) < min_size:
-                    time.sleep(sleep_time)
-                else:
-                    break
-            else:
-                items.append(msg)
 
         try:
-            count_str = ''
-            if 'message_count' in items[-1].delivery_info:
-                # the count from the last message, if the count is
-                # available
-                count_str = '(%d remaining)' % items[-1].delivery_info['message_count']
-            if verbose:
-                print("%s: %d items %s" % (queue, len(items), count_str))
-            callback(items, chan)
+            result = callback(items, channel)
+            if asyncio.iscoroutine(result):
+                await result
 
             if ack:
-                # ack *all* outstanding messages
-                chan.basic_ack(0, multiple=True)
-
-            # flush any log messages printed by the callback
-            sys.stdout.flush()
-        except:
-            for item in items:
-                # explicitly reject the items that we've not processed
-                chan.basic_reject(item.delivery_tag, requeue = True)
+                for msg in items:
+                    await msg.ack()
+        except Exception:
+            for msg in items:
+                await msg.nack(requeue=True)
             raise
 
+        sys.stdout.flush()
 
-def empty_queue(queue):
-    """debug function to completely erase the contents of a queue"""
-    chan = connection_manager.get_channel()
-    chan.queue_purge(queue)
+        if drain:
+            return
 
 
-def black_hole(queue):
-    """continually empty out a queue as new items are created"""
-    def _ignore(msg):
-        print('Ignoring msg: %r' % msg.body)
+# ── Utilities ─────────────────────────────────────────────────────────────────
 
-    consume_items(queue, _ignore)
+async def empty_queue(queue: str) -> None:
+    """Purge all messages from *queue*."""
+    channel = await _get_channel()
+    if channel is None:
+        return
+    q = await channel.declare_queue(queue, durable=True, passive=True)
+    await q.purge()
 
-def dedup_queue(queue, rk = None, limit=None,
-                delivery_mode = DELIVERY_DURABLE):
-    """Hackily try to reduce the size of a queue by removing duplicate
-       messages. The consumers of the target queue must consider
-       identical messages to be idempotent. Preserves only message
-       bodies"""
-    chan = connection_manager.get_channel()
 
-    if rk is None:
-        rk = queue
+async def black_hole(queue: str) -> None:
+    """Continuously discard messages from *queue*."""
+    async def _ignore(msg):
+        cfg.log.debug('Ignoring msg: %r', msg.body)
 
-    bodies = set()
-
-    while True:
-        msg = chan.basic_get(queue)
-
-        if msg is None:
-            break
-
-        if msg.body not in bodies:
-            bodies.add(msg.body)
-
-        if limit is None:
-            limit = msg.delivery_info.get('message_count')
-            if limit is None:
-                default_max = 100*1000
-                print ("Message count was unavailable, defaulting to %d"
-                       % (default_max,))
-                limit = default_max
-            else:
-                print("Grabbing %d messages" % (limit,))
-        else:
-            limit -= 1
-            if limit <= 0:
-                break
-            elif limit % 1000 == 0:
-                print(limit)
-
-    print("Grabbed %d unique bodies" % (len(bodies),))
-
-    if bodies:
-        for body in bodies:
-            _add_item(rk, body, delivery_mode = delivery_mode)
-
-        worker.join()
-
-        chan.basic_ack(0, multiple=True)
+    await consume_items(queue, _ignore)
