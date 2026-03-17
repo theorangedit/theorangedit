@@ -1,13 +1,9 @@
-sudo: required
-dist: trusty
+dist: jammy
 
 language: python
 
 python:
-    - "2.7"
-
-virtualenv:
-    system_site_packages: true
+    - "3.11"
 
 services:
     - postgres
@@ -15,7 +11,7 @@ services:
     - rabbitmq
 
 install:
-    - sudo install/travis.sh travis .
+    - pip install -e r2/
 
 before_script:
     - install/setup_rabbitmq.sh
@@ -23,4 +19,4 @@ before_script:
     - install/setup_cassandra.sh
 
 script:
-    - cd r2 && nosetests
+    - cd r2 && python -m pytest

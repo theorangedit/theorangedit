@@ -58,45 +58,84 @@ setup(
     version="",
     python_requires=">=3.10",
     install_requires=[
-        "Pylons",
-        "Routes",
-        "mako>=0.5",
-        "boto >= 2.0",
-        "pytz",
-        "pycrypto",
-        "Babel>=1.0",
-        "cython>=0.14",
-        "SQLAlchemy",
-        "BeautifulSoup",
-        "chardet",
-        "psycopg2",
-        "pycassa>=1.7.0",
-        "pycaptcha",
-        "amqplib",
-        "py-bcrypt",
-        "snudown>=1.1.0",
+        # --- Framework (Phase 4: replace Pylons with FastAPI) ---
+        # "Pylons",          # Python 2 only; replaced by FastAPI in Phase 4
+        # "Routes",          # replaced by FastAPI routing in Phase 4
+        # "WebOb",           # replaced by Starlette/FastAPI in Phase 4
+        "fastapi>=0.110",
+        "uvicorn[standard]>=0.27",
+        "python-multipart",  # form data parsing for FastAPI
+        "starlette>=0.36",
+
+        # --- Templates (Phase 5: replace Mako with Jinja2) ---
+        # "mako>=0.5",       # replaced by Jinja2 in Phase 5
+        "jinja2>=3.0",
+
+        # --- Database / ORM ---
+        "SQLAlchemy>=1.4",
+        "psycopg2>=2.9",
+
+        # --- Cassandra (TODO: migrate pycassa API -> cassandra-driver API) ---
+        # "pycassa>=1.7.0",  # Python 2 only; cassandra-driver is the Py3 replacement
+        #                      API is incompatible — requires adapter work after Phase 4
+        "cassandra-driver>=3.25",
+
+        # --- Caching ---
+        "pylibmc>=1.6.1",    # was pinned to 1.2.2; 1.6+ has Python 3 support
+
+        # --- AMQP (TODO: migrate amqplib API -> pika API) ---
+        # "amqplib",         # Python 2 only
+        "pika>=1.3",         # Python 3 AMQP client; API differs from amqplib
+
+        # --- Cryptography ---
+        # "pycrypto",        # deprecated; pycryptodome (below) covers everything
+        "pycryptodome>=3.18",
+
+        # --- Auth ---
+        "bcrypt>=4.0",       # replaces py-bcrypt (same API, maintained)
+
+        # --- AWS ---
+        "boto3>=1.26",       # replaces boto 2.x (boto3 is the current SDK)
+
+        # --- Web / HTTP ---
+        "requests>=2.28",
+        "httpx>=0.27",       # async HTTP client for FastAPI testing
+
+        # --- Content / Parsing ---
+        "beautifulsoup4>=4.12",   # replaces BeautifulSoup (old py2 package)
+        "chardet>=5.0",
+        "lxml>=4.9",
+        "Pillow>=10.0",
+        "tinycss2>=1.2",
         "l2cs>=2.0.2",
-        "lxml",
-        "kazoo",
-        "stripe",
-        "requests",
-        "tinycss2",
-        "unidecode",
-        "PyYAML",
-        "Pillow",
-        "pylibmc==1.2.2",
-        "webob",
-        "webtest",
-        "python-snappy",
-        "httpagentparser==1.7.8",
-        "raven",
-        "pycryptodome",
-        "ndg-httpsclient",
+
+        # --- Markdown (evaluate snudown first; mistune is the fallback) ---
+        # "snudown>=1.1.0",  # C extension; evaluate Py3 build — see dependency_links
+        "mistune>=3.0",      # pure-Python fallback if snudown doesn't build on Py3
+
+        # --- CAPTCHA (evaluate custom fork first) ---
+        # "pycaptcha",       # evaluate theorangedit/PyCAPTCHA Py3 build — see dependency_links
+
+        # --- Other services ---
+        "kazoo>=2.9",        # Zookeeper client (already Py3 compatible)
+        "stripe>=5.0",
+        "pytz>=2023.3",
+        "Babel>=2.12",
+        "unidecode>=1.3",
+        "PyYAML>=6.0",
+        "python-snappy>=0.6",
+        "httpagentparser>=1.9",  # was pinned to 1.7.8
+        "sentry-sdk>=1.38",      # replaces raven (raven is EOL; sentry-sdk is the successor)
+        "ndg-httpsclient>=0.5",
+        "cython>=3.0",
+
+        # --- i18n ---
+        "Babel>=2.12",
     ],
-    # setup tests (allowing for "python setup.py test")
-    tests_require=['mock', 'nose', 'coverage'],
-    test_suite="nose.collector",
+    # setup tests
+    tests_require=['pytest>=7.0', 'coverage', 'httpx'],
     dependency_links=[
+        # Evaluate these for Python 3 compatibility before removing:
         "https://github.com/theorangedit/snudown/archive/v1.1.3.tar.gz#egg=snudown-1.1.3",
         "https://github.com/theorangedit/PyCAPTCHA/archive/refs/tags/v0.4.zip#egg=pycaptcha-0.4",
     ],
@@ -111,13 +150,6 @@ setup(
         ),
     ],
     entry_points="""
-    [paste.app_factory]
-    main=r2:make_app
-    [paste.paster_command]
-    run = r2.commands:RunCommand
-    shell = pylons.commands:ShellCommand
-    [paste.filter_app_factory]
-    gzip = r2.lib.gzipper:make_gzip_middleware
     [r2.provider.media]
     s3 = r2.lib.providers.media.s3:S3MediaProvider
     filesystem = r2.lib.providers.media.filesystem:FileSystemMediaProvider
