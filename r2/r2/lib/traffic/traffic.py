@@ -29,7 +29,7 @@ import urllib
 from boto.s3.connection import S3Connection
 from boto.emr.connection import EmrConnection
 from boto.exception import S3ResponseError
-from pylons import app_globals as g
+from r2.lib.app_globals import g
 from sqlalchemy.exc import DataError
 
 from r2.lib.emr_helpers import (EmrException, terminate_jobflow,

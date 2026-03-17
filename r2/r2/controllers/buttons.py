@@ -26,9 +26,9 @@ from r2.lib.pages import (ButtonLite, ButtonDemoPanel, WidgetDemoPanel,
 from r2.lib.pages.things import wrap_links
 from r2.models import *
 from r2.lib.validator import *
-from pylons import request, response
-from pylons import tmpl_context as c
-from pylons.i18n import _
+from r2.lib.context import request, response
+from r2.lib.context import c
+from r2.lib.i18n import _
 
 class ButtonsController(RedditController):
     def get_wrapped_link(self, url, link = None, wrapper = None):

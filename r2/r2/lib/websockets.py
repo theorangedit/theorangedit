@@ -27,7 +27,7 @@ import urllib
 import urllib.parse as urlparse
 
 from baseplate.crypto import MessageSigner
-from pylons import app_globals as g
+from r2.lib.app_globals import g
 
 from r2.lib import amqp
 from r2.lib.filters import websafe_json

@@ -29,7 +29,7 @@ from mock import patch, MagicMock
 from r2.models import Message
 from r2.models.builder import UserMessageBuilder, MessageBuilder
 
-from pylons import tmpl_context as c
+from r2.lib.context import c
 
 
 class UserMessageBuilderTest(RedditTestCase):

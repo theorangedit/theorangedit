@@ -23,8 +23,8 @@
 import subprocess
 import tempfile
 import difflib
-from pylons.i18n import _
-from pylons import app_globals as g
+from r2.lib.i18n import _
+from r2.lib.app_globals import g
 
 
 MAX_DIFF_LINE_LENGTH = 4000

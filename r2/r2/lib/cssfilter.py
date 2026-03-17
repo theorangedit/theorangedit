@@ -38,7 +38,7 @@ import unicodedata
 
 import tinycss2
 
-from pylons.i18n import N_
+from r2.lib.i18n import N_
 
 from r2.lib.contrib import rcssmin
 from r2.lib.utils import tup

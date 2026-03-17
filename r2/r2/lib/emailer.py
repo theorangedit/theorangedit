@@ -29,8 +29,8 @@ import datetime
 import traceback, sys
 from smtplib import SMTP_SSL,SMTP
 
-from pylons import tmpl_context as c
-from pylons import app_globals as g
+from r2.lib.context import c
+from r2.lib.app_globals import g
 import simplejson as json
 
 from r2.config import feature

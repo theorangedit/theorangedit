@@ -22,10 +22,10 @@
 
 from datetime import datetime
 
-from pylons import response
-from pylons import app_globals as g
-from pylons import tmpl_context as c
-from pylons.i18n import _
+from r2.lib.context import response
+from r2.lib.app_globals import g
+from r2.lib.context import c
+from r2.lib.i18n import _
 
 from r2.controllers.reddit_base import MinimalController
 from r2.lib import embeds

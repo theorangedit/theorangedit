@@ -22,7 +22,7 @@
 
 from collections import defaultdict
 
-from pylons import app_globals as g
+from r2.lib.app_globals import g
 
 from r2.lib.utils import SimpleSillyStub
 from r2.lib.utils.comment_tree_utils import get_tree_details, calc_num_children

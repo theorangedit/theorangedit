@@ -30,8 +30,8 @@ import traceback
 import sys
 
 from mock import MagicMock, patch
-from pylons import request
-from pylons import app_globals as g
+from r2.lib.context import request
+from r2.lib.app_globals import g
 
 from r2.lib import utils
 

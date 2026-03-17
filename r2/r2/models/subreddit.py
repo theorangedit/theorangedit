@@ -31,10 +31,10 @@ import struct
 from pycassa import types
 from pycassa.util import convert_uuid_to_time
 from pycassa.system_manager import ASCII_TYPE, DATE_TYPE, FLOAT_TYPE, UTF8_TYPE
-from pylons import request
-from pylons import tmpl_context as c
-from pylons import app_globals as g
-from pylons.i18n import _, N_
+from r2.lib.context import request
+from r2.lib.context import c
+from r2.lib.app_globals import g
+from r2.lib.i18n import _, N_
 from thrift.protocol.TProtocol import TProtocolException
 from thrift.Thrift import TApplicationException
 from thrift.transport.TTransport import TTransportException

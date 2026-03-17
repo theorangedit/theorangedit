@@ -22,20 +22,19 @@
 
 """r2
 
-This file loads the finished app from r2.config.middleware.
+Entry point for the theorangedit application.
+
+The ASGI app is exposed via r2.main:app (for uvicorn / gunicorn).
+The make_app() factory is retained for backwards-compatibility with any
+tooling that still calls it.
 """
 
-# _strptime is imported with PyImport_ImportModuleNoBlock which can fail
-# miserably when multiple threads try to import it simultaneously.
-# import this here to get it over with
-# see "Non Blocking Module Imports" in:
-# http://code.google.com/p/modwsgi/wiki/ApplicationIssues
-import _strptime
+# Pre-import _strptime to avoid threading issues with simultaneous imports
+# (see https://code.google.com/p/modwsgi/wiki/ApplicationIssues)
+import _strptime  # noqa: F401
 
-# defer the (hefty) import until it's actually needed. this allows
-# modules below r2 to be imported before cython files are built, also
-# provides a hefty speed boost to said imports when they don't need
-# the app initialization.
+
 def make_app(*args, **kwargs):
+    """Return the configured ASGI application."""
     from r2.config.middleware import make_app as real_make_app
     return real_make_app(*args, **kwargs)

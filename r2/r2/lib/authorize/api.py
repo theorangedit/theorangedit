@@ -31,11 +31,11 @@ http://developer.authorize.net/api/cim/
 """
 
 import re
-from httplib import HTTPSConnection
-from urllib.parse import urllib.parse as urlparse
+from http.client import HTTPSConnection
+import urllib.parse as urlparse
 
 from BeautifulSoup import BeautifulStoneSoup
-from pylons import app_globals as g
+from r2.lib.app_globals import g
 from xml.sax.saxutils import escape
 
 from r2.lib.export import export

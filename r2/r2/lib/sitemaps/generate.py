@@ -64,7 +64,7 @@ Each sitemap and sitemap index will have 50000 links or fewer.
 """
 
 from lxml import etree
-from pylons import app_globals as g
+from r2.lib.app_globals import g
 
 from r2.lib.template_helpers import add_sr
 from r2.lib.utils import in_chunks

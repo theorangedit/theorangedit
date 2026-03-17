@@ -28,7 +28,7 @@ Currently only supports subreddit links but will soon support comment links.
 import tempfile
 
 from boto.s3.connection import S3Connection
-from pylons import app_globals as g
+from r2.lib.app_globals import g
 
 from r2.lib.hadoop_decompress import hadoop_decompress
 

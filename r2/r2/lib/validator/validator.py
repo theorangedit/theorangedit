@@ -25,11 +25,11 @@ import json
 from collections import OrderedDict
 from decimal import Decimal
 
-from pylons import request, response
-from pylons import tmpl_context as c
-from pylons import app_globals as g
-from pylons.i18n import _
-from pylons.controllers.util import abort
+from r2.lib.context import request, response
+from r2.lib.context import c
+from r2.lib.app_globals import g
+from r2.lib.i18n import _
+from r2.lib.base import abort
 
 from r2.config import feature
 from r2.config.extensions import api_type, is_api

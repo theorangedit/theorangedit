@@ -28,8 +28,8 @@ import re
 import subprocess
 import json
 
-from pylons import app_globals as g
-from pylons import tmpl_context as c
+from r2.lib.app_globals import g
+from r2.lib.context import c
 
 from r2.config.paths import get_built_statics_path
 from r2.lib.permissions import ModeratorPermissionSet
@@ -397,7 +397,7 @@ class LocalizedModule(Module):
                     out.write(appendix.get_localized_source(lang) + ";")
 
     def use(self, **kwargs):
-        from pylons.i18n import get_lang
+        from r2.lib.i18n import get_lang
         from r2.lib.template_helpers import static
         from r2.lib.filters import SC_OFF, SC_ON
 

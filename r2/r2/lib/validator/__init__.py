@@ -20,7 +20,7 @@
 # Inc. All Rights Reserved.
 ###############################################################################
 
-from pylons import config
+from r2.lib.context import config
 
 from validator import *
 

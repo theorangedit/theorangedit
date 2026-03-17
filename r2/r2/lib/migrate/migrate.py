@@ -98,7 +98,7 @@ def pushup_permacache(verbosity=1000):
     """When putting cassandra into the permacache chain, we need to
        push everything up into the rest of the chain, so this is
        everything that uses the permacache, as of that check-in."""
-    from pylons import app_globals as g
+    from r2.lib.app_globals import g
     from r2.models import Link, Subreddit, Account
     from r2.lib.db.operators import desc
     from r2.lib.comment_tree import comments_key, messages_key

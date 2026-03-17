@@ -20,9 +20,9 @@
 # Inc. All Rights Reserved.
 ###############################################################################
 
-from pylons import request
-from pylons import tmpl_context as c
-from pylons.controllers.util import abort
+from r2.lib.context import request
+from r2.lib.context import c
+from r2.lib.base import abort
 
 from r2.lib.base import BaseController
 from r2.lib.validator import chkuser

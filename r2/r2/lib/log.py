@@ -23,10 +23,10 @@
 from hashlib import md5
 import sys
 
-from pylons import request
-from pylons import tmpl_context as c
-from pylons import app_globals as g
-from pylons.util import PylonsContext, AttribSafeContextObj, ContextObj
+from r2.lib.context import request
+from r2.lib.context import c
+from r2.lib.app_globals import g
+# pylons.util stubs removed (pylons migration): PylonsContext, AttribSafeContextObj, ContextObj
 import raven
 from raven.processors import Processor
 from weberror.reporter import Reporter

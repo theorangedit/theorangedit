@@ -19,12 +19,12 @@
 # All portions of the code written by reddit are Copyright (c) 2006-2015 reddit
 # Inc. All Rights Reserved.
 ###############################################################################
-from pylons import request
-from pylons import tmpl_context as c
-from pylons import app_globals as g
-from pylons import url
-from pylons.controllers.util import redirect
-from pylons.i18n import _
+from r2.lib.context import request
+from r2.lib.context import c
+from r2.lib.app_globals import g
+from r2.lib.context import url
+from r2.lib.base import redirect
+from r2.lib.i18n import _
 
 from r2.lib.pages import *
 from reddit_base import set_over18_cookie, delete_over18_cookie

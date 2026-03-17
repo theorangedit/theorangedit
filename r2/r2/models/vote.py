@@ -27,7 +27,7 @@ from uuid import uuid1
 
 from pycassa.types import CompositeType, AsciiType
 from pycassa.system_manager import TIME_UUID_TYPE
-from pylons import app_globals as g
+from r2.lib.app_globals import g
 import pytz
 
 from r2.lib import hooks

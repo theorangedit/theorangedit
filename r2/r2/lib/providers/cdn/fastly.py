@@ -22,7 +22,7 @@
 
 import hashlib
 import requests
-from pylons import app_globals as g
+from r2.lib.app_globals import g
 
 from r2.lib.providers.cdn import CdnProvider
 from r2.lib.utils import constant_time_compare

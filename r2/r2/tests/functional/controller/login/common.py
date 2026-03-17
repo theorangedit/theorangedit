@@ -23,7 +23,7 @@ import contextlib
 import unittest
 from mock import patch, MagicMock
 
-from pylons import app_globals as g
+from r2.lib.app_globals import g
 
 from r2.lib.validator import VThrottledLogin, VUname, validator
 from r2.models import Account, NotFound

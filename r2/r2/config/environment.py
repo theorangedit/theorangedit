@@ -23,9 +23,7 @@
 import os
 import mimetypes
 
-from mako.lookup import TemplateLookup
-from pylons.error import handle_mako_error
-from pylons.configuration import PylonsConfig
+from jinja2 import Environment, FileSystemLoader, select_autoescape
 
 import r2.lib.helpers
 from r2.config.paths import (
@@ -33,9 +31,10 @@ from r2.config.paths import (
     get_built_statics_path,
     get_raw_statics_path,
 )
-from r2.config.routing import make_map
 from r2.lib.app_globals import Globals
 from r2.lib.configparse import ConfigValue
+
+import r2.lib.context as _r2_ctx
 
 
 mimetypes.init()
@@ -56,18 +55,20 @@ def load_environment(global_conf={}, app_conf={}, setup_globals=True):
     else:
         paths['static_files'] = get_built_statics_path()
 
-    config = PylonsConfig()
+    config = {}
+    config.update(global_conf)
+    config.update(app_conf)
+    config['r2.paths'] = paths
 
-    config.init_app(global_conf, app_conf, package='r2', paths=paths)
-
-    # don't put action arguments onto c automatically
-    config['pylons.c_attach_args'] = False
-
-    # when accessing non-existent attributes on c, return "" instead of dying
-    config['pylons.strict_tmpl_context'] = False
-
+    # Initialise the application globals singleton.
     g = Globals(config, global_conf, app_conf, paths)
-    config['pylons.app_globals'] = g
+
+    # Publish g into r2.lib.app_globals so all imports resolve correctly.
+    import r2.lib.app_globals as _app_globals_mod
+    _app_globals_mod.g = g
+
+    # Expose config to the per-request context module.
+    _r2_ctx.config.__dict__.update(config)
 
     if setup_globals:
         config['r2.import_private'] = \
@@ -79,46 +80,39 @@ def load_environment(global_conf={}, app_conf={}, setup_globals=True):
     config['r2.plugins'] = g.plugins
     g.startup_timer.intermediate("plugins")
 
-    config['pylons.h'] = r2.lib.helpers
+    config['r2.helpers'] = r2.lib.helpers
+
+    # -----------------------------------------------------------------
+    # Jinja2 template environment (replaces Mako)
+    # -----------------------------------------------------------------
+    template_dirs = paths['templates']
+    # Plugins may contribute additional template directories
+    for plugin in g.plugins:
+        plugin_tmpl = getattr(plugin, 'template_dir', None)
+        if plugin_tmpl and os.path.isdir(plugin_tmpl):
+            template_dirs.append(plugin_tmpl)
+
+    jinja_env = Environment(
+        loader=FileSystemLoader(template_dirs),
+        autoescape=select_autoescape(['html', 'xml']),
+        extensions=['jinja2.ext.i18n'],
+    )
+
+    # Wire up i18n so {{ _("foo") }} works in templates
+    from r2.lib.i18n import _, ungettext
+    jinja_env.install_gettext_callables(_, ungettext, newstyle=True)
+
+    g.jinja_env = jinja_env
+    config['r2.jinja_env'] = jinja_env
+
+    # -----------------------------------------------------------------
+    # Routes map (kept for reference during incremental migration;
+    # FastAPI routing defined in r2.main takes precedence at runtime)
+    # -----------------------------------------------------------------
+    from r2.config.routing import make_map
     config['routes.map'] = make_map(config)
 
-    #override the default response options
-    config['pylons.response_options']['headers'] = {}
-
-    # when mako loads a previously compiled template file from its cache, it
-    # doesn't check that the original template path matches the current path.
-    # in the event that a new plugin defines a template overriding a reddit
-    # template, unless the mtime newer, mako doesn't update the compiled
-    # template. as a workaround, this makes mako store compiled templates with
-    # the original path in the filename, forcing it to update with the path.
-    if "cache_dir" in app_conf:
-        module_directory = os.path.join(app_conf['cache_dir'], 'templates')
-
-        def mako_module_path(filename, uri):
-            filename = filename.lstrip('/').replace('/', '-')
-            path = os.path.join(module_directory, filename + ".py")
-            return os.path.abspath(path)
-    else:
-        # disable caching templates since we don't know where they should go.
-        module_directory = mako_module_path = None
-
-    # set up the templating system
-    config["pylons.app_globals"].mako_lookup = TemplateLookup(
-        directories=paths["templates"],
-        error_handler=handle_mako_error,
-        module_directory=module_directory,
-        input_encoding="utf-8",
-        default_filters=["conditional_websafe"],
-        filesystem_checks=getattr(g, "reload_templates", False),
-        imports=[
-            "from r2.lib.filters import websafe, unsafe, conditional_websafe",
-            "from pylons import request",
-            "from pylons import tmpl_context as c",
-            "from pylons import app_globals as g",
-            "from pylons.i18n import _, ungettext",
-        ],
-        modulename_callable=mako_module_path,
-    )
+    config['r2.response_options'] = {'headers': {}}
 
     if setup_globals:
         g.setup_complete()

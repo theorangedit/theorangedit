@@ -27,9 +27,9 @@ from r2.lib.db.thing import NotFound
 from r2.lib.merge import *
 from r2.models.last_modified import LastModified
 from pycassa.system_manager import TIME_UUID_TYPE
-from pylons import tmpl_context as c
-from pylons import app_globals as g
-from pylons.controllers.util import abort
+from r2.lib.context import c
+from r2.lib.app_globals import g
+from r2.lib.base import abort
 from r2.lib.db.tdb_cassandra import NotFound
 from r2.models.printable import Printable
 from r2.models.account import Account

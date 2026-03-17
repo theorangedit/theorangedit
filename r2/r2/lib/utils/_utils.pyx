@@ -22,7 +22,7 @@
 
 import re
 from datetime import datetime, timedelta
-from pylons.i18n import ungettext, _
+from r2.lib.i18n import ungettext, _
 import math
 
 cpdef str to_base(long q, str alphabet):
@@ -118,12 +118,12 @@ def timeago(str interval):
 
     [num] second|minute|hour|day|week|month|year(s)
     """
-    from pylons import app_globals as g
+    from r2.lib.app_globals import g
     return datetime.now(g.tz) - timeinterval_fromstr(interval)
 
 def timefromnow(interval):
     "The opposite of timeago"
-    from pylons import app_globals as g
+    from r2.lib.app_globals import g
     return datetime.now(g.tz) + timeinterval_fromstr(interval)
 
 def timedelta_by_name(interval):
@@ -218,11 +218,11 @@ cdef timetext(delta, precision=None, bare=True):
     return s
 
 def timesince(d, precision=None):
-    from pylons import app_globals as g
+    from r2.lib.app_globals import g
     return timetext(datetime.now(g.tz) - d, precision)
 
 def timeuntil(d, precision=None):
-    from pylons import app_globals as g
+    from r2.lib.app_globals import g
     return timetext(d - datetime.now(g.tz), precision)
 
 cpdef dict keymap(keys, callfn, mapfn = None, str prefix=''):

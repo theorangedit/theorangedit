@@ -20,8 +20,8 @@
 # Inc. All Rights Reserved.
 ###############################################################################
 
-from pylons import request
-from pylons.i18n import _, N_
+from r2.lib.context import request
+from r2.lib.i18n import _, N_
 
 from r2.models import Account, Message
 from r2.lib.db import queries

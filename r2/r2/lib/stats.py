@@ -312,7 +312,7 @@ class Stats:
     def action_count(self, counter_name, name, delta=1):
         counter = self.get_counter(counter_name)
         if counter:
-            from pylons import request
+            from r2.lib.context import request
             counter.increment('%s.%s' % (request.environ["pylons.routes_dict"]["action"], name), delta=delta)
 
     def action_event_count(self, event_name, state=None, delta=1, true_name="success", false_name="fail"):
@@ -399,7 +399,7 @@ class Stats:
 
     def pg_before_cursor_execute(self, conn, cursor, statement, parameters,
                                context, executemany):
-        from pylons import tmpl_context as c
+        from r2.lib.context import c
 
         context._query_start_time = time.time()
 
@@ -576,7 +576,7 @@ class StatsCollectingConnectionPool(pool.ConnectionPool):
         # of the response from cassandra.
         def instrument(f, get_cf_name, size_sample=0.01):
             def call_with_instrumentation(*args, **kwargs):
-                from pylons import tmpl_context as c
+                from r2.lib.context import c
 
                 cf_name = get_cf_name(args, kwargs)
                 method_name = f.__name__

@@ -30,9 +30,9 @@ import itertools
 import pytz
 from time import mktime
 
-from pylons import app_globals as g
-from pylons import tmpl_context as c
-from pylons import request
+from r2.lib.app_globals import g
+from r2.lib.context import c
+from r2.lib.context import request
 
 from r2.lib import amqp
 from r2.lib import filters

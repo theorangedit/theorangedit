@@ -6,7 +6,7 @@ import time
 
 from boto.s3.connection import S3Connection
 from boto.sqs.connection import SQSConnection
-from pylons import app_globals as g
+from r2.lib.app_globals import g
 
 from r2.lib.s3_helpers import parse_s3_path
 from r2.lib.sitemaps.store import store_sitemaps_in_s3

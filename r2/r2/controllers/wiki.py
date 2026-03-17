@@ -20,9 +20,9 @@
 # Inc. All Rights Reserved.
 ###############################################################################
 
-from pylons import request
-from pylons import tmpl_context as c
-from pylons import app_globals as g
+from r2.lib.context import request
+from r2.lib.context import c
+from r2.lib.app_globals import g
 
 from reddit_base import RedditController
 from r2.controllers.oauth2 import require_oauth2_scope
@@ -81,7 +81,7 @@ from r2.lib.pages import BoringPage, CssError
 from reddit_base import base_listing
 from r2.models import IDBuilder, LinkListing, DefaultSR
 from r2.lib.merge import ConflictException, make_htmldiff
-from pylons.i18n import _
+from r2.lib.i18n import _
 from r2.lib.pages import PaneStack
 from r2.lib.utils import timesince
 from r2.config import extensions

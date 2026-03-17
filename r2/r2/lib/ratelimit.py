@@ -38,7 +38,7 @@ import time
 
 import pylibmc
 
-from pylons import app_globals as g
+from r2.lib.app_globals import g
 
 # AKA, a half open interval.
 class TimeSlice(collections.namedtuple("TimeSlice", ["beginning", "end"])):

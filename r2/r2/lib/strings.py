@@ -26,9 +26,9 @@ removing the need to pollute the code with lots of extra _ and
 ungettext calls.
 """
 
-from pylons import tmpl_context as c
-from pylons import app_globals as g
-from pylons.i18n import _, ungettext, get_lang
+from r2.lib.context import c
+from r2.lib.app_globals import g
+from r2.lib.i18n import _, ungettext, get_lang
 import random
 import babel.numbers
 

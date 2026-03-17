@@ -41,10 +41,10 @@ from r2.models import (
 )
 from r2.models.token import OAuth2Scope, extra_oauth2_scope
 import time, pytz
-from pylons import response
-from pylons import tmpl_context as c
-from pylons import app_globals as g
-from pylons.i18n import _
+from r2.lib.context import response
+from r2.lib.context import c
+from r2.lib.app_globals import g
+from r2.lib.i18n import _
 
 from r2.models.wiki import ImagesByWikiPage
 

@@ -27,10 +27,10 @@ from unittest import TestCase
 from mock import patch, MagicMock
 from collections import defaultdict
 
-import pylons
-from pylons.i18n.translation import _get_translator
+# import pylons removed (pylons migration)
+from r2.lib.i18n import _get_translator
 from routes.util import URLGenerator
-from pylons import url
+from r2.lib.context import url
 import baseplate.events
 import pkg_resources
 import paste.fixture
@@ -66,7 +66,7 @@ except ImportError:
     ):
         from Captcha import Base
 
-from pylons import app_globals as g
+from r2.lib.app_globals import g
 from r2.config.middleware import RedditApp
 
 # unfortunately, because of the deep intertwinded dependency we have in the

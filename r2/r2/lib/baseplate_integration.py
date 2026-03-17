@@ -33,7 +33,8 @@ import functools
 import sys
 
 from baseplate.core import BaseplateObserver, ServerSpanObserver, SpanObserver
-from pylons import app_globals as g, tmpl_context as c
+from r2.lib.app_globals import g
+from r2.lib.context import c
 
 
 def make_server_span(span_name):

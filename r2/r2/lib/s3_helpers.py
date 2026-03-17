@@ -32,7 +32,7 @@ import datetime
 import pytz
 from collections import namedtuple
 
-from pylons import app_globals as g
+from r2.lib.app_globals import g
 
 
 HADOOP_FOLDER_SUFFIX = '_$folder$'

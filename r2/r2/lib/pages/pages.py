@@ -99,11 +99,11 @@ from r2.lib.db import tdb_cassandra, queries
 from r2.config.extensions import is_api
 from r2.lib.menus import CommentSortMenu
 
-from pylons.i18n import _, ungettext
-from pylons import request, config
-from pylons import tmpl_context as c
-from pylons import app_globals as g
-from pylons.controllers.util import abort
+from r2.lib.i18n import _, ungettext
+from r2.lib.context import request, config
+from r2.lib.context import c
+from r2.lib.app_globals import g
+from r2.lib.base import abort
 
 from r2.lib import hooks, inventory, media
 from r2.lib import promote, tracking
@@ -167,7 +167,7 @@ import sys, random, datetime, calendar, simplejson, re, time
 import time
 from itertools import chain, product
 from urllib.parse import quote, urlencode
-from urllib.parse import urllib.parse as urlparse
+import urllib.parse as urlparse
 
 from r2.lib.ip_events import ips_by_account_id
 

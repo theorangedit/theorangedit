@@ -19,8 +19,8 @@
 # All portions of the code written by reddit are Copyright (c) 2006-2015 reddit
 # Inc. All Rights Reserved.
 ###############################################################################
-from pylons import response
-from pylons import tmpl_context as c
+from r2.lib.context import response
+from r2.lib.context import c
 
 from r2.controllers.api_docs import api_doc, api_section
 from r2.controllers.oauth2 import require_oauth2_scope

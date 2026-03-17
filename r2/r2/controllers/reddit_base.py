@@ -27,23 +27,23 @@ import simplejson
 import socket
 import itertools
 
-from Cookie import CookieError
+from http.cookies import CookieError
 from copy import copy
 from datetime import datetime, timedelta
 from functools import wraps
 from hashlib import sha1, md5
 from urllib.parse import quote, unquote
-from urllib.parse import urllib.parse as urlparse
+import urllib.parse as urlparse
 
 import babel.core
 import pylibmc
 
 from mako.filters import url_escape
-from pylons import request, response
-from pylons import tmpl_context as c
-from pylons import app_globals as g
-from pylons.i18n import _
-from pylons.i18n.translation import LanguageError
+from r2.lib.context import request, response
+from r2.lib.context import c
+from r2.lib.app_globals import g
+from r2.lib.i18n import _
+from r2.lib.i18n import LanguageError
 
 from r2.config import feature
 from r2.config.extensions import is_api, set_extension

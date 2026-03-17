@@ -20,7 +20,7 @@
 # Inc. All Rights Reserved.
 ###############################################################################
 
-from pylons.i18n import N_
+from r2.lib.i18n import N_
 
 
 class PermissionSet(dict):

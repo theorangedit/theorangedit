@@ -26,8 +26,8 @@ from r2.tests import RedditTestCase
 
 from datetime import datetime as dt
 from mock import MagicMock, patch
-from pylons import tmpl_context as c
-from pylons import app_globals as g
+from r2.lib.context import c
+from r2.lib.app_globals import g
 from webob.exc import HTTPForbidden
 
 from r2.lib.errors import errors, ErrorSet

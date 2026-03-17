@@ -42,7 +42,7 @@ from PIL import Image, ImageFile
 import lxml.html
 import requests
 
-from pylons import app_globals as g
+from r2.lib.app_globals import g
 
 from r2 import models
 from r2.config import feature

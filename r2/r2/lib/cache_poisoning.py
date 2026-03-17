@@ -1,6 +1,6 @@
 import hashlib
 import hmac
-from pylons import app_globals as g
+from r2.lib.app_globals import g
 
 # A map of cache policies to their respective cache headers
 # loggedout omitted because loggedout responses are intentionally cacheable

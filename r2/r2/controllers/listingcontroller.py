@@ -59,8 +59,8 @@ import socket
 
 from api_docs import api_doc, api_section
 
-from pylons import app_globals as g
-from pylons.i18n import _
+from r2.lib.app_globals import g
+from r2.lib.i18n import _
 
 from datetime import timedelta
 import random

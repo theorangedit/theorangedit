@@ -27,7 +27,7 @@ from r2.lib.validator import VByName, VUser, VModhash
 
 from r2.models import Link, Message, Account
 
-from pylons import app_globals as g
+from r2.lib.app_globals import g
 
 
 class DelMsgTest(RedditControllerTestCase):

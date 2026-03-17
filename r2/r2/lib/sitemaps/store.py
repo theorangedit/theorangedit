@@ -47,7 +47,7 @@ from io import StringIO
 
 from boto.s3.connection import S3Connection
 from boto.s3.key import Key
-from pylons import app_globals as g
+from r2.lib.app_globals import g
 
 from r2.lib.sitemaps.generate import subreddit_sitemaps, sitemap_index
 

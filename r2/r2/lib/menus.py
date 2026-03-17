@@ -20,10 +20,10 @@
 # Inc. All Rights Reserved.
 ###############################################################################
 
-from pylons import request
-from pylons import tmpl_context as c
-from pylons import app_globals as g
-from pylons.i18n import _, N_
+from r2.lib.context import request
+from r2.lib.context import c
+from r2.lib.app_globals import g
+from r2.lib.i18n import _, N_
 
 from r2.config import feature
 from r2.lib.db import operators

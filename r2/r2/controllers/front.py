@@ -20,7 +20,7 @@
 # Inc. All Rights Reserved.
 ###############################################################################
 
-from pylons.i18n import _, ungettext
+from r2.lib.i18n import _, ungettext
 from r2.controllers.reddit_base import (
     base_listing,
     disable_subreddit_css,
@@ -56,9 +56,9 @@ from listingcontroller import ListingController
 from oauth2 import require_oauth2_scope
 from api_docs import api_doc, api_section
 
-from pylons import request
-from pylons import tmpl_context as c
-from pylons import app_globals as g
+from r2.lib.context import request
+from r2.lib.context import c
+from r2.lib.app_globals import g
 
 from r2.models.token import EmailVerificationToken
 from r2.controllers.ipn import generate_blob, validate_blob, GoldException

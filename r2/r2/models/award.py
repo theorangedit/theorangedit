@@ -20,7 +20,7 @@
 # Inc. All Rights Reserved.
 ###############################################################################
 
-from pylons import app_globals as g
+from r2.lib.app_globals import g
 
 from r2.lib.db.operators import asc, desc, lower
 from r2.lib.db.thing import Thing, Relation, NotFound

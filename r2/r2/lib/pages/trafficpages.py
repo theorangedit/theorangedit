@@ -26,10 +26,10 @@ import datetime
 import pytz
 import urllib
 
-from pylons.i18n import _
-from pylons import request
-from pylons import tmpl_context as c
-from pylons import app_globals as g
+from r2.lib.i18n import _
+from r2.lib.context import request
+from r2.lib.context import c
+from r2.lib.app_globals import g
 
 import babel.core
 from babel.dates import format_datetime

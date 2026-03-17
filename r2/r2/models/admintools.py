@@ -42,10 +42,10 @@ from r2.models.token import AwardClaimToken
 from r2.models.wiki import WikiPage
 
 from _pylibmc import MemcachedError
-from pylons import config
-from pylons import tmpl_context as c
-from pylons import app_globals as g
-from pylons.i18n import _
+from r2.lib.context import config
+from r2.lib.context import c
+from r2.lib.app_globals import g
+from r2.lib.i18n import _
 
 from datetime import datetime, timedelta
 from copy import copy

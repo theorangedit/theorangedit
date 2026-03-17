@@ -23,7 +23,7 @@
 from reddit_base import RedditController
 import io
 import r2.lib.captcha as captcha
-from pylons import response
+from r2.lib.context import response
 
 from r2.controllers.api_docs import api_doc, api_section
 from r2.controllers.oauth2 import allow_oauth2_access

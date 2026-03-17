@@ -20,7 +20,7 @@
 # Inc. All Rights Reserved.
 ###############################################################################
 
-from pylons import app_globals as g
+from r2.lib.app_globals import g
 from datetime import timedelta as timedelta
 from datetime import datetime
 import sqlalchemy as sa

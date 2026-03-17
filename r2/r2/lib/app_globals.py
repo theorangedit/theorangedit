@@ -21,7 +21,7 @@
 ###############################################################################
 
 from datetime import datetime
-from urllib.parse import urllib.parse as urlparse
+import urllib.parse as urlparse
 
 import base64
 import configparser
@@ -1096,3 +1096,6 @@ class Globals(object):
     @property
     def search_syntaxes(self):
         return SEARCH_SYNTAXES[self.config.get('search_provider')]
+
+# Module-level singleton — set by r2.config.environment.load_environment()
+g = None

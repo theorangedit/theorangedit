@@ -23,7 +23,7 @@
 from datetime import datetime
 import heapq
 
-from pylons import app_globals as g
+from r2.lib.app_globals import g
 
 from r2.lib import count
 from r2.lib.sgm import sgm

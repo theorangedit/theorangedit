@@ -29,7 +29,7 @@ import pytz
 
 from datetime import datetime
 from collections import namedtuple
-from pylons import app_globals as g
+from r2.lib.app_globals import g
 
 from r2.lib.utils import Storage, epoch_timestamp, constant_time_compare, tup
 

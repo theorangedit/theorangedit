@@ -26,9 +26,9 @@ import base64
 import hashlib
 import urllib
 
-from pylons import request
-from pylons import tmpl_context as c
-from pylons import app_globals as g
+from r2.lib.context import request
+from r2.lib.context import c
+from r2.lib.app_globals import g
 
 from r2.lib.filters import _force_utf8
 

@@ -25,11 +25,11 @@ from functools import wraps
 import datetime
 import re
 
-from pylons.i18n import _
+from r2.lib.i18n import _
 
-from pylons import request
-from pylons import tmpl_context as c
-from pylons import app_globals as g
+from r2.lib.context import request
+from r2.lib.context import c
+from r2.lib.app_globals import g
 
 from r2.models.wiki import WikiPage, WikiRevision, WikiBadRevision
 from r2.lib.validator import (

@@ -23,8 +23,8 @@
 from r2.models import Link, Subreddit
 from r2.lib import utils
 from r2.lib.db.operators import desc
-from pylons import config
-from pylons import app_globals as g
+from r2.lib.context import config
+from r2.lib.app_globals import g
 
 
 count_period = g.rising_period

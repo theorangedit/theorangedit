@@ -46,7 +46,7 @@ class MailgunEmailProvider(EmailProvider):
 
     def send_email(self, to_address, from_address, subject, text, reply_to,
                    parent_email_id=None, other_email_ids=None):
-        from pylons import app_globals as g
+        from r2.lib.app_globals import g
 
         if not text and not html:
             msg = "must provide either text or html in email body"

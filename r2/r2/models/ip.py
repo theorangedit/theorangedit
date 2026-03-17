@@ -2,7 +2,7 @@ import datetime
 
 from pycassa.batch import Mutator
 from pycassa.system_manager import ASCII_TYPE
-from pylons import app_globals as g
+from r2.lib.app_globals import g
 import pytz
 
 from r2.lib.contrib.ipaddress import ip_address

@@ -19,8 +19,8 @@
 # All portions of the code written by reddit are Copyright (c) 2006-2015 reddit
 # Inc. All Rights Reserved.
 ###############################################################################
-from pylons import request, response
-from pylons import app_globals as g
+from r2.lib.context import request, response
+from r2.lib.app_globals import g
 
 from r2.controllers.reddit_base import MinimalController
 from r2.lib.base import abort

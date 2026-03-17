@@ -37,10 +37,10 @@ from r2.controllers.reddit_base import (
     set_user_cookie,
 )
 
-from pylons.i18n import _
-from pylons import request, response
-from pylons import tmpl_context as c
-from pylons import app_globals as g
+from r2.lib.i18n import _
+from r2.lib.context import request, response
+from r2.lib.context import c
+from r2.lib.app_globals import g
 
 from r2.lib.validator import *
 
@@ -136,7 +136,7 @@ from r2.models.vote import Vote
 from r2.lib.merge import ConflictException
 
 from datetime import datetime, timedelta
-from urllib.parse import urllib.parse as urlparse
+import urllib.parse as urlparse
 
 
 class ApiminimalController(MinimalController):

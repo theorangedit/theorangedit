@@ -30,9 +30,9 @@ from io import StringIO
 
 import babel.messages.frontend
 import babel.messages.pofile
-import pylons
+# import pylons removed (pylons migration)
 
-from pylons.i18n.translation import translation, LanguageError, NullTranslations
+from r2.lib.i18n import translation, LanguageError, NullTranslations
 
 try:
     import reddit_i18n
@@ -48,7 +48,7 @@ SOURCE_LANG = 'en'
 
 def _get_translator(lang, graceful_fail=False, **kwargs):
     """Utility method to get a valid translator object from a language name"""
-    from pylons import config
+    from r2.lib.context import config
 
     if not isinstance(lang, list):
         lang = [lang]

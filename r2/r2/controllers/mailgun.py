@@ -25,8 +25,8 @@ import hmac
 import re
 import time
 
-from pylons import app_globals as g
-from pylons import request
+from r2.lib.app_globals import g
+from r2.lib.context import request
 
 from r2.config import feature
 from r2.controllers.reddit_base import RedditController

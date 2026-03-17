@@ -21,7 +21,7 @@
 ###############################################################################
 
 from copy import copy
-from pylons import app_globals as g
+from r2.lib.app_globals import g
 import os
 from time import time, sleep
 

@@ -28,7 +28,7 @@ from curses.ascii import isgraph
 import logging
 from time import sleep
 
-from pylons import app_globals as g
+from r2.lib.app_globals import g
 
 import pylibmc
 from _pylibmc import MemcachedError
@@ -1119,7 +1119,7 @@ def make_key_id(*a, **kw):
 
 
 def test_stale():
-    from pylons import app_globals as g
+    from r2.lib.app_globals import g
     ca = g.gencache
     assert isinstance(ca, StaleCacheChain)
 

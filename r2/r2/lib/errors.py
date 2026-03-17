@@ -22,9 +22,9 @@
 
 from webob.exc import HTTPBadRequest, HTTPForbidden, status_map
 from r2.lib.utils import Storage, tup
-from pylons import request
-from pylons import app_globals as g
-from pylons.i18n import _
+from r2.lib.context import request
+from r2.lib.app_globals import g
+from r2.lib.i18n import _
 from copy import copy
 
 

@@ -40,7 +40,8 @@ from datetime import date, datetime, timedelta
 from decimal import Decimal
 from urllib.parse import unquote_plus, unquote
 from urllib.request import urlopen, Request
-from urllib.parse import urllib.parse as urlparse, urlunparse
+import urllib.parse as urlparse
+from urllib.parse import urlunparse
 
 import pytz
 import snudown
@@ -50,10 +51,10 @@ from r2.lib.utils import reddit_agent_parser
 from babel.dates import TIMEDELTA_UNITS
 from BeautifulSoup import BeautifulSoup, SoupStrainer
 from mako.filters import url_escape
-from pylons import request, config
-from pylons import tmpl_context as c
-from pylons import app_globals as g
-from pylons.i18n import ungettext, _
+from r2.lib.context import request, config
+from r2.lib.context import c
+from r2.lib.app_globals import g
+from r2.lib.i18n import ungettext, _
 
 from r2.lib.contrib import ipaddress
 from r2.lib.filters import _force_unicode, _force_utf8

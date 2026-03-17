@@ -34,7 +34,7 @@ import time
 import httpagentparser
 import time
 
-from pylons import app_globals as g
+from r2.lib.app_globals import g
 from uuid import uuid4
 from wsgiref.handlers import format_date_time
 

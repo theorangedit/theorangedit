@@ -24,7 +24,7 @@ import os
 import shutil
 import urllib.parse as urlparse
 
-from pylons import app_globals as g
+from r2.lib.app_globals import g
 
 from r2.lib.configparse import ConfigValue
 from r2.lib.providers.media import MediaProvider

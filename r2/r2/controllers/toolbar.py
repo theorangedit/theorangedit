@@ -22,8 +22,8 @@
 import re
 import string
 
-from pylons import tmpl_context as c
-from pylons import app_globals as g
+from r2.lib.context import c
+from r2.lib.app_globals import g
 
 from reddit_base import RedditController
 from r2.lib import utils

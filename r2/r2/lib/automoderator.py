@@ -44,7 +44,7 @@ import re
 import traceback
 import yaml
 
-from pylons import app_globals as g
+from r2.lib.app_globals import g
 
 from r2.lib import amqp
 from r2.lib.db import queries

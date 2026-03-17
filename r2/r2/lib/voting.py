@@ -24,7 +24,8 @@ from collections import defaultdict
 from datetime import datetime
 import json
 
-from pylons import tmpl_context as c, app_globals as g, request
+from r2.lib.app_globals import g
+from r2.lib.context import c, request
 
 from r2.lib import amqp, hooks
 from r2.lib.eventcollector import Event

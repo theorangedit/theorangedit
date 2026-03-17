@@ -19,8 +19,8 @@
 # All portions of the code written by reddit are Copyright (c) 2006-2015 reddit
 # Inc. All Rights Reserved.
 ###############################################################################
-from pylons import request
-from pylons import tmpl_context as c
+from r2.lib.context import request
+from r2.lib.context import c
 
 from r2.config.extensions import set_extension
 from r2.controllers.reddit_base import RedditController, generate_modhash
