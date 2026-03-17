@@ -20,35 +20,106 @@
 # Inc. All Rights Reserved.
 ###############################################################################
 
-import random, string
+"""
+CAPTCHA generation using Pillow (replaces the PyCAPTCHA C extension).
+
+Generates a simple distorted-text CAPTCHA image returned as JPEG bytes.
+"""
+
+import io
+import math
+import random
+import string
+
+from PIL import Image, ImageDraw, ImageFont, ImageFilter
 
 from r2.lib.app_globals import g
-
-from Captcha.Base import randomIdentifier
-from Captcha.Visual import Text, Backgrounds, Distortions, ImageCaptcha
-
 
 IDEN_LENGTH = 32
 SOL_LENGTH = 6
 
-class RandCaptcha(ImageCaptcha):
-    defaultSize = (120, 50)
-    fontFactory = Text.FontFactory(18, "vera/VeraBd.ttf")
+# Image dimensions matching the old PyCAPTCHA defaults
+_WIDTH = 120
+_HEIGHT = 50
+_BG_COLOR = (0, 0, 0)
+_TEXT_COLOR = (255, 255, 255)
+_GRID_COLOR = (60, 60, 60)
 
-    def getLayers(self, solution="blah"):
-        self.addSolution(solution)
-        return ((Backgrounds.Grid(size=8, foreground="white"),
-                 Distortions.SineWarp(amplitudeRange=(5,9))),
-                (Text.TextLayer(solution,
-                               textColor = 'white',
-                               fontFactory = self.fontFactory),
-                 Distortions.SineWarp()))
+
+def _draw_grid(draw, width, height, size=8):
+    """Draw a subtle grid background."""
+    for x in range(0, width, size):
+        draw.line([(x, 0), (x, height)], fill=_GRID_COLOR)
+    for y in range(0, height, size):
+        draw.line([(0, y), (width, y)], fill=_GRID_COLOR)
+
+
+def _sine_warp(image, amplitude=5):
+    """Apply a horizontal sine-wave distortion to the image."""
+    width, height = image.size
+    pixels = image.load()
+    warped = Image.new('RGB', (width, height), _BG_COLOR)
+    warped_px = warped.load()
+    freq = random.uniform(0.3, 0.7)
+    phase = random.uniform(0, 2 * math.pi)
+    for x in range(width):
+        for y in range(height):
+            offset = int(amplitude * math.sin(2 * math.pi * freq * x / width + phase))
+            src_y = (y + offset) % height
+            warped_px[x, y] = pixels[x, src_y]
+    return warped
+
+
+def _render_captcha(solution):
+    """
+    Render a CAPTCHA image for the given solution string.
+    Returns JPEG bytes.
+    """
+    img = Image.new('RGB', (_WIDTH, _HEIGHT), _BG_COLOR)
+    draw = ImageDraw.Draw(img)
+    _draw_grid(draw, _WIDTH, _HEIGHT)
+
+    # Try to load a bundled font; fall back to the default bitmap font
+    try:
+        import os
+        font_path = os.path.join(
+            os.path.dirname(__file__), '..', 'public', 'static', 'fonts', 'VeraBd.ttf'
+        )
+        font = ImageFont.truetype(font_path, 18)
+    except (IOError, OSError):
+        font = ImageFont.load_default()
+
+    # Center the text
+    try:
+        bbox = draw.textbbox((0, 0), solution, font=font)
+        text_w = bbox[2] - bbox[0]
+        text_h = bbox[3] - bbox[1]
+    except AttributeError:
+        # Older Pillow without textbbox
+        text_w, text_h = draw.textsize(solution, font=font)
+
+    x = (_WIDTH - text_w) // 2
+    y = (_HEIGHT - text_h) // 2
+    draw.text((x, y), solution, fill=_TEXT_COLOR, font=font)
+
+    # Apply sine warp distortion
+    img = _sine_warp(img, amplitude=random.randint(5, 9))
+
+    # Slight blur to make OCR harder
+    img = img.filter(ImageFilter.GaussianBlur(radius=0.5))
+
+    buf = io.BytesIO()
+    img.save(buf, format='JPEG', quality=85)
+    return buf.getvalue()
+
 
 def get_iden():
-    return randomIdentifier(length=IDEN_LENGTH)
+    return ''.join(random.choices(string.ascii_lowercase + string.digits, k=IDEN_LENGTH))
+
 
 def make_solution():
-    return randomIdentifier(alphabet=string.ascii_letters, length = SOL_LENGTH).upper()
+    return ''.join(random.choices(string.ascii_letters, k=SOL_LENGTH)).upper()
+
 
 def get_image(iden):
     key = "captcha:%s" % iden
@@ -56,7 +127,7 @@ def get_image(iden):
     if not solution:
         solution = make_solution()
         g.gencache.set(key, solution, time=300)
-    return RandCaptcha(solution=solution).render()
+    return _render_captcha(solution)
 
 
 def valid_solution(iden, solution):
@@ -67,8 +138,7 @@ def valid_solution(iden, solution):
             len(iden) != IDEN_LENGTH or
             len(solution) != SOL_LENGTH or
             solution.upper() != g.gencache.get(key)):
-        # the guess was wrong so make a new solution for the next attempt--the
-        # client will need to refresh the image before guessing again
+        # wrong guess — generate a new solution for the next attempt
         solution = make_solution()
         g.gencache.set(key, solution, time=300)
         return False

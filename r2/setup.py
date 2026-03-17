@@ -109,12 +109,12 @@ setup(
         "tinycss2>=1.2",
         "l2cs>=2.0.2",
 
-        # --- Markdown (evaluate snudown first; mistune is the fallback) ---
-        # "snudown>=1.1.0",  # C extension; evaluate Py3 build — see dependency_links
-        "mistune>=3.0",      # pure-Python fallback if snudown doesn't build on Py3
+        # --- Markdown ---
+        # snudown (Reddit C extension) replaced by mistune (pure Python, Py3 native)
+        "mistune>=3.0",
 
-        # --- CAPTCHA (evaluate custom fork first) ---
-        # "pycaptcha",       # evaluate theorangedit/PyCAPTCHA Py3 build — see dependency_links
+        # --- CAPTCHA ---
+        # PyCAPTCHA (C extension) replaced by Pillow-based generation (see r2/r2/lib/captcha.py)
 
         # --- Other services ---
         "kazoo>=2.9",        # Zookeeper client (already Py3 compatible)
@@ -134,11 +134,7 @@ setup(
     ],
     # setup tests
     tests_require=['pytest>=7.0', 'coverage', 'httpx'],
-    dependency_links=[
-        # Evaluate these for Python 3 compatibility before removing:
-        "https://github.com/theorangedit/snudown/archive/v1.1.3.tar.gz#egg=snudown-1.1.3",
-        "https://github.com/theorangedit/PyCAPTCHA/archive/refs/tags/v0.4.zip#egg=pycaptcha-0.4",
-    ],
+    dependency_links=[],
     packages=find_packages(exclude=["ez_setup"]),
     cmdclass=commands,
     ext_modules=pyx_extensions + [

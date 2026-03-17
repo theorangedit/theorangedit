@@ -44,7 +44,7 @@ import urllib.parse as urlparse
 from urllib.parse import urlunparse
 
 import pytz
-import snudown
+from r2.lib.filters import snudown
 import unidecode
 from r2.lib.utils import reddit_agent_parser
 

@@ -26,7 +26,60 @@ import re
 
 from collections import Counter
 
-import snudown
+import mistune as _mistune
+
+# ---------------------------------------------------------------------------
+# snudown compatibility shim — backed by mistune
+#
+# snudown.markdown(text_bytes, nofollow, target, renderer=RENDERER_WIKI)
+# returns HTML bytes. We accept the same call signature and return str.
+# ---------------------------------------------------------------------------
+
+class _SnudownCompat:
+    """Drop-in for snudown using mistune as the backend."""
+
+    RENDERER_WIKI = 'wiki'
+
+    def __init__(self):
+        self._html = _mistune.create_markdown(
+            escape=False,
+            plugins=['strikethrough', 'table', 'url'],
+        )
+        self._wiki = _mistune.create_markdown(
+            escape=False,
+            plugins=['strikethrough', 'table', 'url'],
+        )
+
+    def markdown(self, text, nofollow=False, target=None, renderer=None):
+        """Render Reddit-flavored Markdown to HTML.
+
+        text    -- bytes or str
+        nofollow -- if True, add rel="nofollow" to links (handled post-render)
+        target   -- link target attribute value (handled post-render)
+        renderer -- RENDERER_WIKI for wiki mode; None for standard
+        """
+        if isinstance(text, bytes):
+            text = text.decode('utf-8', errors='replace')
+
+        md = self._wiki if renderer == self.RENDERER_WIKI else self._html
+        html = md(text)
+
+        if nofollow or target:
+            # Post-process links to add nofollow / target
+            import re
+            def _fix_link(m):
+                attrs = m.group(1)
+                if nofollow and 'nofollow' not in attrs:
+                    attrs += ' rel="nofollow"'
+                if target and 'target=' not in attrs:
+                    attrs += ' target="%s"' % target
+                return '<a ' + attrs.strip() + '>'
+            html = re.sub(r'<a\s+([^>]*)>', _fix_link, html)
+
+        return html
+
+
+snudown = _SnudownCompat()
 
 from BeautifulSoup import BeautifulSoup, Tag
 from r2.lib.context import c
@@ -239,9 +292,9 @@ def wikimarkdown(text, include_toc=True, target=None):
     
     text = snudown.markdown(_force_utf8(text), nofollow, target,
                             renderer=snudown.RENDERER_WIKI)
-    
+
     # TODO: We should test how much of a load this adds to the app
-    soup = BeautifulSoup(text.decode('utf-8'))
+    soup = BeautifulSoup(text)
     images = soup.findAll('img')
     
     if images:

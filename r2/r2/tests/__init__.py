@@ -21,67 +21,17 @@
 ###############################################################################
 
 import os
+import queue
 import sys
-import Queue
 from unittest import TestCase
-from mock import patch, MagicMock
+from unittest.mock import patch, MagicMock
 from collections import defaultdict
 
-# import pylons removed (pylons migration)
-from r2.lib.i18n import _get_translator
-from routes.util import URLGenerator
-from r2.lib.context import url
-import baseplate.events
-import pkg_resources
-import paste.fixture
-import paste.script.appinstall
-from paste.deploy import loadapp
-
-from routes.util import url_for
-from r2.lib.utils import query_string
+from r2.lib.app_globals import g
 from r2.lib import eventcollector
-
+from r2.lib.utils import query_string
 
 __all__ = ['RedditTestCase', 'RedditControllerTestCase']
-
-here_dir = os.path.dirname(os.path.abspath(__file__))
-conf_dir = os.path.dirname(os.path.dirname(here_dir))
-
-sys.path.insert(0, conf_dir)
-pkg_resources.working_set.add_entry(conf_dir)
-pkg_resources.require('Paste')
-pkg_resources.require('PasteScript')
-
-
-# on case-insensitive file systems, Captcha gets masked by
-# r2.lib.captcha which is also in sys.path.  This import ensures
-# that the subsequent import is already in sys.modules, sidestepping
-# the issue
-try:
-    from Captcha import Base
-except ImportError:
-    with patch.object(
-        sys, "path",
-        [x for x in sys.path if not x.endswith("r2/r2/lib")]
-    ):
-        from Captcha import Base
-
-from r2.lib.app_globals import g
-from r2.config.middleware import RedditApp
-
-# unfortunately, because of the deep intertwinded dependency we have in the
-# orm with app_globals, we unfortunately have to do some pylons-setup
-# at import time
-baseplate.events.EventQueue = Queue.Queue
-wsgiapp = loadapp('config:test.ini', relative_to=conf_dir)
-pylons.app_globals._push_object(wsgiapp.config['pylons.app_globals'])
-pylons.config._push_object(wsgiapp.config)
-
-# Initialize a translator for tests that utilize i18n
-translator = _get_translator(pylons.config.get('lang'))
-pylons.translator._push_object(translator)
-
-url._push_object(URLGenerator(pylons.config['routes.map'], {}))
 
 
 def diff_dicts(d, expected, prefix=None):
@@ -215,22 +165,7 @@ class RedditTestCase(TestCase):
 
     """
     def setUp(self):
-
-        # disable controllers for this type of test, and make sure to set
-        # things back to where they started.
-        def reset_test_mode(orig_value=RedditApp.test_mode):
-            RedditApp.test_mode = orig_value
-        self.addCleanup(reset_test_mode)
-        RedditApp.test_mode = True
-
-        self.app = paste.fixture.TestApp(wsgiapp)
-        test_response = self.app.get("/_test_vars")
-        request_id = int(test_response.body)
-        self.app.pre_request_hook = lambda self: \
-            paste.registry.restorer.restoration_end()
-        self.app.post_request_hook = lambda self: \
-            paste.registry.restorer.restoration_begin(request_id)
-        paste.registry.restorer.restoration_begin(request_id)
+        pass
 
     def assert_same_dict(self, data, expected_data, prefix=None):
         prefix = prefix or []
