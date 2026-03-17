@@ -186,7 +186,7 @@ class ErrorController(RedditController):
             response.headers["Retry-After"] = str(retry_after)
         return request.environ['usable_error_content']
 
-    def GET_document(self):
+    async def GET_document(self):
         try:
             c.errors = c.errors or ErrorSet()
             # clear cookies the old fashioned way 
@@ -207,7 +207,7 @@ class ErrorController(RedditController):
                 c.user = UnloggedUser(browser_langs=None)
 
             if srname:
-                c.site = Subreddit._by_name(srname)
+                c.site = await Subreddit._by_name(srname)
 
             if ('allow_framing' in request.GET):
                 c.allow_framing = bool(request.GET['allow_framing'] == '1')
@@ -239,7 +239,7 @@ class ErrorController(RedditController):
                     return scriptsafe_dumps(data)
                 return websafe_json(json.dumps(data))
             elif takedown and code == 404:
-                link = Link._by_fullname(takedown)
+                link = await Link._by_fullname(takedown)
                 return pages.TakedownPage(link).render()
             elif code == 400:
                 return self.send400()

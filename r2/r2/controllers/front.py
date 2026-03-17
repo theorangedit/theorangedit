@@ -788,7 +788,7 @@ class FrontController(RedditController):
 
         return pane
 
-    def _edit_normal_reddit(self, location, created):
+    async def _edit_normal_reddit(self, location, created):
         if (location == 'edit' and
                 c.user_is_loggedin and
                 (c.user_is_admin or
@@ -800,7 +800,7 @@ class FrontController(RedditController):
                 pane.append(InfoBar(message=infobar_message))
 
             c.allow_styles = True
-            c.site = Subreddit._byID(c.site._id, data=True, stale=False)
+            c.site = await Subreddit._byID(c.site._id, data=True, stale=False)
             pane.append(CreateSubreddit(site=c.site))
         elif (location == 'stylesheet'
               and c.site.can_change_stylesheet(c.user)
@@ -913,7 +913,7 @@ class FrontController(RedditController):
               created=VOneOf('created', ('true','false'),
                              default='false'))
     @api_doc(api_section.subreddits, uri="/r/{subreddit}/about/edit")
-    def GET_editreddit(self, location, created):
+    async def GET_editreddit(self, location, created):
         """Get the current settings of a subreddit.
 
         In the API, this returns the current settings of the subreddit as used
@@ -927,7 +927,7 @@ class FrontController(RedditController):
         else:
             VNotInTimeout().run(action_name="pageview",
                 details_text="editreddit_%s" % location, target=c.site)
-            return self._edit_normal_reddit(location, created)
+            return await self._edit_normal_reddit(location, created)
 
     @require_oauth2_scope("read")
     @api_doc(api_section.subreddits, uri='/r/{subreddit}/about')

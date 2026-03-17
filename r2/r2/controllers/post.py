@@ -47,16 +47,16 @@ class PostController(ApiController):
     @csrf_exempt
     @validate(pref_lang = VLang('lang'),
               all_langs = VOneOf('all-langs', ('all', 'some'), default='all'))
-    def POST_unlogged_options(self, all_langs, pref_lang):
+    async def POST_unlogged_options(self, all_langs, pref_lang):
         prefs = {"pref_lang": pref_lang}
         set_prefs(c.user, prefs)
-        c.user._commit()
+        await c.user._commit()
         return self.redirect(request.referer)
 
     @validate(VUser(), VModhash(),
               all_langs=VOneOf('all-langs', ('all', 'some'), default='all'),
               **PREFS_VALIDATORS)
-    def POST_options(self, all_langs, **prefs):
+    async def POST_options(self, all_langs, **prefs):
         if feature.is_enabled("autoexpand_media_previews"):
             validator = VOneOf('media_preview', ('on', 'off', 'subreddit'))
             value = request.params.get('media_preview')
@@ -74,7 +74,7 @@ class PostController(ApiController):
             return self.redirect(u.unparse())
 
         set_prefs(c.user, prefs)
-        c.user._commit()
+        await c.user._commit()
         u.update_query(done='true')
         return self.redirect(u.unparse())
 
@@ -113,18 +113,18 @@ class PostController(ApiController):
         over18=nop('over18'),
         dest=VDestination(default='/'),
     )
-    def POST_over18(self, over18, dest):
+    async def POST_over18(self, over18, dest):
         if over18 == 'yes':
             if c.user_is_loggedin and not c.errors:
                 c.user.pref_over_18 = True
-                c.user._commit()
+                await c.user._commit()
             else:
                 set_over18_cookie()
             return self.redirect(dest)
         else:
             if c.user_is_loggedin and not c.errors:
                 c.user.pref_over_18 = False
-                c.user._commit()
+                await c.user._commit()
             else:
                 delete_over18_cookie()
             return self.redirect('/')

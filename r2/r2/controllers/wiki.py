@@ -310,7 +310,7 @@ class WikiController(RedditController):
         permlevel=VInt('permlevel'),
         listed=VBoolean('listed'),
     )
-    def POST_wiki_settings(self, page, permlevel, listed):
+    async def POST_wiki_settings(self, page, permlevel, listed):
         """Update the permissions and visibility of wiki `page`"""
         oldpermlevel = page.permlevel
         if oldpermlevel != permlevel:
@@ -326,7 +326,7 @@ class WikiController(RedditController):
             self.handle_error(403, 'INVALID_PERMLEVEL')
         if page.listed != listed:
             page.listed = listed
-            page._commit()
+            await page._commit()
             verb = 'Relisted' if listed else 'Delisted'
             description = '%s page %s' % (verb, page.name)
             ModAction.create(c.site, c.user, 'wikipagelisted',
@@ -385,7 +385,7 @@ class WikiApiController(WikiController):
               page_name=VWikiPageName('page'),
               reason=VPrintable('reason', 256, empty_error=None))
     @api_doc(api_section.wiki, uri='/api/wiki/edit', uses_site=True)
-    def POST_wiki_edit(self, pageandprevious, content, page_name, reason):
+    async def POST_wiki_edit(self, pageandprevious, content, page_name, reason):
         """Edit a wiki `page`"""
         page, previous = pageandprevious
 
@@ -449,7 +449,7 @@ class WikiApiController(WikiController):
                 # object. TODO: change this to minimize subreddit get sizes.
                 if page.special and page.name in ATTRIBUTE_BY_PAGE:
                     setattr(c.site, ATTRIBUTE_BY_PAGE[page.name], content)
-                    c.site._commit()
+                    await c.site._commit()
 
                 if page.special or c.is_wiki_mod:
                     description = modactions.get(page.name, 'Page %s edited' % page.name)
@@ -490,14 +490,14 @@ class WikiApiController(WikiController):
         pv=VWikiPageAndVersion(('page', 'revision')),
         deleted=VBoolean('deleted'),
     )
-    def POST_wiki_revision_delete(self, pv, deleted):
+    async def POST_wiki_revision_delete(self, pv, deleted):
         page, revision = pv
         if not revision:
             self.handle_error(400, 'INVALID_REVISION')
         if deleted and page.revision == str(revision._id):
             self.handle_error(400, 'REVISION_IS_CURRENT')
         revision.admin_deleted = deleted
-        revision._commit()
+        await revision._commit()
         return json.dumps({'status': revision.admin_deleted})
 
     @require_oauth2_scope("modwiki")
@@ -520,7 +520,7 @@ class WikiApiController(WikiController):
               VWikiModerator(),
               pv=VWikiPageAndVersion(('page', 'revision')))
     @api_doc(api_section.wiki, uri='/api/wiki/revert', uses_site=True)
-    def POST_wiki_revision_revert(self, pv):
+    async def POST_wiki_revision_revert(self, pv):
         """Revert a wiki `page` to `revision`"""
         page, revision = pv
         if not revision:
@@ -542,7 +542,7 @@ class WikiApiController(WikiController):
                 # object. TODO: change this to minimize subreddit get sizes.
                 if page.name in ATTRIBUTE_BY_PAGE:
                     setattr(c.site, ATTRIBUTE_BY_PAGE[page.name], content)
-                    c.site._commit()
+                    await c.site._commit()
             except ContentLengthError as e:
                 self.handle_error(403, 'CONTENT_LENGTH_ERROR', max_length=e.max_length)
         return json.dumps({})

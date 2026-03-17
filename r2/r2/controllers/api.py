@@ -869,7 +869,7 @@ class ApiController(RedditController):
                    target=VExistingUname('name'),
                    type_and_permissions=VPermissions('type', 'permissions'))
     @api_doc(api_section.users, uses_site=True)
-    def POST_setpermissions(self, form, jquery, target, type_and_permissions):
+    async def POST_setpermissions(self, form, jquery, target, type_and_permissions):
         if form.has_errors('name', errors.USER_DOESNT_EXIST, errors.NO_USER):
             return
         if form.has_errors('type', errors.INVALID_PERMISSION_TYPE):
@@ -899,7 +899,7 @@ class ApiController(RedditController):
             if type == "moderator_invite":
                 rel = c.site.get_moderator_invite(target)
             rel.set_permissions(permissions)
-            rel._commit()
+            await rel._commit()
             update = rel.encoded_permissions
             ModAction.create(c.site, c.user, action='setpermissions',
                              target=target, details='permission_' + type,
@@ -1283,7 +1283,7 @@ class ApiController(RedditController):
         verify=VBoolean("verify"),
         dest=VDestination(),
     )
-    def POST_update_email(self, form, jquery, email, verify, dest):
+    async def POST_update_email(self, form, jquery, email, verify, dest):
         """Update account email address.
 
         Called by /prefs/update on the site.
@@ -1300,7 +1300,7 @@ class ApiController(RedditController):
 
                 c.user.set_email(email)
                 c.user.email_verified = None
-                c.user._commit()
+                await c.user._commit()
                 Award.take_away("verified_email", c.user)
 
             if verify:
@@ -1323,7 +1323,7 @@ class ApiController(RedditController):
             c.user.set_email('')
             c.user.email_verified = None
             c.user.pref_email_messages = False
-            c.user._commit()
+            await c.user._commit()
             Award.take_away("verified_email", c.user)
             form.set_text('.status', _('your email has been updated'))
 
@@ -1400,7 +1400,7 @@ class ApiController(RedditController):
                 VModhash(),
                 thing = VByNameIfAuthor('id'))
     @api_doc(api_section.links_and_comments)
-    def POST_del(self, thing):
+    async def POST_del(self, thing):
         """Delete a Link or Comment."""
         if not thing: return
         was_deleted = thing._deleted
@@ -1408,7 +1408,7 @@ class ApiController(RedditController):
         if (getattr(thing, "promoted", None) is not None and
             not promote.is_promoted(thing)):
             promote.reject_promotion(thing)
-        thing._commit()
+        await thing._commit()
 
         thing.update_search_index()
 
@@ -1418,7 +1418,7 @@ class ApiController(RedditController):
             thing.subreddit_slow.remove_sticky(thing)
             if thing.preview_object:
                 thing.set_preview_object(None)
-                thing._commit()
+                await thing._commit()
         elif isinstance(thing, Comment):
             link = thing.link_slow
 
@@ -1446,7 +1446,7 @@ class ApiController(RedditController):
                 VSrCanBan('id'),
                 thing=VByName('id', thing_cls=Link))
     @api_doc(api_section.links_and_comments)
-    def POST_lock(self, thing):
+    async def POST_lock(self, thing):
         """Lock a link.
 
         Prevents a post from receiving new comments.
@@ -1458,7 +1458,7 @@ class ApiController(RedditController):
             return abort(400, "Bad Request")
         VNotInTimeout().run(action_name="lock", target=thing)
         thing.locked = True
-        thing._commit()
+        await thing._commit()
 
         ModAction.create(thing.subreddit_slow, c.user, target=thing,
                          action='lock')
@@ -1469,7 +1469,7 @@ class ApiController(RedditController):
                 VSrCanBan('id'),
                 thing=VByName('id', thing_cls=Link))
     @api_doc(api_section.links_and_comments)
-    def POST_unlock(self, thing):
+    async def POST_unlock(self, thing):
         """Unlock a link.
 
         Allow a post to receive new comments.
@@ -1481,7 +1481,7 @@ class ApiController(RedditController):
             return abort(400, "Bad Request")
         VNotInTimeout().run(action_name="unlock", target=thing)
         thing.locked = False
-        thing._commit()
+        await thing._commit()
 
         ModAction.create(thing.subreddit_slow, c.user, target=thing,
                          action='unlock')
@@ -1492,14 +1492,14 @@ class ApiController(RedditController):
                 VSrCanAlter('id'),
                 thing = VByName('id'))
     @api_doc(api_section.links_and_comments)
-    def POST_marknsfw(self, thing):
+    async def POST_marknsfw(self, thing):
         """Mark a link NSFW.
 
         See also: [/api/unmarknsfw](#POST_api_unmarknsfw).
 
         """
         thing.over_18 = True
-        thing._commit()
+        await thing._commit()
 
         if c.user._id != thing.author_id:
             ModAction.create(thing.subreddit_slow, c.user, target=thing,
@@ -1513,7 +1513,7 @@ class ApiController(RedditController):
                 VSrCanAlter('id'),
                 thing = VByName('id'))
     @api_doc(api_section.links_and_comments)
-    def POST_unmarknsfw(self, thing):
+    async def POST_unmarknsfw(self, thing):
         """Remove the NSFW marking from a link.
 
         See also: [/api/marknsfw](#POST_api_marknsfw).
@@ -1529,7 +1529,7 @@ class ApiController(RedditController):
                 abort(403,'forbidden')
 
         thing.over_18 = False
-        thing._commit()
+        await thing._commit()
 
         if c.user._id != thing.author_id:
             ModAction.create(thing.subreddit_slow, c.user, target=thing,
@@ -1543,7 +1543,7 @@ class ApiController(RedditController):
                 thing=VByNameIfAuthor('id'),
                 state=VBoolean('state'))
     @api_doc(api_section.links_and_comments)
-    def POST_sendreplies(self, thing, state):
+    async def POST_sendreplies(self, thing, state):
         """Enable or disable inbox replies for a link or comment.
 
         `state` is a boolean that indicates whether you are enabling or
@@ -1554,7 +1554,7 @@ class ApiController(RedditController):
             return
 
         thing.sendreplies = state
-        thing._commit()
+        await thing._commit()
 
     @noresponse(VUser(),
                 VModhash(),
@@ -1582,7 +1582,7 @@ class ApiController(RedditController):
         timeout=VNotInTimeout("id"),
     )
     @api_doc(api_section.links_and_comments)
-    def POST_set_suggested_sort(self, form, jquery, thing, sort, timeout):
+    async def POST_set_suggested_sort(self, form, jquery, thing, sort, timeout):
         """Set a suggested sort for a link.
 
         Suggested sorts are useful to display comments in a certain preferred way
@@ -1595,7 +1595,7 @@ class ApiController(RedditController):
                              action='setsuggestedsort')
 
         thing.suggested_sort = sort
-        thing._commit()
+        await thing._commit()
         jquery.refresh()
 
     @require_oauth2_scope("modposts")
@@ -1608,7 +1608,7 @@ class ApiController(RedditController):
         timeout=VNotInTimeout("id"),
     )
     @api_doc(api_section.links_and_comments)
-    def POST_set_contest_mode(self, form, jquery, thing, state, timeout):
+    async def POST_set_contest_mode(self, form, jquery, thing, state, timeout):
         """Set or unset "contest mode" for a link's comments.
         
         `state` is a boolean that indicates whether you are enabling or
@@ -1616,7 +1616,7 @@ class ApiController(RedditController):
 
         """
         thing.contest_mode = state
-        thing._commit()
+        await thing._commit()
         if state:
             action = 'setcontestmode'
         else:
@@ -1773,7 +1773,7 @@ class ApiController(RedditController):
         thing=VByName('id'),
     )
     @api_doc(api_section.messages)
-    def POST_del_msg(self, thing):
+    async def POST_del_msg(self, thing):
         """Delete messages from the recipient's view of their inbox."""
         if not thing:
             return
@@ -1785,7 +1785,7 @@ class ApiController(RedditController):
             return
 
         thing.del_on_recipient = True
-        thing._commit()
+        await thing._commit()
 
         # report the message deletion to data pipeline
         g.events.message_event(thing, event_type="ss.delete_message",
@@ -1798,7 +1798,7 @@ class ApiController(RedditController):
         thing=VByName('id'),
     )
     @api_doc(api_section.messages)
-    def POST_block(self, thing):
+    async def POST_block(self, thing):
         '''For blocking via inbox.'''
         if not thing:
             return
@@ -1808,7 +1808,7 @@ class ApiController(RedditController):
             return
 
         try:
-            sr = Subreddit._byID(thing.sr_id) if thing.sr_id else None
+            sr = await Subreddit._byID(thing.sr_id) if thing.sr_id else None
         except NotFound:
             sr = None
 
@@ -1834,7 +1834,7 @@ class ApiController(RedditController):
             if not any(rels.values()):
                 return
 
-        block_acct = Account._byID(thing.author_id)
+        block_acct = await Account._byID(thing.author_id)
         display_author = getattr(thing, "display_author", None)
         if block_acct.name in g.admins or display_author:
             return
@@ -1857,12 +1857,12 @@ class ApiController(RedditController):
         thing=VByName('id'),
     )
     @api_doc(api_section.messages)
-    def POST_unblock_subreddit(self, thing):
+    async def POST_unblock_subreddit(self, thing):
         if not thing:
             return
 
         try:
-            sr = Subreddit._byID(thing.sr_id) if thing.sr_id else None
+            sr = await Subreddit._byID(thing.sr_id) if thing.sr_id else None
         except NotFound:
             sr = None
 
@@ -1954,7 +1954,7 @@ class ApiController(RedditController):
         text=VMarkdown('text'),
     )
     @api_doc(api_section.links_and_comments)
-    def POST_editusertext(self, form, jquery, item, text):
+    async def POST_editusertext(self, form, jquery, item, text):
         """Edit the body text of a comment or self-post."""
         if (form.has_errors('text', errors.NO_TEXT) or
                 form.has_errors("thing_id", errors.NOT_AUTHOR)):
@@ -2007,7 +2007,7 @@ class ApiController(RedditController):
 
         item.ignore_reports = False
 
-        item._commit()
+        await item._commit()
 
         # only add to the edited page if this is marked as edited
         if hasattr(item, "editted"):
@@ -2040,7 +2040,7 @@ class ApiController(RedditController):
         comment=VMarkdownLength(['text', 'comment'], max_length=10000),
     )
     @api_doc(api_section.links_and_comments)
-    def POST_comment(self, commentform, jquery, parent, comment):
+    async def POST_comment(self, commentform, jquery, parent, comment):
         """Submit a new comment or reply to a message.
 
         `parent` is the fullname of the thing being replied to. Its value
@@ -2100,10 +2100,10 @@ class ApiController(RedditController):
                 link = parent
                 parent_comment = None
             else:
-                link = Link._byID(parent.link_id)
+                link = await Link._byID(parent.link_id)
                 parent_comment = parent
 
-            sr = Subreddit._byID(parent.sr_id, stale=True)
+            sr = await Subreddit._byID(parent.sr_id, stale=True)
             is_author = link.author_id == c.user._id
             if (is_author and (link.is_self or promote.is_promo(link)) or
                     not sr.should_ratelimit(c.user, 'comment')):
@@ -2128,9 +2128,9 @@ class ApiController(RedditController):
 
         if is_message:
             if parent.from_sr:
-                to = Subreddit._byID(parent.sr_id)
+                to = await Subreddit._byID(parent.sr_id)
             else:
-                to = Account._byID(parent.author_id)
+                to = await Account._byID(parent.author_id)
 
             # Restrict messaging for users in timeout
             if to:
@@ -2140,7 +2140,7 @@ class ApiController(RedditController):
                 # Replies in modmail have an Account as their target, but act
                 # like they're sent to everyone involved in the conversation.
                 elif isinstance(to, Account) and parent and parent.sr_id:
-                    sr = Subreddit._byID(parent.sr_id, data=True)
+                    sr = await Subreddit._byID(parent.sr_id, data=True)
                     if sr:
                         sr_name = sr.name
                 is_messaging_admins = ('/r/%s' % sr_name) == g.admin_message_acct
@@ -2479,7 +2479,7 @@ class ApiController(RedditController):
         VNotInTimeout(),
     )
     @api_doc(api_section.subreddits, uses_site=True)
-    def POST_delete_sr_header(self, form, jquery):
+    async def POST_delete_sr_header(self, form, jquery):
         """Remove the subreddit's custom header image.
 
         The sitewide-default header image will be shown again after this call.
@@ -2494,8 +2494,8 @@ class ApiController(RedditController):
         if c.site.header:
             c.site.header = None
             c.site.header_size = None
-            c.site._commit()
-            ModAction.create(c.site, c.user, action='editsettings', 
+            await c.site._commit()
+            ModAction.create(c.site, c.user, action='editsettings',
                              details='del_header')
 
         # hide the button which started this
@@ -2512,7 +2512,7 @@ class ApiController(RedditController):
         VNotInTimeout(),
     )
     @api_doc(api_section.subreddits, uses_site=True)
-    def POST_delete_sr_icon(self, form, jquery):
+    async def POST_delete_sr_icon(self, form, jquery):
         """Remove the subreddit's custom mobile icon.
 
         See also: [/api/upload_sr_img](#POST_api_upload_sr_img).
@@ -2521,7 +2521,7 @@ class ApiController(RedditController):
         if c.site.icon_img:
             c.site.icon_img = None
             c.site.icon_size = None
-            c.site._commit()
+            await c.site._commit()
             ModAction.create(c.site, c.user, action='editsettings',
                              details='del_icon')
 
@@ -2539,7 +2539,7 @@ class ApiController(RedditController):
         VNotInTimeout(),
     )
     @api_doc(api_section.subreddits, uses_site=True)
-    def POST_delete_sr_banner(self, form, jquery):
+    async def POST_delete_sr_banner(self, form, jquery):
         """Remove the subreddit's custom mobile banner.
 
         See also: [/api/upload_sr_img](#POST_api_upload_sr_img).
@@ -2548,7 +2548,7 @@ class ApiController(RedditController):
         if c.site.banner_img:
             c.site.banner_img = None
             c.site.banner_size = None
-            c.site._commit()
+            await c.site._commit()
             ModAction.create(c.site, c.user, action='editsettings',
                              details='del_banner')
 
@@ -2582,7 +2582,7 @@ class ApiController(RedditController):
                                    ('img', 'header', 'icon', 'banner')),
               header = VInt('header', max=1, min=0))
     @api_doc(api_section.subreddits, uses_site=True)
-    def POST_upload_sr_img(self, file, header, name, form_id, img_type,
+    async def POST_upload_sr_img(self, file, header, name, form_id, img_type,
                            upload_type=None):
         """Add or replace a subreddit image, custom header logo, custom mobile
         icon, or custom mobile banner.
@@ -2685,17 +2685,17 @@ class ApiController(RedditController):
             elif upload_type == 'header':
                 c.site.header = new_url
                 c.site.header_size = size
-                c.site._commit()
+                await c.site._commit()
                 kw = dict(details='upload_image_header')
             elif upload_type == 'icon':
                 c.site.icon_img = new_url
                 c.site.icon_size = size
-                c.site._commit()
+                await c.site._commit()
                 kw = dict(details='upload_image_icon')
             elif upload_type == 'banner':
                 c.site.banner_img = new_url
                 c.site.banner_size = size
-                c.site._commit()
+                await c.site._commit()
                 kw = dict(details='upload_image_banner')
 
             ModAction.create(c.site, c.user, action='editsettings', **kw)
@@ -2746,7 +2746,7 @@ class ApiController(RedditController):
                    # key_color = VColor('key_color'),
                    )
     @api_doc(api_section.subreddits)
-    def POST_site_admin(self, form, jquery, name, sr, **kw):
+    async def POST_site_admin(self, form, jquery, name, sr, **kw):
         """Create or configure a subreddit.
 
         If `sr` is specified, the request will attempt to modify the specified
@@ -2957,7 +2957,7 @@ class ApiController(RedditController):
                                 ip=request.ip, **kw)
 
             update_wiki_text(sr)
-            sr._commit()
+            await sr._commit()
 
             hooks.get_hook("subreddit.new").call(subreddit=sr)
 
@@ -3010,7 +3010,7 @@ class ApiController(RedditController):
                                      details=k)
 
                 setattr(sr, k, v)
-            sr._commit()
+            await sr._commit()
 
             #update the domain cache if the domain changed
             if sr.domain != old_domain:
@@ -3139,7 +3139,7 @@ class ApiController(RedditController):
                 VSrCanBan('id'),
                 thing=VByName('id'))
     @api_doc(api_section.moderation)
-    def POST_ignore_reports(self, thing):
+    async def POST_ignore_reports(self, thing):
         """Prevent future reports on a thing from causing notifications.
 
         Any reports made about a thing after this flag is set on it will not
@@ -3157,7 +3157,7 @@ class ApiController(RedditController):
         VNotInTimeout().run(action_name="ignorereports", target=thing)
 
         thing.ignore_reports = True
-        thing._commit()
+        await thing._commit()
 
         sr = thing.subreddit_slow
         ModAction.create(sr, c.user, 'ignorereports', target=thing)
@@ -3167,7 +3167,7 @@ class ApiController(RedditController):
                 VSrCanBan('id'),
                 thing=VByName('id'))
     @api_doc(api_section.moderation)
-    def POST_unignore_reports(self, thing):
+    async def POST_unignore_reports(self, thing):
         """Allow future reports on a thing to cause notifications.
 
         See also: [/api/ignore_reports](#POST_api_ignore_reports).
@@ -3181,7 +3181,7 @@ class ApiController(RedditController):
         VNotInTimeout().run(action_name="unignorereports", target=thing)
 
         thing.ignore_reports = False
-        thing._commit()
+        await thing._commit()
 
         sr = thing.subreddit_slow
         ModAction.create(sr, c.user, 'unignorereports', target=thing)
@@ -3194,7 +3194,7 @@ class ApiController(RedditController):
                    # sticky=VBoolean('sticky', default=False),
                    )
     @api_doc(api_section.moderation)
-    def POST_distinguish(self, form, jquery, thing, how):
+    async def POST_distinguish(self, form, jquery, thing, how):
         """Distinguish a thing's author with a sigil.
 
         This can be useful to draw attention to and confirm the identity of the
@@ -3266,11 +3266,11 @@ class ApiController(RedditController):
             # generate an inbox notification, send one now upon distinguishing
             # it)
             if not thing.parent_id:
-                to = Account._byID(link.author_id, data=True)
+                to = await Account._byID(link.author_id, data=True)
                 replies_enabled = link.sendreplies
             else:
-                parent = Comment._byID(thing.parent_id, data=True)
-                to = Account._byID(parent.author_id, data=True)
+                parent = await Comment._byID(thing.parent_id, data=True)
+                to = await Account._byID(parent.author_id, data=True)
                 replies_enabled = parent.sendreplies
 
             previously_distinguished = hasattr(thing, 'distinguished')
@@ -3305,7 +3305,7 @@ class ApiController(RedditController):
                     abort_with_error(error, error.code or 400)
 
         thing.distinguished = how
-        thing._commit()
+        await thing._commit()
 
         hooks.get_hook("thing.distinguish").call(thing=thing)
 
@@ -3381,11 +3381,11 @@ class ApiController(RedditController):
 
         thing._unsave(c.user)
 
-    def collapse_handler(self, things, collapse):
+    async def collapse_handler(self, things, collapse):
         if not things:
             return
         things = tup(things)
-        srs = Subreddit._byID([t.sr_id for t in things if t.sr_id],
+        srs = await Subreddit._byID([t.sr_id for t in things if t.sr_id],
                               return_dict = True)
         for t in things:
             if hasattr(t, "to_id") and c.user._id == t.to_id:
@@ -3395,31 +3395,31 @@ class ApiController(RedditController):
             elif isinstance(t, Message) and t.sr_id:
                 if srs[t.sr_id].is_moderator(c.user):
                     t.to_collapse = collapse
-            t._commit()
+            await t._commit()
 
     @noresponse(VUser(),
                 VModhash(),
                 things = VByName('id', multiple = True))
     @api_doc(api_section.messages)
-    def POST_collapse_message(self, things):
+    async def POST_collapse_message(self, things):
         """Collapse a message
 
         See also: [/api/uncollapse_message](#POST_uncollapse_message)
 
         """
-        self.collapse_handler(things, True)
+        await self.collapse_handler(things, True)
 
     @noresponse(VUser(),
                 VModhash(),
                 things = VByName('id', multiple = True))
     @api_doc(api_section.messages)
-    def POST_uncollapse_message(self, things):
+    async def POST_uncollapse_message(self, things):
         """Uncollapse a message
 
         See also: [/api/collapse_message](#POST_collapse_message)
 
         """
-        self.collapse_handler(things, False)
+        await self.collapse_handler(things, False)
 
     @require_oauth2_scope("privatemessages")
     @noresponse(VUser(),
@@ -3620,7 +3620,7 @@ class ApiController(RedditController):
     @validatedForm(VUser(),
                    VModhash(),
                    code=VPrintable("code", 30))
-    def POST_claimgold(self, form, jquery, code):
+    async def POST_claimgold(self, form, jquery, code):
         status = ''
         if not code:
             c.errors.add(errors.NO_TEXT, field = "code")
@@ -3643,7 +3643,7 @@ class ApiController(RedditController):
 
             if code.startswith("cr_"):
                 c.user.gold_creddits += int(days / 31)
-                c.user._commit()
+                await c.user._commit()
                 status = 'claimed-creddits'
             else:
                 # send the user a message if they don't already have gold
@@ -3713,7 +3713,7 @@ class ApiController(RedditController):
     @csrf_exempt
     @validatedForm(token=VOneTimeToken(PasswordResetToken, "key"),
                    password=VPasswordChange(["passwd", "passwd2"]))
-    def POST_resetpassword(self, form, jquery, token, password):
+    async def POST_resetpassword(self, form, jquery, token, password):
         # was the token invalid or has it expired?
         if not token:
             form.redirect("/password?expired=true")
@@ -3730,7 +3730,7 @@ class ApiController(RedditController):
         token.consume()
 
         # load up the user and check that things haven't changed
-        user = Account._by_fullname(token.user_id)
+        user = await Account._by_fullname(token.user_id)
         if not token.valid_for_user(user):
             form.redirect('/password?expired=true')
             return
@@ -3804,12 +3804,12 @@ class ApiController(RedditController):
         subject=VLength('subject', 1000),
         body=VMarkdownLength('body', max_length=10000),
     )
-    def POST_quarantine(self, form, jquery, subreddit, quarantine, subject, body):
+    async def POST_quarantine(self, form, jquery, subreddit, quarantine, subject, body):
         if subreddit.quarantine == quarantine:
             return
 
         subreddit.quarantine = quarantine
-        subreddit._commit()
+        await subreddit._commit()
         system_user = Account.system_user()
         kw = dict(
             sr_id36=subreddit._id36,
@@ -3818,7 +3818,7 @@ class ApiController(RedditController):
             details="quarantine",
         )
         ma = ModAction(**kw)
-        ma._commit()
+        await ma._commit()
 
         if config['r2.import_private']:
             from r2admin.lib.admin_utils import record_admin_event
@@ -3905,7 +3905,7 @@ class ApiController(RedditController):
                                     ("regular", "manual", "invisible")),
                    api_ok=VBoolean("api_ok"),
                    imgurl=VLength("imgurl", max_length = 1000))
-    def POST_editaward(self, form, jquery, award, colliding_award, codename,
+    async def POST_editaward(self, form, jquery, award, colliding_award, codename,
                        title, awardtype, api_ok, imgurl):
         if form.has_errors(("codename", "title", "awardtype", "imgurl"),
                            errors.NO_TEXT):
@@ -3948,7 +3948,7 @@ class ApiController(RedditController):
         award.awardtype = awardtype
         award.imgurl = imgurl
         award.api_ok = api_ok
-        award._commit()
+        await award._commit()
         form.set_text(".status", _('saved'))
 
     @require_oauth2_scope("modflair")
@@ -4108,9 +4108,9 @@ class ApiController(RedditController):
                    VModhash(),
                    flair_enabled = VBoolean("flair_enabled"))
     @api_doc(api_section.flair, uses_site=True)
-    def POST_setflairenabled(self, form, jquery, flair_enabled):
+    async def POST_setflairenabled(self, form, jquery, flair_enabled):
         setattr(c.user, 'flair_%s_enabled' % c.site._id, flair_enabled)
-        c.user._commit()
+        await c.user._commit()
         jquery.refresh()
 
     @require_oauth2_scope("modflair")
@@ -4127,7 +4127,7 @@ class ApiController(RedditController):
         timeout=VNotInTimeout(),
     )
     @api_doc(api_section.flair, uses_site=True)
-    def POST_flairconfig(self, form, jquery, flair_enabled, flair_position,
+    async def POST_flairconfig(self, form, jquery, flair_enabled, flair_position,
             link_flair_position, flair_self_assign_enabled,
             link_flair_self_assign_enabled, timeout):
         if c.site.flair_enabled != flair_enabled:
@@ -4152,7 +4152,7 @@ class ApiController(RedditController):
                 link_flair_self_assign_enabled)
             ModAction.create(c.site, c.user, action='editflair',
                              details='link_flair_self_enabled')
-        c.site._commit()
+        await c.site._commit()
         jquery.refresh()
 
     @require_oauth2_scope("modflair")
@@ -4183,7 +4183,7 @@ class ApiController(RedditController):
                    flair_type = VOneOf('flair_type', (USER_FLAIR, LINK_FLAIR),
                                        default=USER_FLAIR))
     @api_doc(api_section.flair, uses_site=True)
-    def POST_flairtemplate(self, form, jquery, flair_template, text,
+    async def POST_flairtemplate(self, form, jquery, flair_template, text,
                            css_class, text_editable, flair_type):
         if text is None:
             text = ''
@@ -4207,7 +4207,7 @@ class ApiController(RedditController):
             flair_template.text = text
             flair_template.css_class = css_class
             flair_template.text_editable = text_editable
-            flair_template._commit()
+            await flair_template._commit()
             new = False
         else:
             try:
@@ -4425,7 +4425,7 @@ class ApiController(RedditController):
         VModhash(),
         sr_style_enabled=VBoolean("sr_style_enabled")
     )
-    def POST_set_sr_style_enabled(self, form, jquery, sr_style_enabled):
+    async def POST_set_sr_style_enabled(self, form, jquery, sr_style_enabled):
         """Update enabling of individual sr themes; refresh the page style"""
         if feature.is_enabled('stylesheets_everywhere'):
             c.user.set_subreddit_style(c.site, sr_style_enabled)
@@ -4436,7 +4436,7 @@ class ApiController(RedditController):
                 sr = c.site
             elif (c.user.pref_default_theme_sr and
                     feature.is_enabled('stylesheets_everywhere')):
-                sr = Subreddit._by_name(c.user.pref_default_theme_sr)
+                sr = await Subreddit._by_name(c.user.pref_default_theme_sr)
                 if (not sr.can_view(c.user) or
                         not c.user.pref_enable_default_themes):
                     sr = DefaultSR()
@@ -4503,7 +4503,7 @@ class ApiController(RedditController):
         recipient=VExistingUname("recipient"),
         num_creddits=VInt('num_creddits', num_default=0),
     )
-    def POST_givecreddits(self, form, jquery, recipient, num_creddits):
+    async def POST_givecreddits(self, form, jquery, recipient, num_creddits):
         if form.has_errors("recipient",
                            errors.USER_DOESNT_EXIST, errors.NO_USER):
             return
@@ -4512,7 +4512,7 @@ class ApiController(RedditController):
             recipient.gold_creddits += num_creddits
             # make sure it doesn't go into the negative
             recipient.gold_creddits = max(0, recipient.gold_creddits)
-            recipient._commit()
+            await recipient._commit()
 
         form.set_text(".status", _('saved'))
 
@@ -4537,17 +4537,17 @@ class ApiController(RedditController):
     @noresponse(VUser(),
                 VModhash(),
                 ui_elem=VOneOf('id', ('organic',)))
-    def POST_disable_ui(self, ui_elem):
+    async def POST_disable_ui(self, ui_elem):
         if ui_elem:
             pref = "pref_%s" % ui_elem
             if getattr(c.user, pref):
                 setattr(c.user, "pref_" + ui_elem, False)
-                c.user._commit()
+                await c.user._commit()
 
     @noresponse(VUser(),
                 VModhash(),
                 show_nsfw_media=VBoolean("show_nsfw_media"))
-    def POST_set_nsfw_media_pref(self, show_nsfw_media):
+    async def POST_set_nsfw_media_pref(self, show_nsfw_media):
         changed = False
 
         if show_nsfw_media is not None:
@@ -4561,7 +4561,7 @@ class ApiController(RedditController):
             changed = True
 
         if changed:
-            c.user._commit()
+            await c.user._commit()
 
     @validatedForm(type = VOneOf('type', ('click'), default = 'click'),
                    links = VByName('ids', thing_cls = Link, multiple = True))
@@ -4584,7 +4584,7 @@ class ApiController(RedditController):
                    include_over_18=VBoolean('include_over_18', default=True),
                    exact=VBoolean('exact', default=False))
     @api_doc(api_section.subreddits)
-    def POST_search_reddit_names(self, responder, query, include_over_18, exact):
+    async def POST_search_reddit_names(self, responder, query, include_over_18, exact):
         """List subreddit names that begin with a query string.
 
         Subreddits whose names begin with `query` will be returned. If
@@ -4599,7 +4599,7 @@ class ApiController(RedditController):
         names = []
         if query and exact:
             try:
-                sr = Subreddit._by_name(query.strip())
+                sr = await Subreddit._by_name(query.strip())
             except NotFound:
                 self.abort404()
             else:
@@ -4680,7 +4680,7 @@ class ApiController(RedditController):
     @validatedForm(VUser(),
                    VModhash(),
                    otp=nop("otp"))
-    def POST_enable_otp(self, form, jquery, otp):
+    async def POST_enable_otp(self, form, jquery, otp):
         if form.has_errors("password", errors.WRONG_PASSWORD):
             return
 
@@ -4701,7 +4701,7 @@ class ApiController(RedditController):
             return
 
         c.user.otp_secret = secret
-        c.user._commit()
+        await c.user._commit()
 
         form.redirect("/prefs/security")
 
@@ -4711,7 +4711,7 @@ class ApiController(RedditController):
         VVerifyPassword("password", fatal=False),
         VOneTimePassword("otp", required=True),
     )
-    def POST_disable_otp(self, form, jquery):
+    async def POST_disable_otp(self, form, jquery):
         if form.has_errors("password", errors.WRONG_PASSWORD):
             return
 
@@ -4721,7 +4721,7 @@ class ApiController(RedditController):
             return
 
         c.user.otp_secret = ""
-        c.user._commit()
+        await c.user._commit()
         form.redirect("/prefs/security")
 
     @require_oauth2_scope("read")
@@ -4791,7 +4791,7 @@ class ApiController(RedditController):
                    icon_url=VSanitizedUrl('icon_url'),
                    redirect_uri=VRedirectUri('redirect_uri'),
                    app_type=VOneOf('app_type', OAuth2Client.APP_TYPES))
-    def POST_updateapp(self, form, jquery, name, about_url, icon_url,
+    async def POST_updateapp(self, form, jquery, name, about_url, icon_url,
                        redirect_uri, app_type):
         if (form.has_errors('name', errors.NO_TEXT) |
             form.has_errors('redirect_uri', errors.BAD_URL) |
@@ -4835,7 +4835,7 @@ class ApiController(RedditController):
             client.description = description
             client.about_url = about_url or ''
             client.redirect_uri = redirect_uri
-            client._commit()
+            await client._commit()
             form.set_text('.status', _('application updated'))
             apps = PrefApps([], [client])
             jquery('#developed-app-%s' % client._id).replaceWith(
@@ -4847,7 +4847,7 @@ class ApiController(RedditController):
                                        about_url=about_url or '',
                                        redirect_uri=redirect_uri,
                                        app_type=app_type)
-            client._commit()
+            await client._commit()
             client.add_developer(c.user)
             form.set_text('.status', _('application created'))
             apps = PrefApps([], [client])
@@ -4909,10 +4909,10 @@ class ApiController(RedditController):
     @noresponse(VUser(),
                 VModhash(),
                 client=VOAuth2ClientDeveloper())
-    def POST_deleteapp(self, client):
+    async def POST_deleteapp(self, client):
         if client:
             client.deleted = True
-            client._commit()
+            await client._commit()
 
     @validatedMultipartForm(VUser(),
                             VModhash(),
@@ -4920,7 +4920,7 @@ class ApiController(RedditController):
                             icon_file=VUploadLength(
                                 'file', max_length=1024*128,
                                 docs=dict(file="an icon (72x72)")))
-    def POST_setappicon(self, form, jquery, client, icon_file):
+    async def POST_setappicon(self, form, jquery, client, icon_file):
         if not icon_file:
             form.set_error(errors.TOO_LONG, 'file')
         if not form.has_error():
@@ -4932,7 +4932,7 @@ class ApiController(RedditController):
                              field='file')
                 form.set_error(errors.BAD_IMAGE, 'file')
             else:
-                client._commit()
+                await client._commit()
                 form.set_text('.status', 'uploaded')
                 jquery('#developed-app-%s .app-icon img'
                        % client._id).attr('src', make_url_protocol_relative(client.icon_url))
@@ -4947,20 +4947,20 @@ class ApiController(RedditController):
         thing=VByName("thing"),
         signed=VBoolean("signed")
     )
-    def POST_generate_payment_blob(self, responder, thing, signed):
+    async def POST_generate_payment_blob(self, responder, thing, signed):
         if not thing:
             abort(400, "Bad Request")
 
         if thing._deleted:
             abort(403, "Forbidden")
 
-        thing_sr = Subreddit._byID(thing.sr_id, data=True)
+        thing_sr = await Subreddit._byID(thing.sr_id, data=True)
         if (not thing_sr.can_view(c.user) or
             not thing_sr.allow_gilding):
             abort(403, "Forbidden")
 
         try:
-            recipient = Account._byID(thing.author_id, data=True)
+            recipient = await Account._byID(thing.author_id, data=True)
         except NotFound:
             self.abort404()
 
@@ -4987,10 +4987,10 @@ class ApiController(RedditController):
         signed=VBoolean("signed", default=False),
         message=nop("message")
     )
-    def POST_modify_payment_blob(self, responder, code, signed, message):
+    async def POST_modify_payment_blob(self, responder, code, signed, message):
         if c.user.gild_reveal_username != signed:
             c.user.gild_reveal_username = signed
-            c.user._commit()
+            await c.user._commit()
 
         updates = {}
         updates["signed"] = signed
@@ -5044,9 +5044,9 @@ class ApiController(RedditController):
         VModhash(),
         collapsed=VBoolean('collapsed'),
     )
-    def POST_set_left_bar_collapsed(self, responder, collapsed):
+    async def POST_set_left_bar_collapsed(self, responder, collapsed):
         c.user.pref_collapse_left_bar = collapsed
-        c.user._commit()
+        await c.user._commit()
 
     @require_oauth2_scope("read")
     @validate(srs=VSRByNames("srnames"),
@@ -5088,9 +5088,9 @@ class ApiController(RedditController):
             default="private",
         ),
     )
-    def POST_server_seconds_visibility(self, form, jquery, seconds_visibility):
+    async def POST_server_seconds_visibility(self, form, jquery, seconds_visibility):
         c.user.pref_public_server_seconds = seconds_visibility == "public"
-        c.user._commit()
+        await c.user._commit()
 
         hook = hooks.get_hook("server_seconds_visibility.change")
         hook.call(user=c.user, value=c.user.pref_public_server_seconds)
@@ -5236,13 +5236,13 @@ class ApiController(RedditController):
 
 
     @validatedForm(VModhashIfLoggedIn())
-    def POST_hide_locationbar(self, form, jquery):
+    async def POST_hide_locationbar(self, form, jquery):
         c.user.pref_hide_locationbar = True
-        c.user._commit()
+        await c.user._commit()
         jquery(".locationbar").hide()
 
     @validatedForm(VModhashIfLoggedIn())
-    def POST_use_global_defaults(self, form, jquery):
+    async def POST_use_global_defaults(self, form, jquery):
         c.user.pref_use_global_defaults = True
-        c.user._commit()
+        await c.user._commit()
         jquery.refresh()

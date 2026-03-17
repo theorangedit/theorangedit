@@ -42,7 +42,7 @@ from r2.lib.validator import VUser
 
 
 class APIv1GoldController(OAuth2OnlyController):
-    def _gift_using_creddits(self, recipient, months=1, thing_fullname=None,
+    async def _gift_using_creddits(self, recipient, months=1, thing_fullname=None,
             proxying_for=None):
         with creddits_lock(c.user):
             if not c.user.employee and c.user.gold_creddits < months:
@@ -55,7 +55,7 @@ class APIv1GoldController(OAuth2OnlyController):
                 note = "proxy-%s" % c.user.name
                 if proxying_for:
                     try:
-                        buyer = Account._by_name(proxying_for)
+                        buyer = await Account._by_name(proxying_for)
                     except NotFound:
                         pass
 
@@ -72,7 +72,7 @@ class APIv1GoldController(OAuth2OnlyController):
 
             if not c.user.employee:
                 c.user.gold_creddits -= months
-                c.user._commit()
+                await c.user._commit()
 
     @require_oauth2_scope("creddits")
     @validate(
@@ -83,7 +83,7 @@ class APIv1GoldController(OAuth2OnlyController):
         api_section.gold,
         uri="/api/v1/gold/gild/{fullname}",
     )
-    def POST_gild(self, target):
+    async def POST_gild(self, target):
         if not isinstance(target, (Comment, Link)):
             err = RedditError("NO_THING_ID")
             self.on_validation_error(err)
@@ -93,7 +93,7 @@ class APIv1GoldController(OAuth2OnlyController):
             self.on_validation_error(err)
         VNotInTimeout().run(target=target, subreddit=target.subreddit_slow)
 
-        self._gift_using_creddits(
+        await self._gift_using_creddits(
             recipient=target.author_slow,
             thing_fullname=target._fullname,
             proxying_for=request.POST.get("proxying_for"),
@@ -110,8 +110,8 @@ class APIv1GoldController(OAuth2OnlyController):
         api_section.gold,
         uri="/api/v1/gold/give/{username}",
     )
-    def POST_give(self, user, months, timeout):
-        self._gift_using_creddits(
+    async def POST_give(self, user, months, timeout):
+        await self._gift_using_creddits(
             recipient=user,
             months=months,
             proxying_for=request.POST.get("proxying_for"),

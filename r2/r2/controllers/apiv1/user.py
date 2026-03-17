@@ -127,14 +127,14 @@ class APIv1UserController(OAuth2OnlyController):
     )
     @api_doc(api_section.account, json_model=PREFS_JSON_VALIDATOR,
              uri='/api/v1/me/prefs')
-    def PATCH_prefs(self, validated_prefs):
+    async def PATCH_prefs(self, validated_prefs):
         user_prefs = c.user.preferences()
         for short_name, new_value in validated_prefs.items():
             pref_name = "pref_" + short_name
             user_prefs[pref_name] = new_value
         vprefs.filter_prefs(user_prefs, c.user)
         vprefs.set_prefs(c.user, user_prefs)
-        c.user._commit()
+        await c.user._commit()
         return self.api_wrapper(PrefsJsonTemplate().data(c.user))
 
     FRIEND_JSON_SPEC = VValidatedJSON.PartialObject({

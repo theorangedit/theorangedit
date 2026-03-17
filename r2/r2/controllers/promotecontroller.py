@@ -349,7 +349,7 @@ class SponsorController(PromoteController):
               link_text=nop('link_text'),
               owner=VAccountByName('owner'),
               grouping=VOneOf("grouping", ("total", "day"), default="total"))
-    def GET_report(self, start, end, grouping, link_text=None, owner=None):
+    async def GET_report(self, start, end, grouping, link_text=None, owner=None):
         now = datetime.now(g.tz).replace(hour=0, minute=0, second=0,
                                          microsecond=0)
         if not start or not end:
@@ -367,9 +367,9 @@ class SponsorController(PromoteController):
         if owner:
             campaign_ids = PromotionWeights.get_campaign_ids(
                 start, end, author_id=owner._id)
-            campaigns = PromoCampaign._byID(campaign_ids, data=True)
+            campaigns = await PromoCampaign._byID(campaign_ids, data=True)
             link_ids = {camp.link_id for camp in campaigns.values()}
-            links.extend(Link._byID(link_ids, data=True, return_dict=False))
+            links.extend(await Link._byID(link_ids, data=True, return_dict=False))
 
         if link_text is not None:
             id36s = link_text.replace(',', ' ').split()
@@ -396,7 +396,7 @@ class SponsorController(PromoteController):
         sr_name=nop('sr_name'),
         collection_name=nop('collection_name'),
     )
-    def GET_promote_inventory(self, start, end, sr_name, collection_name):
+    async def GET_promote_inventory(self, start, end, sr_name, collection_name):
         if not start or not end:
             start = promote.promo_datetime_now(offset=1).date()
             end = promote.promo_datetime_now(offset=8).date()
@@ -406,7 +406,7 @@ class SponsorController(PromoteController):
         target = Target(Frontpage.name)
         if sr_name:
             try:
-                sr = Subreddit._by_name(sr_name)
+                sr = await Subreddit._by_name(sr_name)
                 target = Target(sr.name)
             except NotFound:
                 c.errors.add(errors.SUBREDDIT_NOEXIST, field='sr_name')
@@ -641,7 +641,7 @@ class SponsorListingController(PromoteListingController):
             return base_keep_fn(item)
         return keep
 
-    def query(self):
+    async def query(self):
         if self.sort == "future_promos":
             return queries.get_all_unapproved_links()
         elif self.sort == "pending_promos":
@@ -658,7 +658,7 @@ class SponsorListingController(PromoteListingController):
             return queries.get_all_edited_live_links()
         elif self.sort == 'underdelivered':
             q = queries.get_underdelivered_campaigns()
-            campaigns = PromoCampaign._by_fullname(list(q), data=True,
+            campaigns = await PromoCampaign._by_fullname(list(q), data=True,
                                                    return_dict=False)
             link_ids = [camp.link_id for camp in campaigns]
             return [Link._fullname_from_id36(to36(id)) for id in link_ids]
@@ -696,7 +696,7 @@ class SponsorListingController(PromoteListingController):
         include_managed=VBoolean("include_managed"),
         exclude_unpaid=VBoolean("exclude_unpaid"),
     )
-    def GET_listing(self, srname=None, include_managed=False,
+    async def GET_listing(self, srname=None, include_managed=False,
                     exclude_unpaid=None, sort="all", **kw):
         self.sort = sort
         self.sr = None
@@ -709,7 +709,7 @@ class SponsorListingController(PromoteListingController):
 
         if srname:
             try:
-                self.sr = Subreddit._by_name(srname)
+                self.sr = await Subreddit._by_name(srname)
             except NotFound:
                 pass
         return ListingController.GET_listing(self, **kw)
@@ -932,7 +932,7 @@ class PromoteApiController(ApiController):
             mobile=images.get("mobile", None),
         )
 
-    def _edit_promo(self, form, jquery, username, title, url,
+    async def _edit_promo(self, form, jquery, username, title, url,
                     selftext, kind, disable_comments, sendreplies,
                     media_url, media_autoplay, media_override,
                     iframe_embed_url, media_url_type, domain_override,
@@ -951,7 +951,7 @@ class PromoteApiController(ApiController):
         # check for user override
         if is_new_promoted and c.user_is_sponsor and username:
             try:
-                user = Account._by_name(username)
+                user = await Account._by_name(username)
             except NotFound:
                 c.errors.add(errors.USER_DOESNT_EXIST, field="username")
                 form.set_error(errors.USER_DOESNT_EXIST, "username")
@@ -1018,7 +1018,7 @@ class PromoteApiController(ApiController):
                 l.domain_override = domain_override or None
                 l.third_party_tracking = third_party_tracking or None
                 l.third_party_tracking_2 = third_party_tracking_2 or None
-            l._commit()
+            await l._commit()
 
             _force_images(l, thumbnail=thumbnail, mobile=mobile)
 
@@ -1146,7 +1146,7 @@ class PromoteApiController(ApiController):
             l.third_party_tracking_2 = third_party_tracking_2 or None
             l.managed_promo = is_managed
 
-        l._commit()
+        await l._commit()
 
         # ensure plugins are notified of the final edits to the link.
         # other methods also call this hook earlier in the process.
@@ -1196,7 +1196,7 @@ class PromoteApiController(ApiController):
         cost_basis=VOneOf('cost_basis', ('cpc', 'cpm',), default=None),
         bid_dollars=VFloat('bid_dollars', coerce=True),
     )
-    def POST_edit_campaign(self, form, jquery, is_auction, link, campaign_id36,
+    async def POST_edit_campaign(self, form, jquery, is_auction, link, campaign_id36,
                            start, end, target, frequency_cap,
                            priority, location, platform, mobile_os,
                            os_versions, ios_devices, ios_versions,
@@ -1304,7 +1304,7 @@ class PromoteApiController(ApiController):
         if priority == PROMOTE_PRIORITIES['auction']:
             bid_pennies = bid_dollars * 100
         else:
-            link_owner = Account._byID(link.author_id)
+            link_owner = await Account._byID(link.author_id)
             bid_pennies = PromotionPrices.get_price(link_owner, target,
                 location)
 

@@ -184,7 +184,7 @@ def check_txn_type(txn_type, psl):
                          ((txn_type, psl),))
 
 
-def existing_subscription(subscr_id, paying_id, custom):
+async def existing_subscription(subscr_id, paying_id, custom):
     if subscr_id is None:
         return None
 
@@ -204,7 +204,7 @@ def existing_subscription(subscr_id, paying_id, custom):
             return None
 
     try:
-        account = Account._byID(account_id, data=True)
+        account = await Account._byID(account_id, data=True)
 
         if account._deleted:
             g.log.info("IPN renewal for deleted account %d (%s)", account_id,
@@ -218,7 +218,7 @@ def existing_subscription(subscr_id, paying_id, custom):
                 return None
 
             account.gold_subscr_id = subscr_id
-            account._commit()
+            await account._commit()
     except NotFound:
         g.log.info("Just got IPN renewal for non-existent account #%d" % account_id)
 
@@ -241,7 +241,7 @@ def months_and_days_from_pennies(pennies, discount=False):
         days   = 31 * months
     return (months, days)
 
-def send_gift(buyer, recipient, months, days, signed, giftmessage,
+async def send_gift(buyer, recipient, months, days, signed, giftmessage,
               thing_fullname, note=None):
     admintools.adjust_gold_expiration(recipient, days=days)
 
@@ -250,7 +250,7 @@ def send_gift(buyer, recipient, months, days, signed, giftmessage,
         buyer._incr("num_gildings")
 
     if thing_fullname:
-        thing = Thing._by_fullname(thing_fullname, data=True)
+        thing = await Thing._by_fullname(thing_fullname, data=True)
         thing._gild(buyer)
         if isinstance(thing, Comment):
             gilding_type = 'comment gild'
@@ -366,7 +366,7 @@ class IpnController(RedditController):
                    VModhash(),
                    months = VInt("months"),
                    passthrough = VPrintable("passthrough", max_length=50))
-    def POST_spendcreddits(self, form, jquery, months, passthrough):
+    async def POST_spendcreddits(self, form, jquery, months, passthrough):
         if months is None or months < 1:
             form.set_text(".status", _("nice try."))
             return
@@ -394,7 +394,7 @@ class IpnController(RedditController):
             recipient_name = payment_blob["recipient"]
 
             try:
-                recipient = Account._by_name(recipient_name)
+                recipient = await Account._by_name(recipient_name)
             except NotFound:
                 raise ValueError("Invalid username %s in spendcreddits, buyer = %s"
                                  % (recipient_name, c.user.name))
@@ -436,7 +436,7 @@ class IpnController(RedditController):
 
             if not c.user.employee:
                 c.user.gold_creddits -= months
-                c.user._commit()
+                await c.user._commit()
 
         form.find("button").hide()
 
@@ -529,7 +529,7 @@ class IpnController(RedditController):
                     payer_email, paying_id, subscr_id,
                     custom, pennies, months, days)
 
-    def finish(self, parameters, txn_id,
+    async def finish(self, parameters, txn_id,
                payer_email, paying_id, subscr_id,
                custom, pennies, months, days):
 
@@ -544,7 +544,7 @@ class IpnController(RedditController):
         buyer_id = payment_blob.get('account_id', None)
         if buyer_id:
             try:
-                buyer = Account._byID(buyer_id, data=True)
+                buyer = await Account._byID(buyer_id, data=True)
             except NotFound:
                 dump_parameters(parameters)
                 raise ValueError("Invalid buyer_id %d in IPN with custom='%s'"
@@ -576,7 +576,7 @@ class IpnController(RedditController):
             subject, message = subscr_pm(pennies, months, new_subscr=True)
         elif payment_blob['goldtype'] == 'creddits':
             buyer._incr("gold_creddits", months)
-            buyer._commit()
+            await buyer._commit()
             subject = _("Eureka! Thank you for investing in reddit gold "
                         "creddits!")
 
@@ -591,7 +591,7 @@ class IpnController(RedditController):
         elif payment_blob['goldtype'] == 'gift':
             recipient_name = payment_blob.get('recipient', None)
             try:
-                recipient = Account._by_name(recipient_name)
+                recipient = await Account._by_name(recipient_name)
             except NotFound:
                 dump_parameters(parameters)
                 raise ValueError("Invalid recipient_name %s in IPN/GC with custom='%s'"
@@ -715,7 +715,7 @@ class GoldPaymentController(RedditController):
         """Extract status and webhook."""
         raise NotImplementedError
 
-    def process_webhook(self, event_type, webhook):
+    async def process_webhook(self, event_type, webhook):
         if event_type == 'noop':
             return
 
@@ -763,7 +763,7 @@ class GoldPaymentController(RedditController):
                         'Contact %(gold_email)s for details')
                 msg %= {'gold_email': g.goldsupport_email}
                 webhook.buyer.gold_subscr_id = None
-                webhook.buyer._commit()
+                await webhook.buyer._commit()
         elif event_type == 'refunded':
             if not (existing and existing.status == 'processed'):
                 return
@@ -776,7 +776,7 @@ class GoldPaymentController(RedditController):
 
         if msg:
             if existing:
-                buyer = Account._byID(int(existing.account_id), data=True)
+                buyer = await Account._byID(int(existing.account_id), data=True)
             elif webhook.buyer:
                 buyer = webhook.buyer
             else:
@@ -1069,14 +1069,14 @@ class StripeController(GoldPaymentController):
 
     @classmethod
     @handle_stripe_error
-    def cancel_subscription(cls, form, user):
+    async def cancel_subscription(cls, form, user):
         if not user.has_stripe_subscription:
             return
 
         customer = cancel_stripe_subscription(user.gold_subscr_id)
 
         user.gold_subscr_id = None
-        user._commit()
+        await user._commit()
         subject = _('your gold subscription has been cancelled')
         message = _('if you have any questions please email %(email)s')
         message %= {'email': g.goldsupport_email}
@@ -1089,7 +1089,7 @@ class StripeController(GoldPaymentController):
                    pennies=VInt('pennies'),
                    months=VInt("months"),
                    period=VOneOf("period", ("monthly", "yearly")))
-    def POST_goldcharge(self, form, jquery, token, passthrough, pennies, months,
+    async def POST_goldcharge(self, form, jquery, token, passthrough, pennies, months,
                         period):
         """
         Submit charge to stripe.
@@ -1137,7 +1137,7 @@ class StripeController(GoldPaymentController):
                 return
 
             c.user.gold_subscr_id = customer.id
-            c.user._commit()
+            await c.user._commit()
 
             status = _('subscription created')
             subject = _('reddit gold subscription')
@@ -1237,7 +1237,7 @@ class RedditGiftsController(GoldPaymentController):
     webhook_secret = g.secrets['redditgifts_webhook']
     event_type_mappings = {'succeeded': 'succeeded'}
 
-    def process_response(self):
+    async def process_response(self):
         data = request.POST
 
         transaction_id = 'RG%s' % data['transaction_id']
@@ -1246,11 +1246,11 @@ class RedditGiftsController(GoldPaymentController):
         status = 'succeeded'
 
         goldtype = data['goldtype']
-        buyer = Account._by_name(data['buyer'])
+        buyer = await Account._by_name(data['buyer'])
 
         if goldtype == 'gift':
             gift_kw = {
-                'recipient': Account._by_name(data['recipient']),
+                'recipient': await Account._by_name(data['recipient']),
                 'giftmessage': _force_unicode(data.get('giftmessage', None)),
                 'signed': data.get('signed') == 'True',
             }
@@ -1266,7 +1266,7 @@ class RedditGiftsController(GoldPaymentController):
 class GoldException(Exception): pass
 
 
-def validate_blob(custom):
+async def validate_blob(custom):
     """Validate payment_blob and return a dict with everything looked up."""
     ret = {}
 
@@ -1279,7 +1279,7 @@ def validate_blob(custom):
 
     if 'account_id' in payment_blob and 'account_name' in payment_blob:
         try:
-            buyer = Account._byID(payment_blob['account_id'], data=True)
+            buyer = await Account._byID(payment_blob['account_id'], data=True)
             ret['buyer'] = buyer
         except NotFound:
             raise GoldException('bad account_id')
@@ -1299,14 +1299,14 @@ def validate_blob(custom):
         if not recipient_name:
             raise GoldException('gift missing recpient')
         try:
-            recipient = Account._by_name(recipient_name)
+            recipient = await Account._by_name(recipient_name)
             ret['recipient'] = recipient
         except NotFound:
             raise GoldException('bad recipient')
         thing_fullname = payment_blob.get('thing', None)
         if thing_fullname:
             try:
-                ret['thing'] = Thing._by_fullname(thing_fullname)
+                ret['thing'] = await Thing._by_fullname(thing_fullname)
             except NotFound:
                 raise GoldException('bad thing')
         ret['signed'] = payment_blob.get('signed', False)
@@ -1329,24 +1329,24 @@ def days_from_months(months):
     return days
 
 
-def subtract_gold_days(user, days):
+async def subtract_gold_days(user, days):
     user.gold_expiration -= timedelta(days=days)
     if user.gold_expiration < datetime.now(g.display_tz):
         admintools.degolden(user)
-    user._commit()
+    await user._commit()
 
 
 def subtract_gold_creddits(user, num):
     user._incr('gold_creddits', -num)
 
 
-def reverse_gold_purchase(transaction_id):
+async def reverse_gold_purchase(transaction_id):
     transaction = retrieve_gold_transaction(transaction_id)
 
     if not transaction:
         raise GoldException('gold_table %s not found' % transaction_id)
 
-    buyer = Account._byID(int(transaction.account_id), data=True)
+    buyer = await Account._byID(int(transaction.account_id), data=True)
     recipient = None
     days = transaction.days
     months = days / 31
@@ -1360,7 +1360,7 @@ def reverse_gold_purchase(transaction_id):
 
     if goldtype == 'gift':
         recipient_name, secret = pieces[1:]
-        recipient = Account._by_name(recipient_name)
+        recipient = await Account._by_name(recipient_name)
 
     gold_recipient = recipient or buyer
     with gold_recipient.get_read_modify_write_lock() as lock:

@@ -144,8 +144,8 @@ class MultiApiController(RedditController):
                               fields='multipath')
         return c.user
 
-    def _add_multi_srs(self, multi, sr_datas):
-        srs = Subreddit._by_name(sr_data['name'] for sr_data in sr_datas)
+    async def _add_multi_srs(self, multi, sr_datas):
+        srs = await Subreddit._by_name(sr_data['name'] for sr_data in sr_datas)
 
         for sr in srs.values():
             if isinstance(sr, FakeSubreddit):
@@ -172,12 +172,12 @@ class MultiApiController(RedditController):
 
         return sr_props
 
-    def _write_multi_data(self, multi, data):
+    async def _write_multi_data(self, multi, data):
         srs = data.pop('subreddits', None)
         if srs is not None:
             multi.clear_srs()
             try:
-                self._add_multi_srs(multi, srs)
+                await self._add_multi_srs(multi, srs)
             except:
                 multi._revert()
                 raise
@@ -193,7 +193,7 @@ class MultiApiController(RedditController):
             if key in WRITABLE_MULTI_FIELDS:
                 setattr(multi, key, val)
 
-        multi._commit()
+        await multi._commit()
         return multi
 
     @require_oauth2_scope("subscribe")
@@ -204,7 +204,7 @@ class MultiApiController(RedditController):
         data=VValidatedJSON("model", multi_json_spec),
     )
     @api_doc(api_section.multis, extends=GET_multi)
-    def POST_multi(self, path_info, data):
+    async def POST_multi(self, path_info, data):
         """Create a multi. Responds with 409 Conflict if it already exists."""
 
         if not path_info and "path" in data:
@@ -220,14 +220,14 @@ class MultiApiController(RedditController):
         owner = self._check_new_multi_path(path_info)
 
         try:
-            LabeledMulti._byID(path_info['path'])
+            await LabeledMulti._byID(path_info['path'])
         except tdb_cassandra.NotFound:
             multi = LabeledMulti.create(path_info['path'], owner)
             response.status = 201
         else:
             raise RedditError('MULTI_EXISTS', code=409, fields='multipath')
 
-        self._write_multi_data(multi, data)
+        await self._write_multi_data(multi, data)
         return self._format_multi(multi)
 
     @require_oauth2_scope("subscribe")
@@ -238,18 +238,18 @@ class MultiApiController(RedditController):
         data=VValidatedJSON("model", multi_json_spec),
     )
     @api_doc(api_section.multis, extends=GET_multi)
-    def PUT_multi(self, path_info, data):
+    async def PUT_multi(self, path_info, data):
         """Create or update a multi."""
 
         owner = self._check_new_multi_path(path_info)
 
         try:
-            multi = LabeledMulti._byID(path_info['path'])
+            multi = await LabeledMulti._byID(path_info['path'])
         except tdb_cassandra.NotFound:
             multi = LabeledMulti.create(path_info['path'], owner)
             response.status = 201
 
-        self._write_multi_data(multi, data)
+        await self._write_multi_data(multi, data)
         return self._format_multi(multi)
 
     @require_oauth2_scope("subscribe")
@@ -263,7 +263,7 @@ class MultiApiController(RedditController):
         """Delete a multi."""
         multi.delete()
 
-    def _copy_multi(self, from_multi, to_path_info, rename=False):
+    async def _copy_multi(self, from_multi, to_path_info, rename=False):
         """Copy a multi to a user account."""
 
         to_owner = self._check_new_multi_path(to_path_info)
@@ -273,7 +273,7 @@ class MultiApiController(RedditController):
             raise RedditError('MULTI_CANNOT_EDIT', code=400)
 
         try:
-            LabeledMulti._byID(to_path_info['path'])
+            await LabeledMulti._byID(to_path_info['path'])
         except tdb_cassandra.NotFound:
             to_multi = LabeledMulti.copy(to_path_info['path'], from_multi,
                                          owner=to_owner)
@@ -297,7 +297,7 @@ class MultiApiController(RedditController):
         api_section.multis,
         uri="/api/multi/copy",
     )
-    def POST_multi_copy(self, from_multi, to_path_info, display_name):
+    async def POST_multi_copy(self, from_multi, to_path_info, display_name):
         """Copy a multi.
 
         Responds with 409 Conflict if the target already exists.
@@ -314,7 +314,7 @@ class MultiApiController(RedditController):
             else:
                 raise RedditError('BAD_MULTI_PATH', code=400)
 
-        to_multi = self._copy_multi(from_multi, to_path_info)
+        to_multi = await self._copy_multi(from_multi, to_path_info)
 
         from_path = from_multi.path
         to_multi.copied_from = from_path
@@ -327,7 +327,7 @@ class MultiApiController(RedditController):
         to_multi.visibility = 'private'
         if display_name:
             to_multi.display_name = display_name
-        to_multi._commit()
+        await to_multi._commit()
 
         return self._format_multi(to_multi)
 
@@ -346,7 +346,7 @@ class MultiApiController(RedditController):
         api_section.multis,
         uri="/api/multi/rename",
     )
-    def POST_multi_rename(self, from_multi, to_path_info, display_name):
+    async def POST_multi_rename(self, from_multi, to_path_info, display_name):
         """Rename a multi."""
         if not to_path_info:
             if display_name:
@@ -355,11 +355,11 @@ class MultiApiController(RedditController):
             else:
                 raise RedditError('BAD_MULTI_PATH', code=400)
 
-        to_multi = self._copy_multi(from_multi, to_path_info, rename=True)
+        to_multi = await self._copy_multi(from_multi, to_path_info, rename=True)
 
         if display_name:
             to_multi.display_name = display_name
-            to_multi._commit()
+            await to_multi._commit()
         from_multi.delete()
 
         return self._format_multi(to_multi)
@@ -392,15 +392,15 @@ class MultiApiController(RedditController):
         data=VValidatedJSON("model", multi_sr_data_json_spec),
     )
     @api_doc(api_section.multis, extends=GET_multi_subreddit)
-    def PUT_multi_subreddit(self, multi, sr_name, data):
+    async def PUT_multi_subreddit(self, multi, sr_name, data):
         """Add a subreddit to a multi."""
 
         new = not any(sr.name.lower() == sr_name.lower() for sr in multi.srs)
 
         data['name'] = sr_name
-        sr_props = self._add_multi_srs(multi, [data])
+        sr_props = await self._add_multi_srs(multi, [data])
         sr = sr_props.items()[0][0]
-        multi._commit()
+        await multi._commit()
 
         if new:
             response.status = 201
@@ -415,10 +415,10 @@ class MultiApiController(RedditController):
         sr=VSRByName('srname'),
     )
     @api_doc(api_section.multis, extends=GET_multi_subreddit)
-    def DELETE_multi_subreddit(self, multi, sr):
+    async def DELETE_multi_subreddit(self, multi, sr):
         """Remove a subreddit from a multi."""
         multi.del_srs(sr)
-        multi._commit()
+        await multi._commit()
 
     def _format_multi_description(self, multi):
         resp = LabeledMultiDescriptionJsonTemplate().render(multi).finalize()
@@ -445,8 +445,8 @@ class MultiApiController(RedditController):
         data=VValidatedJSON('model', multi_description_json_spec),
     )
     @api_doc(api_section.multis, extends=GET_multi_description)
-    def PUT_multi_description(self, multi, data):
+    async def PUT_multi_description(self, multi, data):
         """Change a multi's markdown description."""
         multi.description_md = data['body_md']
-        multi._commit()
+        await multi._commit()
         return self._format_multi_description(multi)

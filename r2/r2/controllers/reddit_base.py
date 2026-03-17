@@ -1313,7 +1313,7 @@ class RedditController(OAuth2ResourceController):  # noqa: E302
                 # patch for fixing mangled language preferences
                 if not isinstance(c.user.pref_lang, str):
                     c.user.pref_lang = g.lang
-                    c.user._commit()
+                    await c.user._commit()
 
         if c.user_is_loggedin:
             self.set_up_user_context()

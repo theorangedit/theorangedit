@@ -108,8 +108,7 @@ class ListingController(RedditController):
     render_params = {}
     extra_page_classes = ['listing-page']
 
-    @property
-    def menus(self):
+    async def menus(self):
         """list of menus underneat the header (e.g., sort, time, kind,
         etc) to be displayed on this listing page"""
         return []
@@ -120,7 +119,7 @@ class ListingController(RedditController):
             return c.site.allows_referrers
         return False
 
-    def build_listing(self, num, after, reverse, count, sr_detail=None, **kwargs):
+    async def build_listing(self, num, after, reverse, count, sr_detail=None, **kwargs):
         """uses the query() method to define the contents of the
         listing and renders the page self.render_cls(..).render() with
         the listing as contents"""
@@ -150,7 +149,7 @@ class ListingController(RedditController):
                                show_sidebar=self.show_sidebar,
                                show_chooser=self.show_chooser,
                                show_newsletterbar=True,
-                               nav_menus=self.menus,
+                               nav_menus=await self.menus(),
                                title=self.title(),
                                infotext=self.infotext,
                                infotext_class=self.infotext_class,
@@ -252,13 +251,13 @@ class ListingController(RedditController):
 
     @require_oauth2_scope("read")
     @base_listing
-    def GET_listing(self, **env):
+    async def GET_listing(self, **env):
         if isinstance(c.site, ModSR):
             VNotInTimeout().run(action_name="pageview",
                 details_text="mod_subreddit")
         if self.can_send_referrer():
             c.referrer_policy = "always"
-        return self.build_listing(**env)
+        return await self.build_listing(**env)
 
 listing_api_doc = partial(
     api_doc,
@@ -568,9 +567,9 @@ class HotController(ListingWithPromos):
 
     @require_oauth2_scope("read")
     @listing_api_doc(uri='/hot', uses_site=True)
-    def GET_listing(self, **env):
+    async def GET_listing(self, **env):
         self.infotext = request.GET.get('deactivated') and strings.user_deactivated
-        return ListingController.GET_listing(self, **env)
+        return await ListingController.GET_listing(self, **env)
 
 class NewController(ListingWithPromos):
     where = 'new'
@@ -597,8 +596,8 @@ class NewController(ListingWithPromos):
 
     @require_oauth2_scope("read")
     @listing_api_doc(uri='/new', uses_site=True)
-    def GET_listing(self, **env):
-        return ListingController.GET_listing(self, **env)
+    async def GET_listing(self, **env):
+        return await ListingController.GET_listing(self, **env)
 
 class RisingController(NewController):
     where = 'rising'
@@ -633,8 +632,7 @@ class BrowseController(ListingWithPromos):
         else:
             return ListingController.keep_fn(self)
 
-    @property
-    def menus(self):
+    async def menus(self):
         return [ControversyTimeMenu(default = self.time)]
 
     def query(self):
@@ -652,7 +650,7 @@ class BrowseController(ListingWithPromos):
     @validate(t = VMenu('sort', ControversyTimeMenu))
     @listing_api_doc(uri='/{sort}', uri_variants=['/top', '/controversial'],
                      uses_site=True)
-    def GET_listing(self, sort, t, **env):
+    async def GET_listing(self, sort, t, **env):
         self.sort = sort
         if sort == 'top':
             self.title_text = _('top scoring links')
@@ -667,7 +665,7 @@ class BrowseController(ListingWithPromos):
             # but in case something has gone wrong...
             abort(404)
         self.time = t
-        return ListingController.GET_listing(self, **env)
+        return await ListingController.GET_listing(self, **env)
 
 
 class AdsController(SubredditListingController):
@@ -703,11 +701,11 @@ class AdsController(SubredditListingController):
         listing = ListingController.listing(self)
         return listing
 
-    def GET_listing(self, *a, **kw):
+    async def GET_listing(self, *a, **kw):
         self.promos = set()
         if not c.site.allow_ads:
             self.abort404()
-        return SubredditListingController.GET_listing(self, *a, **kw)
+        return await SubredditListingController.GET_listing(self, *a, **kw)
 
 
 class RandomrisingController(ListingWithPromos):
@@ -742,7 +740,7 @@ class ByIDController(ListingController):
     @validate(links=VByName("names", thing_cls=Link,
                             ignore_missing=True, multiple=True))
     @api_doc(api_section.listings, uri='/by_id/{names}')
-    def GET_listing(self, links, **env):
+    async def GET_listing(self, links, **env):
         """Get a listing of links by fullname.
 
         `names` is a list of fullnames for links separated by commas or spaces.
@@ -751,7 +749,7 @@ class ByIDController(ListingController):
         if not links:
             return self.abort404()
         self.names = [l._fullname for l in links]
-        return ListingController.GET_listing(self, **env)
+        return await ListingController.GET_listing(self, **env)
 
 
 class UserController(ListingController):
@@ -759,8 +757,7 @@ class UserController(ListingController):
     show_nums = False
     skip = True
 
-    @property
-    def menus(self):
+    async def menus(self):
         res = []
         if (self.where in ('overview', 'submitted', 'comments')):
             res.append(ProfileSortMenu(default = self.sort))
@@ -774,7 +771,7 @@ class UserController(ListingController):
         if self.where == 'saved' and c.user.gold:
             srnames = LinkSavesBySubreddit.get_saved_subreddits(self.vuser)
             srnames += CommentSavesBySubreddit.get_saved_subreddits(self.vuser)
-            srs = Subreddit._by_name(set(srnames), stale=True)
+            srs = await Subreddit._by_name(set(srnames), stale=True)
             srnames = [name for name, sr in srs.items()
                             if sr.can_view(c.user)]
             srnames = sorted(set(srnames), key=lambda name: name.lower())
@@ -1022,7 +1019,7 @@ class UserController(ListingController):
         if vuser.pref_hide_from_robots:
             self.robots = 'noindex,nofollow'
 
-        return ListingController.GET_listing(self, **env)
+        return await ListingController.GET_listing(self, **env)
 
     @property
     def render_params(self):
@@ -1103,8 +1100,7 @@ class MessageController(ListingController):
 
         return self.where in ("moderator", "multi")
 
-    @property
-    def menus(self):
+    async def menus(self):
         if c.default_sr and self.where in ('inbox', 'messages', 'comments',
                           'selfreply', 'unread', 'mentions'):
             buttons = [NavButton(_("all"), "inbox"),
@@ -1356,7 +1352,7 @@ class MessageController(ListingController):
     @listing_api_doc(section=api_section.messages,
                      uri='/message/{where}',
                      uri_variants=['/message/inbox', '/message/unread', '/message/sent'])
-    def GET_listing(self, where, mark, message, subwhere = None, **env):
+    async def GET_listing(self, where, mark, message, subwhere = None, **env):
         if not (c.default_sr
                 or c.site.is_moderator_with_perms(c.user, 'mail')
                 or c.user_is_admin):
@@ -1399,7 +1395,7 @@ class MessageController(ListingController):
         else:
             self.source = "usermail"
 
-        return ListingController.GET_listing(self, **env)
+        return await ListingController.GET_listing(self, **env)
 
     @validate(
         VUser(),
@@ -1576,7 +1572,7 @@ class RedditsController(ListingController):
                          '/subreddits/gold',
                          '/subreddits/default',
                      ])
-    def GET_listing(self, where, **env):
+    async def GET_listing(self, where, **env):
         """Get all subreddits.
 
         The `where` parameter chooses the order in which the subreddits are
@@ -1586,14 +1582,13 @@ class RedditsController(ListingController):
 
         """
         self.where = where
-        return ListingController.GET_listing(self, **env)
+        return await ListingController.GET_listing(self, **env)
 
 class MyredditsController(ListingController):
     render_cls = MySubredditsPage
     extra_page_classes = ListingController.extra_page_classes + ['subreddits-page']
 
-    @property
-    def menus(self):
+    async def menus(self):
         buttons = (NavButton(plurals.subscriber,  'subscriber'),
                     NavButton(getattr(plurals, "approved submitter"), 'contributor'),
                     NavButton(plurals.moderator,   'moderator'))
@@ -1650,11 +1645,11 @@ class MyredditsController(ListingController):
 
         return stack
 
-    def build_listing(self, after=None, **kwargs):
+    async def build_listing(self, after=None, **kwargs):
         if after and not isinstance(after, Subreddit):
             abort(400, 'gimme a subreddit')
 
-        return ListingController.build_listing(self, after=after, **kwargs)
+        return await ListingController.build_listing(self, after=after, **kwargs)
 
     @property
     def render_params(self):
@@ -1679,7 +1674,7 @@ class MyredditsController(ListingController):
     @listing_api_doc(section=api_section.subreddits,
                      uri='/subreddits/mine/{where}',
                      uri_variants=['/subreddits/mine/subscriber', '/subreddits/mine/contributor', '/subreddits/mine/moderator'])
-    def GET_listing(self, where='subscriber', **env):
+    async def GET_listing(self, where='subscriber', **env):
         """Get subreddits the user has a relationship with.
 
         The `where` parameter chooses which subreddits are returned as follows:
@@ -1694,7 +1689,7 @@ class MyredditsController(ListingController):
 
         """
         self.where = where
-        return ListingController.GET_listing(self, **env)
+        return await ListingController.GET_listing(self, **env)
 
 
 class CommentsController(SubredditListingController):
@@ -1728,10 +1723,10 @@ class CommentsController(SubredditListingController):
         return c.site.get_all_comments()
 
     @require_oauth2_scope("read")
-    def GET_listing(self, **env):
+    async def GET_listing(self, **env):
         c.profilepage = True
         self.suppress_reply_buttons = True
-        return ListingController.GET_listing(self, **env)
+        return await ListingController.GET_listing(self, **env)
 
 
 class UserListListingController(ListingController):
@@ -1884,7 +1879,7 @@ class UserListListingController(ListingController):
                      uri='/prefs/{where}',
                      uri_variants=['/prefs/friends', '/prefs/blocked',
                          '/api/v1/me/friends', '/api/v1/me/blocked'])
-    def GET_user_prefs(self, where, **kw):
+    async def GET_user_prefs(self, where, **kw):
         self.where = where
 
         self.listing_cls = None
@@ -1911,7 +1906,7 @@ class UserListListingController(ListingController):
             abort(404)
 
         kw['num'] = 0
-        return self.build_listing(**kw)
+        return await self.build_listing(**kw)
 
 
     @require_oauth2_scope("read")
@@ -1923,7 +1918,7 @@ class UserListListingController(ListingController):
                      uri_variants=['/about/' + where for where in [
                         'banned', 'muted', 'wikibanned', 'contributors',
                         'wikicontributors', 'moderators']])
-    def GET_listing(self, where, user=None, **kw):
+    async def GET_listing(self, where, user=None, **kw):
         if isinstance(c.site, FakeSubreddit):
             return self.abort404()
 
@@ -2003,7 +1998,7 @@ class UserListListingController(ListingController):
         if not self.paginated:
             kw['num'] = 0
 
-        return self.build_listing(**kw)
+        return await self.build_listing(**kw)
 
 
 class GildedController(SubredditListingController):
@@ -2042,9 +2037,9 @@ class GildedController(SubredditListingController):
             abort(404)
 
     @require_oauth2_scope("read")
-    def GET_listing(self, **env):
+    async def GET_listing(self, **env):
         c.profilepage = True
         self.suppress_reply_buttons = True
         if not c.site.allow_gilding:
             self.abort404()
-        return ListingController.GET_listing(self, **env)
+        return await ListingController.GET_listing(self, **env)
