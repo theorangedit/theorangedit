@@ -84,7 +84,7 @@ def handle_login(
         _event(error=None)
 
 
-def handle_register(
+async def handle_register(
     controller, form, responder, name, email,
     password, rem=None, newsletter_subscribe=False,
     sponsor=False, signature=None, **kwargs
@@ -150,7 +150,7 @@ def handle_register(
 
     else:
         try:
-            user = register(name, password, request.ip)
+            user = await register(name, password, request.ip)
         except AccountExists:
             c.errors.add(errors.USERNAME_TAKEN, field="user")
             form.has_errors("user", errors.USERNAME_TAKEN)
@@ -165,7 +165,7 @@ def handle_register(
             emailer.verify_email(user)
 
         user.pref_lang = c.lang
-        user._commit()
+        await user._commit()
 
         amqp.add_item('new_account', user._fullname)
 

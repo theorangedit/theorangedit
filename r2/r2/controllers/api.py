@@ -623,7 +623,7 @@ class ApiController(RedditController):
         user=VThrottledLogin(['user', 'passwd']),
         rem=VBoolean('rem'),
     )
-    def POST_login(self, form, responder, user, rem=None, **kwargs):
+    async def POST_login(self, form, responder, user, rem=None, **kwargs):
         """Log into an account.
 
         `rem` specifies whether or not the session cookie returned should last
@@ -652,7 +652,7 @@ class ApiController(RedditController):
         newsletter_subscribe=VBoolean('newsletter_subscribe', default=False),
         sponsor=VBoolean('sponsor', default=False),
     )
-    def POST_register(self, form, responder, name, email, password, **kwargs):
+    async def POST_register(self, form, responder, name, email, password, **kwargs):
         """Create a new account.
 
         `rem` specifies whether or not the session cookie returned should last
@@ -669,7 +669,7 @@ class ApiController(RedditController):
             email=email,
             password=password,
         ))
-        return handle_register(**kwargs)
+        return await handle_register(**kwargs)
 
     @require_oauth2_scope("modself")
     @noresponse(VUser(),

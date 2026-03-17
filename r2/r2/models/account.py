@@ -247,6 +247,24 @@ Account = _AccountORM
 
 
 # ---------------------------------------------------------------------------
+# Convenience async registration function (called by controllers)
+# ---------------------------------------------------------------------------
+
+async def register(name: str, password: str, ip: str = '') -> Account:
+    """Create a new Account.
+
+    Raises AccountExists if the name is already taken.
+    """
+    db = c.db
+    existing = await account_svc.get_by_name(db, name)
+    if existing is not None:
+        raise AccountExists(f'{name!r} is already registered')
+
+    account = await account_svc.register(db, name, password, ip=ip)
+    return account
+
+
+# ---------------------------------------------------------------------------
 # Stub / compat classes
 # ---------------------------------------------------------------------------
 
