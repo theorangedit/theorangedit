@@ -20,7 +20,18 @@
 # Inc. All Rights Reserved.
 ###############################################################################
 
-import pycassa
+# pycassa removed (Cassandra removed in Phase 10) — raise on use so callers surface immediately
+ASCII_TYPE = UTF8_TYPE = TIME_UUID_TYPE = INT_TYPE = 'UTF8Type'  # schema constants — dead code
+class NotFoundException(Exception): pass
+class LongType:
+    def __init__(self, *a, **kw): raise NotImplementedError('pycassa removed')
+class IntegerType:
+    def __init__(self, *a, **kw): raise NotImplementedError('pycassa removed')
+class Mutator:
+    def __init__(self, *a, **kw): raise NotImplementedError('pycassa.batch.Mutator removed — use service layer')
+    def __enter__(self): raise NotImplementedError('pycassa.batch.Mutator removed')
+    def __exit__(self, *a): pass
+def convert_uuid_to_time(u): raise NotImplementedError('pycassa.util.convert_uuid_to_time removed')
 import time
 
 from collections import defaultdict
@@ -101,7 +112,7 @@ class AccountSRFeedback(tdb_cassandra.DenormalizedRelation):
         try:
             row = AccountSRFeedback._cf.get(account._id36,
                                             column_count=max_column_count)
-        except pycassa.NotFoundException:
+        except NotFoundException:
             return feedback
         for colkey, colval in row.items():
             action, sr_id36 = colkey.split('.')

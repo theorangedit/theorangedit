@@ -19,48 +19,50 @@
 # All portions of the code written by reddit are Copyright (c) 2006-2015 reddit
 # Inc. All Rights Reserved.
 ###############################################################################
+"""
+LastModified — replaces Cassandra-backed View with memcache.
+
+Keys: "lastmod:{fullname}:{name}" → datetime
+TTL: 7 days (same as old Cassandra TTL)
+"""
 
 import datetime
-
 from r2.lib.app_globals import g
-from pycassa.system_manager import ASCII_TYPE, DATE_TYPE
-
-from r2.lib.db import tdb_cassandra
 from r2.lib.utils import tup
 
+_TTL = 7 * 24 * 3600  # 7 days in seconds
 
-class LastModified(tdb_cassandra.View):
-    _use_db = True
-    _value_type = "date"
-    _connection_pool = "main"
-    _read_consistency_level = tdb_cassandra.CL.ONE
-    _extra_schema_creation_args = dict(key_validation_class=ASCII_TYPE,
-                                       default_validation_class=DATE_TYPE)
 
+def _key(fullname, name):
+    return 'lastmod:%s:%s' % (fullname, name)
+
+
+class LastModified:
     @classmethod
     def touch(cls, fullname, names):
         names = tup(names)
         now = datetime.datetime.now(g.tz)
-        values = dict.fromkeys(names, now)
-        cls._set_values(fullname, values)
+        cache = getattr(g, 'thingcache', None)
+        if cache is not None:
+            for name in names:
+                cache.set(_key(fullname, name), now, time=_TTL)
         return now
 
     @classmethod
     def get(cls, fullname, name, touch_if_not_set=False):
-        try:
-            obj = cls._byID(fullname)
-        except tdb_cassandra.NotFound:
-            if touch_if_not_set:
-                time = cls.touch(fullname, name)
-                return time
-            else:
-                return None
-
-        return getattr(obj, name, None)
+        cache = getattr(g, 'thingcache', None)
+        if cache is None:
+            return None
+        val = cache.get(_key(fullname, name))
+        if val is None and touch_if_not_set:
+            return cls.touch(fullname, name)
+        return val
 
     @classmethod
     def get_multi(cls, fullnames, name):
-        res = cls._byID(fullnames, return_dict=True)
-
-        return dict((k, getattr(v, name, None))
-                    for k, v in res.items())
+        cache = getattr(g, 'thingcache', None)
+        if cache is None:
+            return {fn: None for fn in fullnames}
+        keys = {fn: _key(fn, name) for fn in fullnames}
+        raw = cache.get_multi(list(keys.values()))
+        return {fn: raw.get(keys[fn]) for fn in fullnames}

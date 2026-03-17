@@ -35,8 +35,13 @@ from _pylibmc import MemcachedError
 
 import random
 
-from pycassa import ColumnFamily
-from pycassa.cassandra.ttypes import ConsistencyLevel
+# pycassa removed (Cassandra removed in Phase 10) — raise on use so callers surface immediately
+class ColumnFamily:
+    def __init__(self, *a, **kw):
+        raise NotImplementedError("pycassa.ColumnFamily removed — Cassandra is gone")
+class ConsistencyLevel:
+    ONE = 1
+    QUORUM = 2
 
 from r2.lib.utils import in_chunks, prefix_keys, trace, tup
 from r2.lib.hardcachebackend import HardCacheBackend

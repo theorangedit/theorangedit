@@ -37,7 +37,6 @@ from r2.lib.app_globals import Globals
 def get_operational_exceptions():
     import _pylibmc
     import sqlalchemy.exc
-    import pycassa.pool
     import r2.lib.db.thing
     import r2.lib.lock
     import r2.lib.cache

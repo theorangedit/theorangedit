@@ -22,7 +22,18 @@
 
 from datetime import datetime
 
-from pycassa.util import convert_uuid_to_time
+# pycassa removed (Cassandra removed in Phase 10) — raise on use so callers surface immediately
+ASCII_TYPE = UTF8_TYPE = TIME_UUID_TYPE = INT_TYPE = 'UTF8Type'  # schema constants — dead code
+class NotFoundException(Exception): pass
+class LongType:
+    def __init__(self, *a, **kw): raise NotImplementedError('pycassa removed')
+class IntegerType:
+    def __init__(self, *a, **kw): raise NotImplementedError('pycassa removed')
+class Mutator:
+    def __init__(self, *a, **kw): raise NotImplementedError('pycassa.batch.Mutator removed — use service layer')
+    def __enter__(self): raise NotImplementedError('pycassa.batch.Mutator removed')
+    def __exit__(self, *a): pass
+def convert_uuid_to_time(u): raise NotImplementedError('pycassa.util.convert_uuid_to_time removed')
 from r2.lib.app_globals import g
 
 from r2.models.trylater import TryLaterBySubject

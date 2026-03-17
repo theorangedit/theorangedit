@@ -29,8 +29,20 @@ import time
 import threading
 import random
 
-from pycassa import columnfamily
-from pycassa import pool
+# pycassa removed (Cassandra removed in Phase 10) — raise on use so callers surface immediately
+class _RemovedCassandraPool:
+    def __init__(self, *a, **kw):
+        raise NotImplementedError("pycassa.pool removed — Cassandra is gone")
+    def _get_new_wrapper(self, *a, **kw):
+        raise NotImplementedError("pycassa.pool removed — Cassandra is gone")
+class _RemovedCassandraColumnFamily:
+    class ColumnParent:
+        pass
+    class ColumnPath:
+        pass
+    ConnectionPool = _RemovedCassandraPool
+columnfamily = _RemovedCassandraColumnFamily()
+pool = type('pool', (), {'ConnectionPool': _RemovedCassandraPool})()
 
 from r2.lib import baseplate_integration
 from r2.lib import cache
