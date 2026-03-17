@@ -72,8 +72,10 @@ setup(
         "jinja2>=3.0",
 
         # --- Database / ORM ---
-        "SQLAlchemy>=1.4",
-        "psycopg2>=2.9",
+        "SQLAlchemy>=2.0",
+        "asyncpg>=0.29",        # async PostgreSQL driver for SQLAlchemy 2.x
+        "alembic>=1.13",        # database migrations
+        "psycopg2>=2.9",        # kept for Alembic offline/sync use
 
         # --- Cassandra (TODO: migrate pycassa API -> cassandra-driver API) ---
         # "pycassa>=1.7.0",  # Python 2 only; cassandra-driver is the Py3 replacement
