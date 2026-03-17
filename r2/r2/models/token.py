@@ -440,3 +440,61 @@ class EmailVerificationToken(Token):
     @property
     def email(self) -> Optional[str]:
         return self.data.get('email')
+
+
+# ---------------------------------------------------------------------------
+# OAuth2 scope handling
+# ---------------------------------------------------------------------------
+
+class OAuth2Scope:
+    """
+    Represents an OAuth2 scope grant.
+
+    The scope string format is: "<scope1> <scope2> ..." or a comma-separated
+    list.  Special value "*" grants full access.
+
+    Callers:
+        grant = OAuth2Scope(access_token.scope)
+        grant.has_access(sr_name, {'read', 'submit'})
+    """
+
+    FULL_ACCESS = '*'
+
+    class InsufficientScopeError(Exception):
+        """Raised when the grant does not cover required scopes."""
+
+    def __init__(self, scope_str: str = '') -> None:
+        self.scope_str = scope_str or ''
+        # Accept space-separated or comma-separated scope lists.
+        raw = self.scope_str.replace(',', ' ')
+        self.scopes = set(raw.split()) if raw.strip() else set()
+
+    def has_access(self, sr_name: str, required: set) -> bool:
+        """Return True if this grant covers all *required* scopes."""
+        if self.FULL_ACCESS in self.scopes:
+            return True
+        return required.issubset(self.scopes)
+
+    def is_valid(self) -> bool:
+        return bool(self.scopes) or self.scope_str == ''
+
+    def __repr__(self) -> str:  # pragma: no cover
+        return f'OAuth2Scope({self.scope_str!r})'
+
+
+def extra_oauth2_scope(*extra_scopes):
+    """
+    Decorator that marks a controller method as requiring additional OAuth2
+    scopes beyond those declared in the @oauth2_required decorator.
+
+    Usage::
+
+        @extra_oauth2_scope("privatemessages")
+        def GET_inbox(self, ...):
+            ...
+    """
+    def decorator(fn):
+        existing = getattr(fn, '_extra_oauth2_scopes', set())
+        fn._extra_oauth2_scopes = existing | set(extra_scopes)
+        return fn
+    return decorator

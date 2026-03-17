@@ -224,7 +224,7 @@ def set_user_cookie(name, val, **kwargs):
 
 
 valid_click_cookie = fullname_regex(Link, True).match
-def set_recent_clicks():
+async def set_recent_clicks():
     c.recent_clicks = []
     if not c.user_is_loggedin:
         return
@@ -241,7 +241,7 @@ def set_recent_clicks():
             names = names[:5]
 
             try:
-                c.recent_clicks = Link._by_fullname(names, data=True,
+                c.recent_clicks = await Link._by_fullname(names, data=True,
                                                     return_dict=False)
             except NotFound:
                 # clear their cookie because it's got bad links in it
@@ -280,7 +280,7 @@ def set_obey_over18():
     c.obey_over18 = request.GET.get("obey_over18") == "true"
 
 valid_ascii_domain = re.compile(r'\A(\w[-\w]*\.)+[\w]+\Z')
-def set_subreddit():
+async def set_subreddit():
     #the r parameter gets added by javascript for API requests so we
     #can reference c.site in api.py
     sr_name = request.environ.get("subreddit", request.params.get('r'))
@@ -293,7 +293,7 @@ def set_subreddit():
         #check for cnames
         cname = request.environ.get('legacy-cname')
         if cname:
-            sr = Subreddit._by_domain(cname) or Frontpage
+            sr = await Subreddit._by_domain(cname) or Frontpage
             domain = g.domain
             if g.domain_prefix:
                 domain = ".".join((g.domain_prefix, domain))
@@ -302,8 +302,8 @@ def set_subreddit():
     elif '+' in sr_name:
         name_filter = lambda name: Subreddit.is_valid_name(name,
             allow_language_srs=True)
-        sr_names = filter(name_filter, sr_name.split('+'))
-        srs = Subreddit._by_name(sr_names, stale=can_stale).values()
+        sr_names = list(filter(name_filter, sr_name.split('+')))
+        srs = (await Subreddit._by_names(sr_names)).values()
         if All in srs:
             c.site = All
         elif Friends in srs:
@@ -314,7 +314,7 @@ def set_subreddit():
                 c.site = srs[0]
             elif srs:
                 found = {sr.name.lower() for sr in srs}
-                sr_names = filter(lambda name: name.lower() in found, sr_names)
+                sr_names = [name for name in sr_names if name.lower() in found]
                 sr_name = '+'.join(sr_names)
                 multi_path = '/r/' + sr_name
                 c.site = MultiReddit(multi_path, srs)
@@ -323,7 +323,7 @@ def set_subreddit():
     elif '-' in sr_name:
         sr_names = sr_name.split('-')
         base_sr_name, exclude_sr_names = sr_names[0], sr_names[1:]
-        srs = Subreddit._by_name(sr_names, stale=can_stale)
+        srs = await Subreddit._by_names(sr_names)
         base_sr = srs.pop(base_sr_name, None)
         exclude_srs = [sr for sr in srs.values()
                           if not isinstance(sr, FakeSubreddit)]
@@ -343,7 +343,7 @@ def set_subreddit():
             abort(302, location=BaseController.format_output_url(path))
     else:
         try:
-            c.site = Subreddit._by_name(sr_name, stale=can_stale)
+            c.site = await Subreddit._by_name(sr_name, stale=can_stale)
         except NotFound:
             if Subreddit.is_valid_name(sr_name):
                 path = "/subreddits/search?q=%s" % sr_name
@@ -370,7 +370,7 @@ def set_subreddit():
         c.default_sr = True
 
 _FILTER_SRS = {"mod": ModFiltered, "all": AllFiltered}
-def set_multireddit():
+async def set_multireddit():
     routes_dict = request.environ["pylons.routes_dict"]
     if "multipath" in routes_dict or ("m" in request.GET and is_api()):
         fullpath = routes_dict.get("multipath", "").lower()
@@ -406,7 +406,7 @@ def set_multireddit():
             multiurl = ""
 
         if multi_ids is not None:
-            multis = LabeledMulti._byID(multi_ids, return_dict=False) or []
+            multis = await LabeledMulti._byID(multi_ids, return_dict=False) or []
             multis = [m for m in multis if m.can_view(c.user)]
             if not multis:
                 abort(404)
@@ -420,7 +420,7 @@ def set_multireddit():
                     ))),
                     LabeledMulti.MAX_SR_COUNT,
                 )
-                srs = Subreddit._byID(sr_ids, data=True, return_dict=False)
+                srs = await Subreddit._byID(sr_ids, data=True, return_dict=False)
                 c.site = MultiReddit(multiurl, srs)
                 if any(m.weighting_scheme == "fresh" for m in multis):
                     c.site.weighting_scheme = "fresh"
@@ -927,7 +927,7 @@ class MinimalController(BaseController):
 
         c.extension = request.environ.get('extension')
         # the domain has to be set before Cookies get initialized
-        set_subreddit()
+        await set_subreddit()
         c.subdomain = extract_subdomain()
         c.errors = ErrorSet()
         c.cookies = Cookies()
@@ -1122,19 +1122,19 @@ class MinimalController(BaseController):
 class OAuth2ResourceController(MinimalController):
     defer_ratelimiting = True
 
-    def authenticate_with_token(self):
+    async def authenticate_with_token(self):
         set_extension(request.environ, "json")
         set_content_type()
         require_https()
         require_domain(g.oauth_domain)
 
         try:
-            access_token = OAuth2AccessToken.get_token(self._get_bearer_token())
+            access_token = await OAuth2AccessToken._byID(self._get_bearer_token())
             require(access_token)
             require(access_token.check_valid())
             c.oauth2_access_token = access_token
             if access_token.user_id:
-                account = Account._byID36(access_token.user_id, data=True)
+                account = await Account._byID36(access_token.user_id, data=True)
                 require(account)
                 require(not account._deleted)
                 c.user = c.oauth_user = account
@@ -1142,7 +1142,7 @@ class OAuth2ResourceController(MinimalController):
             else:
                 c.user = UnloggedUser(get_browser_langs())
                 c.user_is_loggedin = False
-            c.oauth2_client = OAuth2Client._byID(access_token.client_id)
+            c.oauth2_client = await OAuth2Client._byID(access_token.client_id)
         except RequirementException:
             self._auth_error(401, "invalid_token")
 
@@ -1158,9 +1158,9 @@ class OAuth2ResourceController(MinimalController):
             else:
                 self._auth_error(400, "invalid_request")
 
-    def check_for_bearer_token(self):
+    async def check_for_bearer_token(self):
         if self._get_bearer_token(strict=False):
-            self.authenticate_with_token()
+            await self.authenticate_with_token()
 
     def _auth_error(self, code, error):
         abort(code, headers=[("WWW-Authenticate", 'Bearer realm="reddit", error="%s"' % error)])
@@ -1197,7 +1197,7 @@ class OAuth2OnlyController(OAuth2ResourceController):
     async def pre(self):
         await OAuth2ResourceController.pre(self)
         if request.method != "OPTIONS":
-            self.authenticate_with_token()
+            await self.authenticate_with_token()
             self.set_up_user_context()
             self.run_sitewide_ratelimits()
 
@@ -1281,7 +1281,7 @@ class RedditController(OAuth2ResourceController):  # noqa: E302
         maybe_admin = False
         is_otpcookie_valid = False
 
-        self.check_for_bearer_token()
+        await self.check_for_bearer_token()
 
         # no logins for RSS feed unless valid_feed has already been called
         if not c.user:
@@ -1333,11 +1333,11 @@ class RedditController(OAuth2ResourceController):  # noqa: E302
         set_obey_over18()
 
         # looking up the multireddit requires c.user.
-        set_multireddit()
+        await set_multireddit()
 
         #set_browser_langs()
         set_iface_lang()
-        set_recent_clicks()
+        await set_recent_clicks()
         # used for HTML-lite templates
         set_colors()
 
@@ -1437,9 +1437,13 @@ class RedditController(OAuth2ResourceController):  # noqa: E302
         # use override stylesheet if one exists and:
         #   this page has no custom stylesheet
         #   or the user disabled the stylesheet for this sr (indiv or global)
-        has_style_override = (c.user.pref_default_theme_sr and
-                feature.is_enabled('stylesheets_everywhere') and
-                Subreddit._by_name(c.user.pref_default_theme_sr).can_view(c.user))
+        _theme_sr = None
+        if c.user.pref_default_theme_sr and feature.is_enabled('stylesheets_everywhere'):
+            try:
+                _theme_sr = await Subreddit._by_name(c.user.pref_default_theme_sr)
+            except NotFound:
+                pass
+        has_style_override = bool(_theme_sr and _theme_sr.can_view(c.user))
         sr_stylesheet_enabled = c.user.use_subreddit_style(c.site)
 
         if (not sr_stylesheet_enabled and

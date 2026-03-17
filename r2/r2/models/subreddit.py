@@ -255,6 +255,81 @@ class DefaultSR(FakeSubreddit):
     title = 'Front Page'
 
 
+class Frontpage(DefaultSR):
+    """Alias for DefaultSR — the logged-in front page."""
+    name = 'front'
+    title = 'Front Page'
+
+
+class AllSR(FakeSubreddit):
+    """Virtual subreddit that aggregates all public subreddits."""
+    name = 'all'
+    title = 'All'
+
+
+All = AllSR()
+
+
+class AllFiltered(FakeSubreddit):
+    """AllSR minus user-filtered subreddits."""
+    name = 'all'
+    title = 'All (filtered)'
+
+
+class AllMinus(FakeSubreddit):
+    """AllSR minus a set of excluded subreddits."""
+
+    def __init__(self, exclude_srs=None):
+        self.exclude_srs = exclude_srs or []
+        self.name = 'all'
+        self.title = 'All'
+
+
+class Friends(FakeSubreddit):
+    """Virtual subreddit for posts by friends."""
+    name = 'friends'
+    title = 'Friends'
+
+
+class Mod(FakeSubreddit):
+    """Virtual subreddit aggregating moderated subreddits."""
+    name = 'mod'
+    title = 'Mod'
+
+
+class ModFiltered(FakeSubreddit):
+    """Mod subreddit minus user-filtered srs."""
+    name = 'mod'
+    title = 'Mod (filtered)'
+
+
+class ModMinus(FakeSubreddit):
+    """Mod minus a set of excluded subreddits."""
+
+    def __init__(self, exclude_srs=None):
+        self.exclude_srs = exclude_srs or []
+        self.name = 'mod'
+        self.title = 'Mod'
+
+
+class Random(FakeSubreddit):
+    """Sentinel for random subreddit redirect."""
+    name = 'random'
+    title = 'Random'
+
+
+class RandomNSFW(FakeSubreddit):
+    """Sentinel for random NSFW subreddit redirect."""
+    name = 'randnsfw'
+    title = 'Random NSFW'
+
+
+class RandomSubscription(FakeSubreddit):
+    """Sentinel for random subscribed subreddit redirect."""
+    name = 'myrandom'
+    title = 'Random Subscription'
+
+
 class DomainSR(FakeSubreddit):
     """Virtual subreddit scoped to a specific link domain."""
 

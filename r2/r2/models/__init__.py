@@ -23,3 +23,51 @@
 # Legacy Python 2 relative imports removed. Individual model modules still
 # exist in this package but are imported directly where needed. The new
 # SQLAlchemy ORM models live in r2.models.orm.
+
+# Re-export the most commonly imported names so that
+#   from r2.models import Account, Link, Subreddit, All, ...
+# continues to work as it did in the legacy Pylons stack.
+
+from r2.models.account import (  # noqa: F401
+    Account,
+    FakeAccount,
+    DeletedUser,
+    NotFound,
+)
+
+from r2.models.subreddit import (  # noqa: F401
+    Subreddit,
+    FakeSubreddit,
+    DefaultSR,
+    Frontpage,
+    All,
+    AllSR,
+    AllFiltered,
+    AllMinus,
+    Friends,
+    Mod,
+    ModFiltered,
+    ModMinus,
+    Random,
+    RandomNSFW,
+    RandomSubscription,
+    DomainSR,
+    MultiReddit,
+    LabeledMulti,
+)
+
+from r2.models.link import Link, Comment, Message  # noqa: F401
+
+from r2.models.token import (  # noqa: F401
+    OAuth2AccessToken,
+    OAuth2Client,
+    OAuth2RefreshToken,
+    OAuth2Scope,
+    PasswordResetToken,
+    EmailVerificationToken,
+)
+
+from r2.models.vote import Vote  # noqa: F401
+
+# Auth helpers that controllers expect on r2.models
+from r2.lib.auth import valid_feed, valid_admin_cookie, valid_otp_cookie  # noqa: F401
