@@ -40,6 +40,95 @@ import mistune as _mistune
 #   >!spoiler!<    -> <span class="spoiler">
 # ---------------------------------------------------------------------------
 
+def _render_superscripts(text):
+    """
+    Convert Reddit/snudown-style superscript notation to nested <sup> tags.
+
+    Rules (matching snudown behaviour):
+      ^word           -> <sup>word</sup>
+      ^word^          -> <sup>word</sup>      (trailing ^ is ignored / treated
+                                               as start of next level if followed
+                                               by non-space)
+      a^b^c^d         -> a<sup>b<sup>c<sup>d</sup></sup></sup>
+      ^(multi word)   -> <sup>multi word</sup>  (parens allow spaces)
+      code spans (already stripped by caller) are not processed.
+
+    Algorithm: tokenise on ^ boundaries. Each ^ between two non-space tokens
+    adds a nesting level. A trailing ^ with nothing after closes.
+    """
+    if '^' not in text:
+        return text
+
+    # Tokenise: split into runs of [non-^] and [^]
+    # We process left-to-right, opening a <sup> on each ^ that is followed
+    # by non-whitespace, and closing at whitespace or end-of-string.
+    out = []
+    i = 0
+    n = len(text)
+
+    def _esc(s):
+        return s.replace('&', '&amp;').replace('<', '&lt;').replace('>', '&gt;')
+
+    while i < n:
+        if text[i] != '^':
+            out.append(_esc(text[i]))
+            i += 1
+            continue
+
+        # We're on a '^'. Look ahead: if followed by whitespace or end, emit
+        # a literal ^ and move on.
+        j = i + 1
+        if j >= n or text[j] in ' \t\n\r':
+            out.append('^')
+            i += 1
+            continue
+
+        # Collect the full superscript "group" — possibly multiple ^-separated
+        # words, which nest.
+        sup_parts = []  # list of strings, each to be wrapped in one <sup> level
+
+        while i < n and text[i] == '^':
+            i += 1  # skip ^
+
+            if i < n and text[i] == '(':
+                # Parenthesised group — allows spaces
+                i += 1  # skip (
+                end = text.find(')', i)
+                if end == -1:
+                    # unclosed — emit literal and bail
+                    out.append('^(')
+                    break
+                sup_parts.append(_esc(text[i:end]))
+                i = end + 1
+            else:
+                # Plain word: consume until whitespace or ^
+                start = i
+                while i < n and text[i] not in ' \t\n\r^':
+                    i += 1
+                sup_parts.append(_esc(text[start:i]))
+
+            # If next char is ^ and followed by non-space, keep nesting
+            if i < n and text[i] == '^' and (i + 1) < n and text[i + 1] not in ' \t\n\r':
+                continue  # loop will consume the next ^
+            else:
+                # consume a lone trailing ^ (closing marker) if present
+                if i < n and text[i] == '^':
+                    i += 1
+                break
+
+        if not sup_parts:
+            continue
+
+        # Build nested <sup> tags: innermost part is deepest
+        # sup_parts = ['b', 'c', 'd']  ->  <sup>b<sup>c<sup>d</sup></sup></sup>
+        html = sup_parts[-1]
+        for part in reversed(sup_parts[:-1]):
+            html = part + '<sup>' + html + '</sup>'
+        out.append('<sup>' + html + '</sup>')
+
+    return ''.join(out)
+
+
 def _plugin_reddit(md):
     """Mistune plugin adding Reddit-specific inline syntax."""
 
@@ -47,26 +136,17 @@ def _plugin_reddit(md):
     SLASH_PATTERN = r'(?<!\w)(/[ru]/\w{1,25})(?=[^\w/]|$)'
     # u/username without leading slash
     U_PATTERN = r'(?<!\w)(u/\w{1,25})(?=[^\w/]|$)'
-    # ^superscript^  (non-greedy, no spaces, no nesting for simplicity)
-    SUP_PATTERN = r'\^(\S+)\^'
     # >!spoiler!<
     SPOILER_PATTERN = r'>!(.+?)!<'
 
     def parse_slash_link(inline, m, state):
-        text = m.group(1)
-        return 'slash_link', text
+        return 'slash_link', m.group(1)
 
     def parse_u_link(inline, m, state):
-        text = m.group(1)
-        return 'u_link', text
-
-    def parse_superscript(inline, m, state):
-        text = m.group(1)
-        return 'superscript', text
+        return 'u_link', m.group(1)
 
     def parse_spoiler(inline, m, state):
-        text = m.group(1)
-        return 'spoiler', text
+        return 'spoiler', m.group(1)
 
     def render_slash_link(text):
         return '<a href="/%s">%s</a>' % (text.lstrip('/'), text)
@@ -74,21 +154,16 @@ def _plugin_reddit(md):
     def render_u_link(text):
         return '<a href="/%s">%s</a>' % (text, text)
 
-    def render_superscript(text):
-        return '<sup>%s</sup>' % _mistune.escape(text)
-
     def render_spoiler(text):
         return '<span class="spoiler">%s</span>' % _mistune.escape(text)
 
     md.inline.register('slash_link', SLASH_PATTERN, parse_slash_link, before='link')
     md.inline.register('u_link', U_PATTERN, parse_u_link, before='link')
-    md.inline.register('superscript', SUP_PATTERN, parse_superscript, before='emphasis')
     md.inline.register('spoiler', SPOILER_PATTERN, parse_spoiler, before='emphasis')
 
     if md.renderer and md.renderer.NAME == 'html':
         md.renderer.register('slash_link', render_slash_link)
         md.renderer.register('u_link', render_u_link)
-        md.renderer.register('superscript', render_superscript)
         md.renderer.register('spoiler', render_spoiler)
 
 
@@ -139,6 +214,17 @@ class _SnudownCompat:
             text = text.decode('utf-8', errors='replace')
 
         md = self._wiki if renderer == self.RENDERER_WIKI else self._html
+
+        # Pre-process superscripts before mistune touches the text.
+        # We split on code spans (`` ` `` and ``` ``` ```) to leave them alone,
+        # then run _render_superscripts on every non-code segment.
+        text = _re.sub(
+            r'(`+.+?`+|([^`]+))',
+            lambda m: m.group(0) if m.group(2) is None else _render_superscripts(m.group(2)),
+            text,
+            flags=_re.DOTALL,
+        )
+
         html = md(text)
 
         if nofollow or target:
