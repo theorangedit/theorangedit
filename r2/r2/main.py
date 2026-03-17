@@ -64,19 +64,49 @@ app = FastAPI(
 @app.on_event("startup")
 async def startup_event():
     """
-    Application startup hook.
+    Application startup hook — runs after the event loop starts.
 
-    The Globals singleton (g) is already initialised synchronously by
-    make_app() -> load_environment() before uvicorn starts.  This hook is
-    available for any async initialisation needed after the event loop starts
-    (e.g. async DB connection pools).
+    Handles async initialisation that cannot be done synchronously during
+    load_environment() (e.g. Redis connection, async DB engine).
     """
-    pass
+    from r2.lib.app_globals import g
+
+    # ── Async DB engine ──────────────────────────────────────────────────────
+    from r2.lib.db.engine import init_engine
+    db_url = g.config.get("r2.db_url", "postgresql+asyncpg://reddit:password@postgres:5432/reddit")
+    init_engine(db_url)
+
+    # ── Redis listing cache ───────────────────────────────────────────────────
+    try:
+        import redis.asyncio as aioredis
+        g.redis = aioredis.from_url(
+            g.redis_url,
+            encoding="utf-8",
+            decode_responses=False,
+        )
+        await g.redis.ping()
+        g.log.info("Redis connected: %s", g.redis_url)
+    except Exception as exc:
+        g.log.warning(
+            "Redis unavailable (%s) — listing cache will fall back to PostgreSQL", exc
+        )
+        g.redis = None
+
+    # ── Live config from PostgreSQL (async refresh) ───────────────────────────
+    try:
+        from r2.lib.live_config import refresh_live_config
+        from r2.lib.db.engine import AsyncSessionLocal
+        async with AsyncSessionLocal() as db:
+            await refresh_live_config(db, g)
+    except Exception as exc:
+        g.log.warning("live_config PostgreSQL refresh failed (%s), using INI values", exc)
 
 
 @app.on_event("shutdown")
 async def shutdown_event():
-    pass
+    from r2.lib.app_globals import g
+    if getattr(g, 'redis', None):
+        await g.redis.aclose()
 
 
 # ---------------------------------------------------------------------------

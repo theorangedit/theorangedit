@@ -80,12 +80,6 @@ from r2.lib.stats import (
 )
 from r2.lib.translation import get_active_langs, I18N_PATH
 from r2.lib.utils import config_gold_price, thread_dump
-from r2.lib.zookeeper import (
-import importlib
-    connect_to_zookeeper,
-    LiveConfig,
-    IPNetworkLiveList,
-)
 
 
 LIVE_CONFIG_NODE = "/config/live"
@@ -198,7 +192,6 @@ class Globals(object):
             'butler_max_mentions',
             'min_membership_create_community',
             'bcrypt_work_factor',
-            'cassandra_pool_size',
             'sr_banned_quota',
             'sr_muted_quota',
             'sr_wikibanned_quota',
@@ -274,7 +267,6 @@ class Globals(object):
             'stalecaches',
             'lockcaches',
             'permacache_memcaches',
-            'cassandra_seeds',
             'automatic_reddits',
             'hardcache_categories',
             'case_sensitive_domains',
@@ -320,16 +312,8 @@ class Globals(object):
             'events_collector_url',
             'events_collector_test_url',
             'search_provider',
-        ],
-
-        ConfigValue.choice(ONE=CL_ONE, QUORUM=CL_QUORUM): [
-             'cassandra_rcl',
-             'cassandra_wcl',
-        ],
-
-        ConfigValue.choice(zookeeper="zookeeper", config="config"): [
-            "liveconfig_source",
-            "secrets_source",
+            'redis_url',
+            'r2.db_url',
         ],
 
         ConfigValue.timeinterval: [
@@ -584,9 +568,6 @@ class Globals(object):
         if not self.amqp_host:
             raise ValueError("amqp_host not set in the .ini")
 
-        if not self.cassandra_seeds:
-            raise ValueError("cassandra_seeds not set in the .ini")
-
         # heavy load mode is read only mode with a different infobar
         if self.heavy_load_mode:
             self.read_only_mode = True
@@ -687,32 +668,16 @@ class Globals(object):
 
         self.startup_timer.intermediate("configuration")
 
-        ################# ZOOKEEPER
-        zk_hosts = self.config["zookeeper_connection_string"]
-        zk_username = self.config["zookeeper_username"]
-        zk_password = self.config["zookeeper_password"]
-        self.zookeeper = connect_to_zookeeper(zk_hosts, (zk_username,
-                                                         zk_password))
-
-        self.throttles = IPNetworkLiveList(
-            self.zookeeper,
-            root="/throttles",
-            reduced_data_node="/throttles_reduced",
-        )
-
+        ################# LIVE CONFIG (PostgreSQL-backed, replaces ZooKeeper)
         parser = configparser.RawConfigParser()
         parser.optionxform = str
         parser.read([self.config["__file__"]])
 
-        if self.config["liveconfig_source"] == "zookeeper":
-            self.live_config = LiveConfig(self.zookeeper, LIVE_CONFIG_NODE)
-        else:
-            self.live_config = extract_live_config(parser, self.plugins)
+        self.live_config = extract_live_config(parser, self.plugins)
+        self.secrets = extract_secrets(parser)
 
-        if self.config["secrets_source"] == "zookeeper":
-            self.secrets = fetch_secrets(self.zookeeper)
-        else:
-            self.secrets = extract_secrets(parser)
+        # Throttle list — now a plain set; async-updated from live_config table
+        self.throttles = set()
 
         ################# PRIVILEGED USERS
         self.admins = PermissionFilteredEmployeeList(
@@ -727,7 +692,11 @@ class Globals(object):
         self.employee_approved_clients = \
             self.live_config["employee_approved_clients"].values()
 
-        self.startup_timer.intermediate("zookeeper")
+        self.startup_timer.intermediate("live_config")
+
+        ################# REDIS URL (client initialised async in main.py startup)
+        self.redis_url = self.config.get("redis_url", "redis://localhost:6379/0")
+        self.redis = None  # populated by startup_event() after event loop starts
 
         ################# MEMCACHE
         num_mc_clients = self.num_mc_clients
@@ -739,16 +708,6 @@ class Globals(object):
             num_clients=num_mc_clients,
         )
         self.make_lock = make_lock_factory(self.lock_cache, self.stats)
-
-        # memcaches used in front of the permacache CF in cassandra.
-        # XXX: this is a legacy thing; permacache was made when C* didn't have
-        # a row cache.
-        permacache_memcaches = CMemcache(
-            "perma",
-            self.permacache_memcaches,
-            min_compress_len=1400,
-            num_clients=num_mc_clients,
-        )
 
         # the stalecache is a memcached local to the current app server used
         # for data that's frequently fetched but doesn't need to be fresh.
@@ -784,29 +743,6 @@ class Globals(object):
                 ThriftContextFactory(activity_pool, ActivityService.Client))
 
         self.startup_timer.intermediate("thrift")
-
-        ################# CASSANDRA
-        keyspace = "reddit"
-        self.cassandra_pools = {
-            "main":
-                StatsCollectingConnectionPool(
-                    keyspace,
-                    stats=self.stats,
-                    logging_name="main",
-                    server_list=self.cassandra_seeds,
-                    pool_size=self.cassandra_pool_size,
-                    timeout=4,
-                    max_retries=3,
-                    prefill=False
-                ),
-        }
-
-        permacache_cf = Permacache._setup_column_family(
-            'permacache',
-            self.cassandra_pools[self.cassandra_default_pool],
-        )
-
-        self.startup_timer.intermediate("cassandra")
 
         ################# POSTGRES
         self.dbm = self.load_db_params()
@@ -890,36 +826,6 @@ class Globals(object):
             self.mcrouter,
         ))
         cache_chains.update(commentpanecache=self.commentpanecache)
-
-        # cassandra_local_cache is used for request-local caching in tdb_cassandra
-        self.cassandra_local_cache = localcache_cls()
-        cache_chains.update(cassandra_local_cache=self.cassandra_local_cache)
-
-        if stalecaches:
-            permacache_cache = StaleCacheChain(
-                localcache_cls(),
-                stalecaches,
-                permacache_memcaches,
-            )
-        else:
-            permacache_cache = CacheChain(
-                (localcache_cls(), permacache_memcaches),
-            )
-        cache_chains.update(permacache=permacache_cache)
-
-        self.permacache = Permacache(
-            permacache_cache,
-            permacache_cf,
-            lock_factory=self.make_lock,
-        )
-
-        # hardcache is used for various things that tend to expire
-        # TODO: replace hardcache w/ cassandra stuff
-        self.hardcache = HardcacheChain(
-            (localcache_cls(), HardCache(self)),
-            cache_negative_results=True,
-        )
-        cache_chains.update(hardcache=self.hardcache)
 
         # I know this sucks, but we need non-request-threads to be
         # able to reset the caches, so we need them be able to close

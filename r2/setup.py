@@ -77,13 +77,9 @@ setup(
         "alembic>=1.13",        # database migrations
         "psycopg2>=2.9",        # kept for Alembic offline/sync use
 
-        # --- Cassandra (TODO: migrate pycassa API -> cassandra-driver API) ---
-        # "pycassa>=1.7.0",  # Python 2 only; cassandra-driver is the Py3 replacement
-        #                      API is incompatible — requires adapter work after Phase 4
-        "cassandra-driver>=3.25",
-
         # --- Caching ---
         "pylibmc>=1.6.1",    # was pinned to 1.2.2; 1.6+ has Python 3 support
+        "redis[hiredis]>=5.0",  # async Redis client for listing cache (Phase 10)
 
         # --- AMQP (TODO: migrate amqplib API -> pika API) ---
         # "amqplib",         # Python 2 only
@@ -119,7 +115,6 @@ setup(
         # PyCAPTCHA (C extension) replaced by Pillow-based generation (see r2/r2/lib/captcha.py)
 
         # --- Other services ---
-        "kazoo>=2.9",        # Zookeeper client (already Py3 compatible)
         "stripe>=5.0",
         "pytz>=2023.3",
         "Babel>=2.12",

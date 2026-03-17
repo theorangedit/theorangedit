@@ -27,13 +27,13 @@ services:
       - ./volumes/postgres:/var/lib/postgresql/data
     restart: always
 
-  cassandra:
-    image: cassandra:4.1
+  redis:
+    image: redis:7.2-alpine
+    command: redis-server --appendonly yes
     ports:
-      - 9042:9042
+      - 6379:6379
     volumes:
-      # can alternatively be a named volume
-      - ./volumes/cassandra:/var/lib/cassandra
+      - ./volumes/redis:/data
     restart: always
 
   memcached:
@@ -67,12 +67,6 @@ services:
       - 15672:15672
     restart: always
 
-  zookeeper:
-    image: jplock/zookeeper:3.4.6
-    ports:
-      - 2181:2181
-    restart: always
-
   solr:
     build:
       context: docker/solr
@@ -90,16 +84,15 @@ services:
       - 9000:9000
       - 8082:8082
     environment:
-      CASSANDRA_PORT: 9042
+      REDIS_URL: redis://redis:6379/0
     volumes:
       # starts empty so bind mount can replace container directory, can alternatively be a named volume
       - ./volumes/media:/srv/www/media
     restart: always
     depends_on:
       - postgres
-      - cassandra
+      - redis
       - memcached
       - mcrouter
       - rabbitmq
-      - zookeeper
       - solr
