@@ -21,7 +21,7 @@
 ###############################################################################
 
 SHELL=/bin/sh
-PYTHON=python
+PYTHON=python3
 SED=sed
 CAT=cat
 BUILD_DIR=build

@@ -56,6 +56,7 @@ else:
 setup(
     name="r2",
     version="",
+    python_requires=">=3.10",
     install_requires=[
         "Pylons",
         "Routes",

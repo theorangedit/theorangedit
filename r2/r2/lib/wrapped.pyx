@@ -78,10 +78,10 @@ class StringTemplate(object):
         # for the nth time, we have to transform the string into
         # unicode.  Otherwise, re.sub will choke on non-ascii
         # characters.
-        try:
+        if isinstance(template, bytes):
+            self.template = template.decode("utf-8")
+        else:
             self.template = str(template)
-        except UnicodeDecodeError:
-            self.template = str(template, "utf8")
 
     def update(self, d):
         """
@@ -393,18 +393,11 @@ class Templated(object):
 
 class Uncachable(Exception): pass
 
-_easy_cache_cls = set([bool, int, long, float, unicode, str, types.NoneType,
-                      datetime])
+_easy_cache_cls = set([bool, int, float, str, type(None), datetime])
 
 def make_cachable(v, style):
     if v.__class__ in _easy_cache_cls or isinstance(v, type):
-        try:
-            return str(v)
-        except UnicodeDecodeError:
-            try:
-                return str(v, "utf8")
-            except (TypeError, UnicodeDecodeError):
-                return repr(v)
+        return str(v)
     elif isinstance(v, (types.MethodType, CachedVariable)):
        return
     elif isinstance(v, (tuple, list, set)):
@@ -468,7 +461,7 @@ class CachedTemplate(Templated):
         auto_keys = [(k,  make_cachable(v, style))
                      for k, v in self.cachable_attrs()]
         keys.append(repr(auto_keys))
-        h = md5(u''.join(keys)).hexdigest()
+        h = md5(''.join(keys).encode('utf-8')).hexdigest()
         return "rend:%s:%s" % (self.render_class_name, h)
 
 

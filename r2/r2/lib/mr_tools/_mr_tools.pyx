@@ -21,7 +21,7 @@
 ###############################################################################
 
 import sys
-from builtins import map, groupby
+from itertools import groupby
 from heapq import nlargest
 
 stdin = sys.stdin
@@ -35,7 +35,7 @@ class _Chunker(object):
         self._size = range(size)
         self._done = 0
 
-    def next(self):
+    def __next__(self):
         if self._done:
             raise StopIteration
 
