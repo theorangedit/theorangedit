@@ -47,7 +47,6 @@ from r2.lib.app_globals import g
 from r2 import models
 from r2.config import feature
 from r2.lib import amqp, hooks
-from r2.lib.db.tdb_cassandra import NotFound
 from r2.lib.memoize import memoize
 from r2.lib.nymph import optimize_png
 from r2.lib.template_helpers import format_html

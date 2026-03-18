@@ -27,21 +27,6 @@ from datetime import (
     datetime,
     timedelta,
 )
-# pycassa removed (Cassandra removed in Phase 10) — raise on use so callers surface immediately
-ASCII_TYPE = UTF8_TYPE = TIME_UUID_TYPE = INT_TYPE = 'UTF8Type'  # schema constants — dead code
-class NotFoundException(Exception): pass
-class LongType:
-    def __init__(self, *a, **kw): raise NotImplementedError('pycassa removed')
-class IntegerType:
-    def __init__(self, *a, **kw): raise NotImplementedError('pycassa removed')
-class Mutator:
-    def __init__(self, *a, **kw): raise NotImplementedError('pycassa.batch.Mutator removed — use service layer')
-    def __enter__(self): raise NotImplementedError('pycassa.batch.Mutator removed')
-    def __exit__(self, *a): pass
-def convert_uuid_to_time(u): raise NotImplementedError('pycassa.util.convert_uuid_to_time removed')
-from r2.lib.db import tdb_cassandra
-
-
 Media = collections.namedtuple('_Media', ("media_object",
                                           "secure_media_object",
                                           "preview_object",
@@ -51,19 +36,11 @@ Media = collections.namedtuple('_Media', ("media_object",
 ERROR_MEDIA = Media(None, None, None, None, None)
 
 
-class MediaByURL(tdb_cassandra.View):
-    _use_db = True
-    _connection_pool = 'main'
-    _ttl = timedelta(minutes=720)
+class MediaByURL:
+    """Media metadata cache — stub only, Cassandra backend removed."""
 
-    _read_consistency_level = tdb_cassandra.CL.QUORUM
-    _write_consistency_level = tdb_cassandra.CL.QUORUM
     _int_props = {"thumbnail_width", "thumbnail_height"}
     _date_props = {"last_modified"}
-    _extra_schema_creation_args = {
-        "key_validation_class": ASCII_TYPE,
-        "column_name_class": UTF8_TYPE,
-    }
 
     _defaults = {
         "state": "enqueued",
@@ -163,7 +140,7 @@ class MediaByURL(tdb_cassandra.View):
                 return None
             else:
                 return temp
-        except tdb_cassandra.NotFound:
+        except (AttributeError, NotImplementedError):
             return None
 
     @property

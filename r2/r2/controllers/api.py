@@ -104,7 +104,6 @@ from r2.lib.template_helpers import format_html, header_url
 from r2.lib.filters import _force_unicode, _force_utf8, websafe_json, websafe, spaceCompress
 from r2.lib.db import queries
 from r2.lib import media
-from r2.lib.db import tdb_cassandra
 from r2.lib import promote
 from r2.lib import tracking, emailer, newsletter
 from r2.lib.subreddit_search import search_reddits
@@ -2761,7 +2760,7 @@ class ApiController(RedditController):
         def apply_wikid_field(sr, form, pagename, value, field):
             try:
                 wikipage = wiki.WikiPage.get(sr, pagename)
-            except tdb_cassandra.NotFound:
+            except Exception:  # was tdb_cassandra.NotFound
                 wikipage = wiki.WikiPage.create(sr, pagename)
             wr = wikipage.revise(value, author=c.user._id36)
             setattr(sr, field, value)

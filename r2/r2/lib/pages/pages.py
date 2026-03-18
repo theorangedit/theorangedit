@@ -95,7 +95,7 @@ from r2.models import traffic
 from r2.models import ModAction
 from r2.models import Thing
 from r2.models.wiki import WikiPage, ImagesByWikiPage
-from r2.lib.db import tdb_cassandra, queries
+from r2.lib.db import queries
 from r2.config.extensions import is_api
 from r2.lib.menus import CommentSortMenu
 
@@ -601,7 +601,7 @@ class Reddit(Templated):
                     dest="../wiki/edit/config/automoderator",
                     css_class="reddit-automod access-required",
                     data=data_attrs('automoderator')))
-            except tdb_cassandra.NotFound:
+            except Exception:  # was tdb_cassandra.NotFound
                 buttons.append(NamedButton(
                     "new_automod",
                     sr_path=False,
@@ -1528,7 +1528,7 @@ class RegistrationInfo(Templated):
     def get_registration_info_html(cls):
         try:
             wp = WikiPage.get(Frontpage, g.wiki_page_registration_info)
-        except tdb_cassandra.NotFound:
+        except Exception:  # was tdb_cassandra.NotFound
             return ''
         else:
             return wikimarkdown(wp.content, include_toc=False, target='_blank')

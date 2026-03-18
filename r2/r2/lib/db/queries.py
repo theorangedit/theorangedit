@@ -38,7 +38,6 @@ from r2.lib.context import request
 from r2.lib import amqp
 from r2.lib import filters
 from r2.lib.comment_tree import add_comments
-from r2.lib.db import tdb_cassandra
 from r2.lib.db.operators import and_, or_
 from r2.lib.db.operators import asc, desc, timeago
 from r2.lib.db.sorts import epoch_seconds
@@ -1798,7 +1797,7 @@ def get_likes(user, requested_items):
 
     try:
         last_modified = LastModified._byID(user._fullname)
-    except tdb_cassandra.NotFound:
+    except Exception:  # was tdb_cassandra.NotFound
         last_modified = None
 
     items_in_grace_period = {}

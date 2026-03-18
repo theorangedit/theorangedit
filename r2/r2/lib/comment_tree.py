@@ -396,7 +396,6 @@ def tree_sort_fn(tree):
 
 def _populate(after_id = None, estimate=54301242):
     from r2.models import desc
-    from r2.lib.db import tdb_cassandra
     from r2.lib import utils
 
     # larger has a chance to decrease the number of Cassandra writes,

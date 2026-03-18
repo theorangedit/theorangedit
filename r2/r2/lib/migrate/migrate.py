@@ -187,9 +187,7 @@ def pushup_permacache(verbosity=1000):
 
 def port_cassaurls(after_id=None, estimate=15231317):
     from r2.models import Link, LinksByUrlAndSubreddit
-    from r2.lib.db import tdb_cassandra
     from r2.lib.db.operators import desc
-    from r2.lib.db.tdb_cassandra import CL
     from r2.lib.utils import fetch_things2, in_chunks, progress
 
     q = Link._query(Link.c._spam == (True, False),

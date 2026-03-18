@@ -74,7 +74,6 @@ from r2.lib.pages.wiki import (WikiPageView, WikiNotFound, WikiRevisions,
 
 from r2.config.extensions import set_extension
 from r2.lib.template_helpers import add_sr
-from r2.lib.db import tdb_cassandra
 from r2.models.listing import WikiRevisionListing
 from r2.lib.pages.things import default_thing_wrapper
 from r2.lib.pages import BoringPage, CssError

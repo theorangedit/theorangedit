@@ -36,7 +36,6 @@ from r2.models.subreddit import (
     LabeledMulti,
     TooManySubredditsError,
 )
-from r2.lib.db import tdb_cassandra
 from r2.lib.validator import (
     validate,
     VAccountByName,
@@ -221,7 +220,7 @@ class MultiApiController(RedditController):
 
         try:
             await LabeledMulti._byID(path_info['path'])
-        except tdb_cassandra.NotFound:
+        except Exception:  # was tdb_cassandra.NotFound
             multi = LabeledMulti.create(path_info['path'], owner)
             response.status = 201
         else:
@@ -245,7 +244,7 @@ class MultiApiController(RedditController):
 
         try:
             multi = await LabeledMulti._byID(path_info['path'])
-        except tdb_cassandra.NotFound:
+        except Exception:  # was tdb_cassandra.NotFound
             multi = LabeledMulti.create(path_info['path'], owner)
             response.status = 201
 
@@ -274,7 +273,7 @@ class MultiApiController(RedditController):
 
         try:
             await LabeledMulti._byID(to_path_info['path'])
-        except tdb_cassandra.NotFound:
+        except Exception:  # was tdb_cassandra.NotFound
             to_multi = LabeledMulti.copy(to_path_info['path'], from_multi,
                                          owner=to_owner)
         else:

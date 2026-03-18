@@ -21,7 +21,6 @@
 ###############################################################################
 
 from r2.lib import amqp
-from r2.lib.db import tdb_cassandra
 from r2.lib.db.thing import NotFound
 from r2.lib.errors import MessageError
 from r2.lib.utils import tup, fetch_things2
@@ -356,7 +355,7 @@ def wiki_template(template_slug, sr=None):
 
     try:
         wiki = WikiPage.get(sr, f"templates/{template_slug}")
-    except tdb_cassandra.NotFound:
+    except Exception:  # was tdb_cassandra.NotFound
         return None
 
     return wiki._get("content")

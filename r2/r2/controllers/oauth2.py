@@ -33,7 +33,6 @@ from r2.lib.i18n import _
 from r2.config.extensions import set_extension
 from r2.lib.base import abort
 from reddit_base import RedditController, MinimalController, require_https
-from r2.lib.db import tdb_cassandra
 from r2.lib.db.thing import NotFound
 from r2.lib.pages import RedditError
 from r2.lib.strings import strings

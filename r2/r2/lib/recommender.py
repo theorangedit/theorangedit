@@ -26,21 +26,8 @@ import random
 from collections import defaultdict
 from datetime import timedelta
 from operator import itemgetter
-# pycassa removed (Cassandra removed in Phase 10) — raise on use so callers surface immediately
-ASCII_TYPE = UTF8_TYPE = TIME_UUID_TYPE = INT_TYPE = 'UTF8Type'  # schema constants — dead code
-class NotFoundException(Exception): pass
-class LongType:
-    def __init__(self, *a, **kw): raise NotImplementedError('pycassa removed')
-class IntegerType:
-    def __init__(self, *a, **kw): raise NotImplementedError('pycassa removed')
-class Mutator:
-    def __init__(self, *a, **kw): raise NotImplementedError('pycassa.batch.Mutator removed — use service layer')
-    def __enter__(self): raise NotImplementedError('pycassa.batch.Mutator removed')
-    def __exit__(self, *a): pass
-def convert_uuid_to_time(u): raise NotImplementedError('pycassa.util.convert_uuid_to_time removed')
-
 from r2.lib import rising
-from r2.lib.db import operators, tdb_cassandra
+from r2.lib.db import operators
 from r2.lib.pages import ExploreItem
 from r2.lib.normalized_hot import normalized_hot
 from r2.lib.utils import roundrobin, tup, to36
@@ -277,17 +264,8 @@ def is_visible(sr):
     )
 
 
-class SRRecommendation(tdb_cassandra.View):
-    _use_db = True
-
-    _compare_with = LongType()
-
-    # don't keep these around if a run hasn't happened lately, or if the last
-    # N runs didn't generate recommendations for a given subreddit
-    _ttl = timedelta(days=7, hours=12)
-
-    # we know that we mess with these but it's okay
-    _warn_on_partial_ttl = False
+class SRRecommendation:
+    """Subreddit recommendations — stub only, Cassandra backend removed."""
 
     @classmethod
     def for_srs(cls, srid36, to_omit, count, source, match_set=True):

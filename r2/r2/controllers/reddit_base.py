@@ -132,7 +132,6 @@ from r2.models import (
     valid_feed,
     valid_otp_cookie,
 )
-from r2.lib.db import tdb_cassandra
 
 
 # Cookies which may be set in a response without making it uncacheable

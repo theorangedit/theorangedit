@@ -20,59 +20,19 @@
 # Inc. All Rights Reserved.
 ###############################################################################
 
-import json
-from datetime import datetime
-
-# pycassa removed (Cassandra removed in Phase 10) — raise on use so callers surface immediately
-ASCII_TYPE = UTF8_TYPE = TIME_UUID_TYPE = INT_TYPE = 'UTF8Type'  # schema constants — dead code
-class NotFoundException(Exception): pass
-class LongType:
-    def __init__(self, *a, **kw): raise NotImplementedError('pycassa removed')
-class IntegerType:
-    def __init__(self, *a, **kw): raise NotImplementedError('pycassa removed')
-class Mutator:
-    def __init__(self, *a, **kw): raise NotImplementedError('pycassa.batch.Mutator removed — use service layer')
-    def __enter__(self): raise NotImplementedError('pycassa.batch.Mutator removed')
-    def __exit__(self, *a): pass
-def convert_uuid_to_time(u): raise NotImplementedError('pycassa.util.convert_uuid_to_time removed')
-from r2.lib.app_globals import g
-
-from r2.lib.db import tdb_cassandra
+_MSG = 'AdminNotesBySystem: Cassandra removed — re-implement with PostgreSQL'
 
 
-class AdminNotesBySystem(tdb_cassandra.View):
-    _use_db = True
-    _read_consistency_level = tdb_cassandra.CL.QUORUM
-    _write_consistency_level = tdb_cassandra.CL.ONE
-    _compare_with = TIME_UUID_TYPE
-    _extra_schema_creation_args = {
-        "key_validation_class": UTF8_TYPE,
-        "default_validation_class": UTF8_TYPE,
-    }
+class AdminNotesBySystem:
+    """Admin moderation notes — stub only, Cassandra backend removed."""
 
     @classmethod
     def add(cls, system_name, subject, note, author, when=None):
-        if not when:
-            when = datetime.now(g.tz)
-        jsonpacked = json.dumps({"note": note, "author": author})
-        updatedict = {when: jsonpacked}
-        key = cls._rowkey(system_name, subject)
-        cls._set_values(key, updatedict)
+        raise NotImplementedError(_MSG)
 
     @classmethod
     def in_display_order(cls, system_name, subject):
-        key = cls._rowkey(system_name, subject)
-        try:
-            query = cls._cf.get(key, column_reversed=True)
-        except tdb_cassandra.NotFoundException:
-            return []
-        result = []
-        for uuid, json_blob in query.items():
-            when = datetime.fromtimestamp(convert_uuid_to_time(uuid), tz=g.tz)
-            payload = json.loads(json_blob)
-            payload['when'] = when
-            result.append(payload)
-        return result
+        raise NotImplementedError(_MSG)
 
     @classmethod
     def _rowkey(cls, system_name, subject):

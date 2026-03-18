@@ -22,34 +22,11 @@
 
 from datetime import timedelta
 
-# pycassa removed (Cassandra removed in Phase 10) — raise on use so callers surface immediately
-ASCII_TYPE = UTF8_TYPE = TIME_UUID_TYPE = INT_TYPE = 'UTF8Type'  # schema constants — dead code
-class NotFoundException(Exception): pass
-class LongType:
-    def __init__(self, *a, **kw): raise NotImplementedError('pycassa removed')
-class IntegerType:
-    def __init__(self, *a, **kw): raise NotImplementedError('pycassa removed')
-class Mutator:
-    def __init__(self, *a, **kw): raise NotImplementedError('pycassa.batch.Mutator removed — use service layer')
-    def __enter__(self): raise NotImplementedError('pycassa.batch.Mutator removed')
-    def __exit__(self, *a): pass
-def convert_uuid_to_time(u): raise NotImplementedError('pycassa.util.convert_uuid_to_time removed')
-
-from r2.lib.db import tdb_cassandra
+_MSG = 'PerformedRulesByThing: Cassandra removed — re-implement with PostgreSQL'
 
 
-class PerformedRulesByThing(tdb_cassandra.View):
-    """Used to track which rules have previously matched a specific item."""
-    _use_db = True
-    _connection_pool = "main"
-    _read_consistency_level = tdb_cassandra.CL.QUORUM
-    _write_consistency_level = tdb_cassandra.CL.QUORUM
-    _ttl = timedelta(days=3)
-    _extra_schema_creation_args = {
-        "key_validation_class": ASCII_TYPE,
-        "column_name_class": ASCII_TYPE,
-        "default_validation_class": UTF8_TYPE,
-    }
+class PerformedRulesByThing:
+    """Tracks which automod rules have been applied to a thing — stub only."""
 
     @classmethod
     def _rowkey(cls, thing):
@@ -57,15 +34,8 @@ class PerformedRulesByThing(tdb_cassandra.View):
 
     @classmethod
     def mark_performed(cls, thing, rule):
-        rowkey = cls._rowkey(thing)
-        cls._set_values(rowkey, {rule.unique_id: ''})
+        raise NotImplementedError(_MSG)
 
     @classmethod
     def get_already_performed(cls, thing):
-        rowkey = cls._rowkey(thing)
-        try:
-            columns = cls._cf.get(rowkey)
-        except NotFoundException:
-            return []
-
-        return columns.keys()
+        raise NotImplementedError(_MSG)

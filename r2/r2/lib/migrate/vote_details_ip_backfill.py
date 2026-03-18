@@ -5,7 +5,7 @@ from datetime import datetime, timedelta
 from r2.lib.app_globals import g
 
 from r2.lib.db.sorts import epoch_seconds
-from r2.lib.db.tdb_cassandra import write_consistency_level
+def write_consistency_level(fn): return fn  # was tdb_cassandra.write_consistency_level
 from r2.lib.utils import in_chunks
 from r2.models.vote import VoteDetailsByComment, VoteDetailsByLink, VoterIPByThing
 

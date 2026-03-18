@@ -22,51 +22,22 @@
 
 import json
 
-# pycassa removed (Cassandra removed in Phase 10) — raise on use so callers surface immediately
-ASCII_TYPE = UTF8_TYPE = TIME_UUID_TYPE = INT_TYPE = 'UTF8Type'  # schema constants — dead code
-class NotFoundException(Exception): pass
-class LongType:
-    def __init__(self, *a, **kw): raise NotImplementedError('pycassa removed')
-class IntegerType:
-    def __init__(self, *a, **kw): raise NotImplementedError('pycassa removed')
-class Mutator:
-    def __init__(self, *a, **kw): raise NotImplementedError('pycassa.batch.Mutator removed — use service layer')
-    def __enter__(self): raise NotImplementedError('pycassa.batch.Mutator removed')
-    def __exit__(self, *a): pass
-def convert_uuid_to_time(u): raise NotImplementedError('pycassa.util.convert_uuid_to_time removed')
-
-from r2.lib.db.tdb_cassandra import ThingMeta
-
 NoDefault = object()
 
-class KeyValueStore(object):
-    __metaclass__ = ThingMeta
+_MSG = 'KeyValueStore: Cassandra removed — re-implement with PostgreSQL/Redis'
 
-    _use_db = False
-    _cf_name = None
-    _type_prefix = None
-    _compare_with = UTF8_TYPE
 
-    _extra_schema_creation_args = dict(
-        key_validation_class=UTF8_TYPE,
-        default_validation_class=UTF8_TYPE,
-    )
+class KeyValueStore:
+    """Generic key/value store — stub only, Cassandra backend removed."""
 
     @classmethod
     def get(cls, key, default=NoDefault):
-        try:
-            return json.loads(cls._cf.get(key)["data"])
-        except NotFoundException:
-            if default is not NoDefault:
-                return default
-            else:
-                raise
+        raise NotImplementedError(_MSG)
 
     @classmethod
     def set(cls, key, data):
-        cls._cf.insert(key, {"data": json.dumps(data)})
+        raise NotImplementedError(_MSG)
 
 
 class NamedGlobals(KeyValueStore):
-    _use_db = True
-
+    pass

@@ -20,18 +20,6 @@
 # Inc. All Rights Reserved.
 ###############################################################################
 
-# pycassa removed (Cassandra removed in Phase 10) — raise on use so callers surface immediately
-ASCII_TYPE = UTF8_TYPE = TIME_UUID_TYPE = INT_TYPE = 'UTF8Type'  # schema constants — dead code
-class NotFoundException(Exception): pass
-class LongType:
-    def __init__(self, *a, **kw): raise NotImplementedError('pycassa removed')
-class IntegerType:
-    def __init__(self, *a, **kw): raise NotImplementedError('pycassa removed')
-class Mutator:
-    def __init__(self, *a, **kw): raise NotImplementedError('pycassa.batch.Mutator removed — use service layer')
-    def __enter__(self): raise NotImplementedError('pycassa.batch.Mutator removed')
-    def __exit__(self, *a): pass
-def convert_uuid_to_time(u): raise NotImplementedError('pycassa.util.convert_uuid_to_time removed')
 import time
 
 from collections import defaultdict
@@ -39,8 +27,6 @@ from datetime import datetime, timedelta
 from itertools import chain
 from r2.lib.app_globals import g
 
-from r2.lib.db import tdb_cassandra
-from r2.lib.db.tdb_cassandra import max_column_count
 from r2.lib.utils import utils, tup
 from r2.models import Account, LabeledMulti, Subreddit
 from r2.lib.pages import ExploreItem
@@ -95,88 +81,36 @@ class AccountSRPrefs(object):
         return prefs
 
 
-class AccountSRFeedback(tdb_cassandra.DenormalizedRelation):
-    """Column family for storing users' recommendation feedback."""
+_MSG = 'Cassandra removed — re-implement with PostgreSQL'
 
-    _use_db = True
-    _views = []
-    _write_last_modified = False
-    _read_consistency_level = tdb_cassandra.CL.QUORUM
-    _write_consistency_level = tdb_cassandra.CL.QUORUM
+
+class AccountSRFeedback:
+    """Recommendation feedback — stub only, Cassandra backend removed."""
 
     @classmethod
     def for_user(cls, account):
-        """Return dict mapping each feedback type to a set of sr id36s."""
-
-        feedback = defaultdict(set)
-        try:
-            row = AccountSRFeedback._cf.get(account._id36,
-                                            column_count=max_column_count)
-        except NotFoundException:
-            return feedback
-        for colkey, colval in row.items():
-            action, sr_id36 = colkey.split('.')
-            feedback[action].add(sr_id36)
-        return feedback
+        raise NotImplementedError(_MSG)
 
     @classmethod
     def record_feedback(cls, account, srs, action):
-        if action not in FEEDBACK_ACTIONS:
-            g.log.error('Unrecognized feedback: %s' % action)
-            return
-        srs = tup(srs)
-        # update user feedback record, setting appropriate ttls
-        fb_rowkey = account._id36
-        fb_colkeys = [f'{action}.{sr._id36}' for sr in srs]
-        col_data = {col: '' for col in fb_colkeys}
-        ttl = FEEDBACK_TTL.get(action, 0)
-        if ttl > 0:
-            AccountSRFeedback._cf.insert(fb_rowkey, col_data, ttl=ttl)
-        else:
-            AccountSRFeedback._cf.insert(fb_rowkey, col_data)
+        raise NotImplementedError(_MSG)
 
     @classmethod
     def record_views(cls, account, srs):
-        cls.record_feedback(account, srs, VIEW)
+        raise NotImplementedError(_MSG)
 
 
-class ExploreSettings(tdb_cassandra.Thing):
-    """Column family for storing users' view prefs for the /explore page."""
-    _use_db = True
-    _bool_props = ('personalized', 'discovery', 'rising', 'nsfw')
+class ExploreSettings:
+    """Explore page user settings — stub only, Cassandra backend removed."""
 
     @classmethod
     def for_user(cls, account):
-        """Return user's prefs or default prefs if user has none."""
-        try:
-            return cls._byID(account._id36)
-        except tdb_cassandra.NotFound:
-            return DefaultExploreSettings()
+        return DefaultExploreSettings()
 
     @classmethod
-    def record_settings(cls,
-                        user,
-                        personalized=False,
-                        discovery=False,
-                        rising=False,
-                        nsfw=False):
-        """Update or create settings for user."""
-        try:
-            settings = cls._byID(user._id36)
-        except tdb_cassandra.NotFound:
-            settings = ExploreSettings(
-                _id=user._id36,
-                personalized=personalized,
-                discovery=discovery,
-                rising=rising,
-                nsfw=nsfw,
-            )
-        else:
-            settings.personalized = personalized
-            settings.discovery = discovery
-            settings.rising = rising
-            settings.nsfw = nsfw
-        settings._commit()
+    def record_settings(cls, user, personalized=False, discovery=False,
+                        rising=False, nsfw=False):
+        raise NotImplementedError(_MSG)
 
 
 class DefaultExploreSettings(object):

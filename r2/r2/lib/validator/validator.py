@@ -35,7 +35,6 @@ from r2.config.extensions import api_type, is_api
 from r2.lib import utils, captcha, promote, totp, ratelimit
 from r2.lib.filters import unkeep_space, websafe, _force_unicode, _force_utf8
 from r2.lib.filters import markdown_souptest
-from r2.lib.db import tdb_cassandra
 from r2.lib.db.operators import asc, desc
 from r2.lib.souptest import (
     SoupError,
@@ -2974,7 +2973,7 @@ class VOAuth2RefreshToken(Validator):
         if refresh_token_id:
             try:
                 token = OAuth2RefreshToken._byID(refresh_token_id)
-            except tdb_cassandra.NotFound:
+            except Exception:  # was tdb_cassandra.NotFound
                 self.set_error(errors.OAUTH2_INVALID_REFRESH_TOKEN)
                 return None
             if not token.check_valid():
@@ -3210,7 +3209,7 @@ class VMultiByPath(Validator):
 
         try:
             multi = LabeledMulti._byID(path)
-        except tdb_cassandra.NotFound:
+        except Exception:  # was tdb_cassandra.NotFound
             return self.set_error('MULTI_NOT_FOUND', code=404)
 
         if not multi or multi.kind not in self.kinds:

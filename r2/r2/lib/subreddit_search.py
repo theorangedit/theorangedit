@@ -24,14 +24,8 @@ from r2.models import Subreddit
 from r2.lib.memoize import memoize
 from r2.lib.db.operators import desc
 from r2.lib import utils
-from r2.lib.db import tdb_cassandra
-from r2.lib.cache import CL_ONE
-
-class SubredditsByPartialName(tdb_cassandra.View):
-    _use_db = True
-    _value_type = 'pickle'
-    _connection_pool = 'main'
-    _read_consistency_level = CL_ONE
+class SubredditsByPartialName:
+    """Subreddit name autocomplete cache — stub only, Cassandra backend removed."""
 
 def load_all_reddits():
     query_cache = {}
@@ -61,7 +55,7 @@ def search_reddits(query, include_over_18=True):
         result = SubredditsByPartialName._byID(query)
         return [name for (name, over_18) in getattr(result, 'tups', [])
                 if not over_18 or include_over_18]
-    except tdb_cassandra.NotFound:
+    except (AttributeError, NotImplementedError):
         return []
 
 @memoize('popular_searches', stale=True, time=3600)

@@ -46,7 +46,6 @@ from r2.lib.filters import unsafe, _force_unicode, _force_utf8
 from r2.lib.emailer import Email, generate_notification_email_unsubscribe_token
 from r2.lib.db.operators import desc
 from r2.lib.db import queries
-from r2.lib.db.tdb_cassandra import MultiColumnQuery
 from r2.lib.strings import strings
 from r2.lib.validator import *
 from r2.lib import jsontemplates

@@ -37,7 +37,6 @@ from r2.lib.validator import (
     VSrModerator,
     set_api_docs,
 )
-from r2.lib.db import tdb_cassandra
 
 MAX_PAGE_NAME_LENGTH = g.wiki_max_page_name_length
 
@@ -263,7 +262,7 @@ class VWikiPage(VWikiPageName):
                 self.set_error('MAY_NOT_VIEW', code=403)
                 raise AbortWikiError
             return wp
-        except tdb_cassandra.NotFound:
+        except Exception:  # was tdb_cassandra.NotFound
             if self.required:
                 self.set_error('PAGE_NOT_FOUND', code=404)
                 raise AbortWikiError
@@ -281,7 +280,7 @@ class VWikiPage(VWikiPageName):
                 self.set_error('HIDDEN_REVISION', code=403)
                 raise AbortWikiError
             return r
-        except (tdb_cassandra.NotFound, WikiBadRevision, ValueError):
+        except (Exception, WikiBadRevision, ValueError):
             self.set_error('INVALID_REVISION', code=404)
             raise AbortWikiError
 
