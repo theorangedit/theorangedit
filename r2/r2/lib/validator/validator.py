@@ -727,7 +727,7 @@ class VMarkdown(Validator):
             g.log.error("HAX by %s: %s" % (user, text))
             s = sys.exc_info()
             # reraise the original error with the original stack trace
-            raise s[1], None, s[2]
+            raise s[1].with_traceback(s[2])
 
     def param_docs(self):
         return {
