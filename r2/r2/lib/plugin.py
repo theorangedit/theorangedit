@@ -91,10 +91,9 @@ class PluginLoader(object):
             entry_points = []
             for name in plugin_names:
                 try:
-                    entry_point = self.available_plugins(name).next()
+                    entry_point = next(self.available_plugins(name))
                 except StopIteration:
-                    print(("Unable to locate plugin ", file=sys.stderr)
-                                          "%s. Skipping." % name)
+                    print(f"Unable to locate plugin {name}. Skipping.", file=sys.stderr)
                     continue
                 else:
                     entry_points.append(entry_point)
@@ -108,8 +107,7 @@ class PluginLoader(object):
                     # if this plugin was specifically requested, fail.
                     raise e
                 else:
-                    print(("Error loading plugin %s (%s).", file=sys.stderr)
-                                          " Skipping." % (entry_point.name, e))
+                    print(f"Error loading plugin {entry_point.name} ({e}). Skipping.", file=sys.stderr)
                     continue
             self.plugins[entry_point.name] = plugin_cls(entry_point)
 

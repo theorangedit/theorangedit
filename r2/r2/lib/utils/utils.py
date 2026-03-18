@@ -463,7 +463,7 @@ def query_string(dict):
 # Spaces only seem to cause parsing differences when occurring directly before
 # the scheme
 URL_PROBLEMATIC_RE = re.compile(
-    ur'(\A\x20|[\x00-\x19\xA0\u1680\u180E\u2000-\u2029\u205f\u3000\\])',
+    r'(\A\x20|[\x00-\x19\xA0\u1680\u180E\u2000-\u2029\u205f\u3000\\])',
     re.UNICODE
 )
 
@@ -1372,7 +1372,7 @@ def in_chunks(it, size=25):
     it = iter(it)
     try:
         while True:
-            chunk.append(it.next())
+            chunk.append(next(it))
             if len(chunk) >= size:
                 yield chunk
                 chunk = []

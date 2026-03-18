@@ -90,10 +90,11 @@ class RunCommand(command.Command):
 
         try:
             if self.args[1:]:
-                execfile(self.args[1], loaded_namespace)
+                with open(self.args[1]) as _f:
+                    exec(compile(_f.read(), self.args[1], 'exec'), loaded_namespace)
 
             if self.options.command:
-                exec self.options.command in loaded_namespace
+                exec(self.options.command, loaded_namespace)
         except Exception:
             if report_to_sentry:
                 exc_info = sys.exc_info()

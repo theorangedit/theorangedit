@@ -403,9 +403,9 @@ class RuleTarget(object):
     # valid options for changing how a field value is searched for a match
     _match_regexes = {
         "full-exact": u"^%s$",
-        "full-text": ur"^\W*%s\W*$",
-        "includes": u"%s",
-        "includes-word": ur"(?:^|\W|\b)%s(?:$|\W|\b)",
+        "full-text": r"^\W*%s\W*$",
+        "includes": "%s",
+        "includes-word": r"(?:^|\W|\b)%s(?:$|\W|\b)",
         "starts-with": u"^%s",
         "ends-with": u"%s$",
     }
@@ -754,7 +754,7 @@ class RuleTarget(object):
                     field = list(parsed_key["fields"])[0]
                     # default to handling subdomains for checks against domain only
                     if field == "domain":
-                        value_str = ur"(?:.*?\.)?" + value_str
+                        value_str = r"(?:.*?\.)?" + value_str
                     match_mod = self._match_field_defaults.get(
                         field, "includes-word")
                 else:
