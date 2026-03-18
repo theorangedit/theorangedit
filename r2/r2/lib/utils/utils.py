@@ -34,7 +34,7 @@ import signal
 import time
 import traceback
 
-from collections import OrderedDict
+
 from copy import deepcopy
 from datetime import date, datetime, timedelta
 from decimal import Decimal
@@ -532,7 +532,7 @@ class UrlParser(object):
                 s_params != o_params or
                 s_fragment != o_fragment):
             return False
-        # Coerce query dicts from OrderedDicts to standard dicts to avoid an
+        # Coerce query dicts to standard dicts to avoid an
         # order-sensitive comparison.
         if dict(self.query_dict) != dict(other.query_dict):
             return False
@@ -562,7 +562,7 @@ class UrlParser(object):
                 p = param.split('=')
                 return (unquote_plus(p[0]),
                         unquote_plus('='.join(p[1:])))
-            self._query_dict = OrderedDict(
+            self._query_dict = dict(
                                  _split(p) for p in self.query.split('&') if p)
         return self._query_dict
 

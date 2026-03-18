@@ -22,7 +22,6 @@
 
 import cgi
 import json
-from collections import OrderedDict
 from decimal import Decimal
 
 from r2.lib.context import request, response

@@ -21,7 +21,7 @@
 # Inc. All Rights Reserved.
 ###############################################################################
 
-from collections import Counter, OrderedDict
+from collections import Counter
 
 from r2.config import feature
 from r2.lib.contrib.ipaddress import ip_address

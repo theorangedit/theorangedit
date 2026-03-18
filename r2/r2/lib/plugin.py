@@ -23,8 +23,6 @@
 import sys
 import os.path
 import pkg_resources
-from collections import OrderedDict
-
 
 class Plugin(object):
     js = {}
@@ -101,7 +99,7 @@ class PluginLoader(object):
                 else:
                     entry_points.append(entry_point)
 
-        self.plugins = OrderedDict()
+        self.plugins = {}
         for entry_point in entry_points:
             try:
                 plugin_cls = entry_point.load()

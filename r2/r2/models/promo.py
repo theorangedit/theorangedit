@@ -20,7 +20,7 @@
 # Inc. All Rights Reserved.
 ###############################################################################
 
-from collections import OrderedDict
+
 from datetime import datetime
 from uuid import uuid1
 
@@ -108,8 +108,8 @@ class AuctionPriority(PriorityLevel):
 HIGH, MEDIUM, REMNANT, HOUSE, AUCTION = (HighPriority(), MediumPriority(),
                                          RemnantPriority(), HousePriority(),
                                          AuctionPriority(),)
-PROMOTE_PRIORITIES = OrderedDict((p.name, p) for p in (HIGH, MEDIUM, REMNANT,
-                                                       HOUSE, AUCTION,))
+PROMOTE_PRIORITIES = {p.name: p for p in (HIGH, MEDIUM, REMNANT,
+                                           HOUSE, AUCTION,)}
 
 
 def PROMOTE_DEFAULT_PRIORITY(context=None):
@@ -127,8 +127,7 @@ class Location(object):
         self.metro = metro or None
 
     def __repr__(self):
-        return '<%s (%s/%s/%s)>' % (self.__class__.__name__, self.country,
-                                    self.region, self.metro)
+        return f'<{self.__class__.__name__} ({self.country}/{self.region}/{self.metro})>'
 
     def to_code(self):
         fields = [self.country, self.region, self.metro]
@@ -211,7 +210,7 @@ class Collection(object):
         return sorted_collections
 
     def __repr__(self):
-        return "<%s: %s>" % (self.__class__.__name__, self.name)
+        return f"<{self.__class__.__name__}: {self.name}>"
 
 
 class CollectionStorage(tdb_cassandra.View):
@@ -257,8 +256,7 @@ class CollectionStorage(tdb_cassandra.View):
         rowkey = name
         for key in attributes:
             if not hasattr(Collection.by_name(name), key):
-                raise AttributeError('No attribute on %s called %s'
-                    % (name, key))
+                raise AttributeError(f'No attribute on {name} called {key}')
 
         columns = attributes
         cls._set_values(rowkey, columns)
@@ -353,10 +351,10 @@ class Target(object):
         elif self.subreddit_name == Frontpage.name:
             return _("frontpage")
         else:
-            return "/r/%s" % self.subreddit_name
+            return f"/r/{self.subreddit_name}"
 
     def __repr__(self):
-        return "<%s: %s>" % (self.__class__.__name__, self.pretty_name)
+        return f"<{self.__class__.__name__}: {self.pretty_name}>"
 
 
 class PromoCampaign(Thing):
@@ -639,7 +637,7 @@ class PromoCampaign(Thing):
                 return '/'.join([country, region, metro_str])
             else:
                 region_name = g.locations[country]['regions'][region]['name']
-                return ('%s, %s' % (region_name, country))
+                return (f'{region_name}, {country}')
         else:
             return g.locations[self.location.country]['name']
 
@@ -694,7 +692,7 @@ class PromotionLog(tdb_cassandra.View):
     def add(cls, link, text):
         name = c.user.name if c.user_is_loggedin else "<AUTOMATED>"
         now = datetime.now(g.tz).strftime("%Y-%m-%d %H:%M:%S")
-        text = "[%s: %s] %s" % (name, now, text)
+        text = f"[{name}: {now}] {text}"
         rowkey = cls._rowkey(link)
         column = {uuid1(): _force_unicode(text)}
         cls._set_values(rowkey, column)

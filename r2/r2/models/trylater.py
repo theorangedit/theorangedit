@@ -56,7 +56,6 @@ you might need to cancel your jobs later, use ``TryLaterBySubject``, which uses
 almost the exact same semantics, but has a useful ``unschedule`` method.
 """
 
-from collections import OrderedDict
 from datetime import datetime, timedelta
 import uuid
 
@@ -89,7 +88,7 @@ class TryLater(tdb_cassandra.View):
         cutoff = datetime.now(g.tz)
 
         columns = cls._cf.xget(rowkey, include_timestamp=True)
-        ready_items = OrderedDict()
+        ready_items = {}
         ready_timestamps = []
         unripe_timestamps = []
 
@@ -103,11 +102,11 @@ class TryLater(tdb_cassandra.View):
                 unripe_timestamps.append(timestamp)
 
         g.stats.simple_event(
-            "trylater.{system}.ready".format(system=rowkey),
+            f"trylater.{rowkey}.ready",
             delta=len(ready_items),
         )
         g.stats.simple_event(
-            "trylater.{system}.pending".format(system=rowkey),
+            f"trylater.{rowkey}.pending",
             delta=len(unripe_timestamps),
         )
 
@@ -118,7 +117,7 @@ class TryLater(tdb_cassandra.View):
             ready_fn(ready_items)
         except:
             g.stats.simple_event(
-                "trylater.{system}.failed".format(system=rowkey),
+                f"trylater.{rowkey}.failed",
             )
 
         cls.cleanup(rowkey, ready_items, ready_timestamps, unripe_timestamps)
@@ -132,7 +131,7 @@ class TryLater(tdb_cassandra.View):
             # tombstones
             cls._cf.remove(rowkey, timestamp=max(ready_timestamps))
             g.stats.simple_event(
-                "trylater.{system}.row_delete".format(system=rowkey),
+                f"trylater.{rowkey}.row_delete",
                 delta=len(ready_items),
             )
         else:
@@ -141,7 +140,7 @@ class TryLater(tdb_cassandra.View):
             # to delete. fallback to deleting specific columns.
             cls._cf.remove(rowkey, ready_items.keys())
             g.stats.simple_event(
-                "trylater.{system}.column_delete".format(system=rowkey),
+                f"trylater.{rowkey}.column_delete",
                 delta=len(ready_items),
             )
 
