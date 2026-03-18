@@ -26,18 +26,6 @@ import json
 import pytz
 import uuid
 
-# pycassa removed (Cassandra removed in Phase 10) — raise on use so callers surface immediately
-ASCII_TYPE = UTF8_TYPE = TIME_UUID_TYPE = INT_TYPE = 'UTF8Type'  # schema constants — dead code
-class NotFoundException(Exception): pass
-class LongType:
-    def __init__(self, *a, **kw): raise NotImplementedError('pycassa removed')
-class IntegerType:
-    def __init__(self, *a, **kw): raise NotImplementedError('pycassa removed')
-class Mutator:
-    def __init__(self, *a, **kw): raise NotImplementedError('pycassa.batch.Mutator removed — use service layer')
-    def __enter__(self): raise NotImplementedError('pycassa.batch.Mutator removed')
-    def __exit__(self, *a): pass
-def convert_uuid_to_time(u): raise NotImplementedError('pycassa.util.convert_uuid_to_time removed')
 from r2.lib.context import c
 from r2.lib.app_globals import g
 from r2.lib.i18n import _, ungettext
@@ -54,8 +42,6 @@ import re
 from random import choice
 from time import time
 
-from r2.lib.db import tdb_cassandra
-from r2.lib.db.tdb_cassandra import NotFound, view_of
 from r2.models import Account
 from r2.models.subreddit import Frontpage
 from r2.models.wiki import WikiPage, WikiPageIniItem
@@ -106,19 +92,8 @@ indices = [index_str(gold_table, 'status', 'status'),
 create_table(gold_table, indices)
 
 
-class GoldRevenueGoalByDate(object):
-    __metaclass__ = tdb_cassandra.ThingMeta
-
-    _use_db = True
-    _cf_name = "GoldRevenueGoalByDate"
-    _read_consistency_level = tdb_cassandra.CL.ONE
-    _write_consistency_level = tdb_cassandra.CL.ALL
-    _extra_schema_creation_args = {
-        "column_name_class": UTF8_TYPE,
-        "default_validation_class": INT_TYPE,
-    }
-    _compare_with = UTF8_TYPE
-    _type_prefix = None
+class GoldRevenueGoalByDate:
+    """Revenue goal tracking — Cassandra removed, stub only."""
 
     ROWKEY = '1'
 
@@ -128,123 +103,11 @@ class GoldRevenueGoalByDate(object):
 
     @classmethod
     def set(cls, date, goal):
-        cls._cf.insert(cls.ROWKEY, {cls._colkey(date): int(goal)})
+        raise NotImplementedError('GoldRevenueGoalByDate: Cassandra removed')
 
     @classmethod
     def get(cls, date):
-        """Gets the goal for a date, or the nearest previous goal."""
-        try:
-            colkey = cls._colkey(date)
-            col = cls._cf.get(
-                cls.ROWKEY,
-                column_reversed=True,
-                column_start=colkey,
-                column_count=1,
-            )
-            return col.values()[0]
-        except NotFoundException:
-            return None
-
-
-class GildedCommentsByAccount(tdb_cassandra.DenormalizedRelation):
-    _use_db = True
-    _last_modified_name = 'Gilding'
-    _views = []
-
-    @classmethod
-    def value_for(cls, thing1, thing2):
-        return ''
-
-    @classmethod
-    def gild(cls, user, thing):
-        cls.create(user, [thing])
-
-
-class GildedLinksByAccount(tdb_cassandra.DenormalizedRelation):
-    _use_db = True
-    _last_modified_name = 'Gilding'
-    _views = []
-
-    @classmethod
-    def value_for(cls, thing1, thing2):
-        return ''
-
-    @classmethod
-    def gild(cls, user, thing):
-        cls.create(user, [thing])
-
-
-@view_of(GildedCommentsByAccount)
-@view_of(GildedLinksByAccount)
-class GildingsByThing(tdb_cassandra.View):
-    _use_db = True
-    _extra_schema_creation_args = {
-        "key_validation_class": UTF8_TYPE,
-        "column_name_class": UTF8_TYPE,
-    }
-
-    @classmethod
-    def get_gilder_ids(cls, thing):
-        columns = cls.get_time_sorted_columns(thing._fullname)
-        return [int(account_id, 36) for account_id in columns.keys()]
-
-    @classmethod
-    def create(cls, user, things):
-        for thing in things:
-            cls._set_values(thing._fullname, {user._id36: ""})
-
-    @classmethod
-    def delete(cls, user, things):
-        # gildings cannot be undone
-        raise NotImplementedError()
-
-
-@view_of(GildedCommentsByAccount)
-@view_of(GildedLinksByAccount)
-class GildingsByDay(tdb_cassandra.View):
-    _use_db = True
-    _compare_with = TIME_UUID_TYPE
-    _extra_schema_creation_args = {
-        "key_validation_class": ASCII_TYPE,
-        "column_name_class": TIME_UUID_TYPE,
-        "default_validation_class": UTF8_TYPE,
-    }
-
-    @staticmethod
-    def _rowkey(date):
-        return date.strftime("%Y-%m-%d")
-
-    @classmethod
-    def get_gildings(cls, date):
-        key = cls._rowkey(date)
-        columns = cls.get_time_sorted_columns(key)
-        gildings = []
-        for name, json_blob in columns.items():
-            timestamp = convert_uuid_to_time(name)
-            date = datetime.utcfromtimestamp(timestamp).replace(tzinfo=g.tz)
-
-            gilding = json.loads(json_blob)
-            gilding["date"] = date
-            gilding["user"] = int(gilding["user"], 36)
-            gildings.append(gilding)
-        return gildings
-
-    @classmethod
-    def create(cls, user, things):
-        key = cls._rowkey(datetime.now(g.tz))
-
-        columns = {}
-        for thing in things:
-            columns[uuid.uuid1()] = json.dumps({
-                "user": user._id36,
-                "thing": thing._fullname,
-            })
-        cls._set_values(key, columns)
-
-    @classmethod
-    def delete(cls, user, things):
-        # gildings cannot be undone
-        raise NotImplementedError()
+        raise NotImplementedError('GoldRevenueGoalByDate: Cassandra removed')
 
 
 def create_unclaimed_gold (trans_id, payer_email, paying_id,
