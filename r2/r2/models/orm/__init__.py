@@ -33,7 +33,12 @@ from r2.models.orm.modaction import ModAction
 from r2.models.orm.wiki import WikiPage, WikiRevision
 from r2.models.orm.flair import FlairTemplate
 from r2.models.orm.award import Award as AwardORM, Trophy as TrophyORM
-from r2.models.orm.promo import PromoCampaign
+from r2.models.orm.promo import (
+    PromoCampaign,
+    PromoCollection,
+    PromotionLog as PromotionLogORM,
+    PromotionPrices as PromotionPricesORM,
+)
 from r2.models.orm.misc import (
     VoteDetail,
     IpTracking,
@@ -57,6 +62,6 @@ __all__ = [
     'ModAction',
     'WikiPage', 'WikiRevision', 'FlairTemplate',
     'AwardORM', 'TrophyORM',
-    'PromoCampaign',
+    'PromoCampaign', 'PromoCollection', 'PromotionLogORM', 'PromotionPricesORM',
     'VoteDetail', 'IpTracking', 'SubredditRule', 'LiveConfig',
 ]
