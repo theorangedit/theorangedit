@@ -69,6 +69,8 @@ from r2.models.token import (  # noqa: F401
 
 from r2.models.vote import Vote  # noqa: F401
 
+from r2.models.award import Award, Trophy  # noqa: F401
+
 from r2.models.flair import (  # noqa: F401
     Flair,
     FlairTemplate,

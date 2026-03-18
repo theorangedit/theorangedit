@@ -1537,8 +1537,8 @@ class FrontController(RedditController):
         token.consume()
 
         award = await Award._by_fullname(token.awardfullname)
-        trophy, preexisting = Trophy.claim(c.user, token.uid, award,
-                                           token.description, token.url)
+        trophy, preexisting = await Trophy.claim(c.user, token.uid, award,
+                                                  token.description, token.url)
         redirect = '/awards/received?trophy=' + trophy._id36
         if preexisting:
             redirect += '&duplicate=true'
@@ -1625,7 +1625,7 @@ class FormsController(RedditController):
             token.consume()
             c.user.email_verified = True
             await c.user._commit()
-            Award.give_if_needed("verified_email", c.user)
+            await Award.give_if_needed("verified_email", c.user)
             return self.redirect(dest)
 
         # failure. let 'em know.

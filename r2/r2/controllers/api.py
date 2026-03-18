@@ -1301,7 +1301,7 @@ class ApiController(RedditController):
                 c.user.set_email(email)
                 c.user.email_verified = None
                 await c.user._commit()
-                Award.take_away("verified_email", c.user)
+                await Award.take_away("verified_email", c.user)
 
             if verify:
                 if dest == '/':
@@ -1324,7 +1324,7 @@ class ApiController(RedditController):
             c.user.email_verified = None
             c.user.pref_email_messages = False
             await c.user._commit()
-            Award.take_away("verified_email", c.user)
+            await Award.take_away("verified_email", c.user)
             form.set_text('.status', _('your email has been updated'))
 
     @validatedForm(
@@ -3929,7 +3929,7 @@ class ApiController(RedditController):
             return
 
         if award is None:
-            Award._new(codename, title, awardtype, imgurl, api_ok)
+            await Award._new(codename, title, awardtype, imgurl, api_ok)
             form.set_text(".status", "saved. reload to see it.")
             return
 
@@ -4442,7 +4442,7 @@ class ApiController(RedditController):
                    description=VLength("description", max_length=1000),
                    url=VLength("url", max_length=1000),
                    recipient=VExistingUname("recipient"))
-    def POST_givetrophy(self, form, jquery, secret_used, award, description,
+    async def POST_givetrophy(self, form, jquery, secret_used, award, description,
                         url, recipient):
         if form.has_errors("recipient", errors.USER_DOESNT_EXIST,
                                         errors.NO_USER):
@@ -4458,28 +4458,26 @@ class ApiController(RedditController):
         if form.has_error():
             return
 
-        t = Trophy._new(recipient, award, description=description, url=url)
+        t = await Trophy._new(recipient, award, description=description, url=url)
 
         form.set_text(".status", _('saved'))
         form._send_data(trophy_fn=t._id36)
 
     @validatedForm(secret_used=VAdminOrAdminSecret("secret"),
                    trophy = VTrophy("trophy_fn"))
-    def POST_removetrophy(self, form, jquery, secret_used, trophy):
+    async def POST_removetrophy(self, form, jquery, secret_used, trophy):
         if not trophy:
             return self.abort404()
-        recipient = trophy._thing1
-        award = trophy._thing2
+        recipient = await trophy._thing1
+        award = await trophy._thing2
         if secret_used and not award.api_ok:
             c.errors.add(errors.NO_API, field='secret')
             form.has_errors('secret', errors.NO_API)
-        
+
         if form.has_error():
             return
 
-        trophy._delete()
-        Trophy.by_account(recipient, _update=True)
-        Trophy.by_award(award, _update=True)
+        await trophy._delete()
 
     @validatedForm(
         VAdmin(),
