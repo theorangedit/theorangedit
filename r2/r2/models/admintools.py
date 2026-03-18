@@ -341,14 +341,6 @@ def is_banned_domain(dom):
 def is_shamed_domain(dom):
     return False, None, None
 
-def bans_for_domain_parts(dom):
-    return []
-
-
-def apply_updates(user, timer):
-    pass
-
-
 def ip_span(ip):
     ip = websafe(ip)
     return f'<!-- {ip} -->'
