@@ -64,12 +64,10 @@ def get_reply_to_address(message):
 
     email_mac = hmac.new(
         g.secrets['modmail_email_secret'], email_id, hashlib.sha256).hexdigest()
-    reply_id = "zendeskreply+{email_id}-{email_mac}".format(
-        email_id=email_id, email_mac=email_mac)
+    reply_id = f"zendeskreply+{email_id}-{email_mac}"
 
     sr = Subreddit._byID(message.sr_id, data=True)
-    return "r/{subreddit} mail <{reply_id}@{domain}>".format(
-        subreddit=sr.name, reply_id=reply_id, domain=g.modmail_email_domain)
+    return f"r/{sr.name} mail <{reply_id}@{g.modmail_email_domain}>"
 
 
 def parse_and_validate_reply_to_address(address):
@@ -111,8 +109,7 @@ def get_message_subject(message):
     else:
         conversation_subject = message.subject
 
-    return u"[r/{subreddit} mail]: {subject}".format(
-        subreddit=sr.name, subject=_force_unicode(conversation_subject))
+    return f"[r/{sr.name} mail]: {_force_unicode(conversation_subject)}"
 
 
 def get_email_ids(message):
@@ -133,8 +130,7 @@ def get_email_ids(message):
 
 
 def get_system_from_address(sr):
-    return "r/{subreddit} mail <{sender_email}>".format(
-        subreddit=sr.name, sender_email=g.modmail_system_email)
+    return f"r/{sr.name} mail <{g.modmail_system_email}>"
 
 
 def send_modmail_email(message):
@@ -157,12 +153,9 @@ def send_modmail_email(message):
         distinguish = None
 
     if distinguish:
-        from_address = "u/{username} {distinguish} <{sender_email}>".format(
-            username=sender.name, distinguish=distinguish,
-            sender_email=g.modmail_sender_email)
+        from_address = f"u/{sender.name} {distinguish} <{g.modmail_sender_email}>"
     else:
-        from_address = "u/{username} <{sender_email}>".format(
-            username=sender.name, sender_email=g.modmail_sender_email)
+        from_address = f"u/{sender.name} <{g.modmail_sender_email}>"
 
     reply_to = get_reply_to_address(message)
     parent_email_id, other_email_ids = get_email_ids(message)
@@ -172,20 +165,13 @@ def send_modmail_email(message):
         # this is a message from the subreddit to a user. add some text that
         # shows the recipient
         recipient = Account._byID(message.to_id, data=True)
-        sender_text = ("This message was sent from r/{subreddit} to "
-            "u/{user}").format(subreddit=sr.name, user=recipient.name)
+        sender_text = f"This message was sent from r/{sr.name} to u/{recipient.name}"
     else:
-        userlink = add_sr("/u/{name}".format(name=sender.name), sr_path=False)
-        sender_text = "This message was sent by {userlink}".format(
-            userlink=userlink,
-        )
+        userlink = add_sr(f"/u/{sender.name}", sr_path=False)
+        sender_text = f"This message was sent by {userlink}"
 
-    reply_footer = ("\n\n-\n{sender_text}\n\n"
-        "Reply to this email directly or view it on reddit: {link}")
-    reply_footer = reply_footer.format(
-        sender_text=sender_text,
-        link=message.make_permalink(force_domain=True),
-    )
+    reply_footer = (f"\n\n-\n{sender_text}\n\n"
+        f"Reply to this email directly or view it on reddit: {message.make_permalink(force_domain=True)}")
     message_text = message.body + reply_footer
 
     email_id = g.email_provider.send_email(

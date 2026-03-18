@@ -33,28 +33,26 @@ def fix_trans_id():
         return
 
     # print some info and prompt user to continue
-    print ("Found %d campaigns with trans_id == 1. \n"
-           "Campaigns ids: %s \n" 
-           "Press 'c' to fix them or any other key to abort." %
-           (num_bad_campaigns, [pc._id for pc in bad_campaigns]))
+    print (f"Found {num_bad_campaigns} campaigns with trans_id == 1. \n"
+           f"Campaigns ids: {[pc._id for pc in bad_campaigns]} \n"
+           "Press 'c' to fix them or any other key to abort.")
     input_char = sys.stdin.read(1)
     if input_char != 'c' and input_char != 'C':
         print("aborting...")
         return
 
     # log the ids for reference
-    print ("Fixing %d campaigns with bad freebie trans_id: %s" % 
-           (num_bad_campaigns, [pc._id for pc in bad_campaigns]))
+    print (f"Fixing {num_bad_campaigns} campaigns with bad freebie trans_id: {[pc._id for pc in bad_campaigns]}")
 
     # get corresponding links and copy trans_id from link data to campaign thing
     link_ids = set([campaign.link_id for campaign in bad_campaigns])
-    print("Fetching associated links: %s" % link_ids)
+    print(f"Fetching associated links: {link_ids}")
     try:
         links = Link._byID(link_ids, data=True, return_dict=False)
     except NotFound as e:
-        print("Invalid data: Some promocampaigns have invalid link_ids. "
+        print(f"Invalid data: Some promocampaigns have invalid link_ids. "
               "Please delete these campaigns or fix the data before "
-              "continuing. Exception: %s" % e)
+              f"continuing. Exception: {e}")
 
     # organize bad campaigns by link_id
     bad_campaigns_by_link = defaultdict(list)
@@ -82,8 +80,7 @@ def fix_trans_id():
                 })
 
     # log the actions for future reference
-    msg = ("%d of %d campaigns updated successfully. %d updates failed: %s" %
-           (num_bad_campaigns, num_bad_campaigns - len(failed), len(failed), failed))
+    msg = (f"{num_bad_campaigns} of {num_bad_campaigns - len(failed)} campaigns updated successfully. {len(failed)} updates failed: {failed}")
     print(msg)
 
         

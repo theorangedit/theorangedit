@@ -114,7 +114,7 @@ class WikiBasePage(Reddit):
             pageactions += [(page, _("view"), False, 'wikiview')]
             if may_revise:
                 pageactions += [('edit', _("edit"), True, 'wikiedit')]
-            pageactions += [('revisions/%s' % page, _("history"), False, 'wikirevisions')]
+            pageactions += [(f'revisions/{page}', _("history"), False, 'wikirevisions')]
             pageactions += [('discussions', _("talk"), True, 'wikidiscussions')]
             if c.is_wiki_mod and may_revise:
                 pageactions += [('settings', _("settings"), True, 'wikisettings')]
@@ -143,7 +143,7 @@ class WikiBasePage(Reddit):
             context["title"] = _("%(page)s - %(site)s") % {
                 "site": c.site.name,
                 "page": page}
-            page_classes = ['wiki-page-%s' % page.replace('/', '-')]
+            page_classes = [f'wiki-page-{page.replace("/", "-")}']
 
         Reddit.__init__(self, extra_js_config={'wiki_page': page}, 
                         show_wiki_actions=True, page_classes=page_classes,
@@ -193,7 +193,7 @@ class WikiSettings(WikiBasePage):
 class WikiRevisions(WikiBasePage):
     def __init__(self, revisions, page, **context):
         content = WikiPageRevisions(revisions, page)
-        context['wikiaction'] = ('revisions/%s' % page, _("revisions"))
+        context['wikiaction'] = (f'revisions/{page}', _("revisions"))
         WikiBasePage.__init__(self, content, page=page, **context)
 
 class WikiRecent(WikiBasePage):

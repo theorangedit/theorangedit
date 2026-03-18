@@ -227,10 +227,10 @@ def make_subreddit_traffic_report(subreddits=None, num=None):
             name = _("[frontpage]")
             url = None
         elif srname in Subreddit._specials:
-            name = "[%s]" % srname
+            name = f"[{srname}]"
             url = None
         else:
-            name = "/r/%s" % srname
+            name = f"/r/{srname}"
             url = name + "/about/traffic"
 
         report.append(((name, url), data))
@@ -361,7 +361,7 @@ class AdvertTrafficSummary(RedditTraffic):
             srname = AdvertTrafficSummary.get_sr_name(thing.name)
             name = "300x100: " + srname
             if campaign:
-                name += " (%s)" % campaign
+                name += f" ({campaign})"
             return name
 
     @staticmethod
@@ -369,8 +369,8 @@ class AdvertTrafficSummary(RedditTraffic):
         """Given a codename, return the canonical URL for its traffic page."""
         thing = things.get(code)
         if isinstance(thing, Link):
-            return "/traffic/%s" % thing._id36
-        return "/traffic/adverts/%s" % code
+            return f"/traffic/{thing._id36}"
+        return f"/traffic/adverts/{code}"
 
 
 class LanguageTraffic(RedditTraffic):
@@ -443,10 +443,9 @@ class SubredditTraffic(RedditTraffic):
             "syntax": "cloudsearch",
             "restrict_sr": "on",
             "sort": "top",
-            "q": "timestamp:{:d}..{:d}".format(int(epoch_seconds(date)),
-                                               int(epoch_seconds(end))),
+            "q": f"timestamp:{int(epoch_seconds(date)):d}..{int(epoch_seconds(end)):d}",
         })
-        return "/r/%s/search?%s" % (c.site.name, query)
+        return f"/r/{c.site.name}/search?{query}"
 
     def get_dow_summary(self):
         return traffic.PageviewsBySubreddit.history("day", c.site.name)
@@ -538,7 +537,7 @@ class PromotedLinkTraffic(Templated):
         self.next = None
         self.has_live_campaign = False
         self.has_early_campaign = False
-        self.detail_name = ('campaign %s' % campaign._id36 if campaign
+        self.detail_name = (f'campaign {campaign._id36}' if campaign
                                                            else 'all campaigns')
 
         editable = c.user_is_sponsor or c.user._id == thing.author_id
@@ -619,7 +618,7 @@ class PromotedLinkTraffic(Templated):
             location = camp.location_str
             spent = promote.get_spent_amount(camp)
             is_active = self.campaign and self.campaign._id36 == camp._id36
-            url = '/traffic/%s/%s' % (self.thing._id36, camp._id36)
+            url = f'/traffic/{self.thing._id36}/{camp._id36}'
             is_total = False
             campaign_budget_dollars = camp.total_budget_dollars
             row = self.make_campaign_table_row(camp._id36,
@@ -651,7 +650,7 @@ class PromotedLinkTraffic(Templated):
         location = '---'
         is_live = False
         is_active = not self.campaign
-        url = '/traffic/%s' % self.thing._id36
+        url = f'/traffic/{self.thing._id36}'
         is_total = True
         row = self.make_campaign_table_row(_('total'),
                                            start=start,
@@ -698,7 +697,7 @@ class PromotedLinkTraffic(Templated):
                     'after': None,
                     'before': display_start.strftime('%Y%m%d%H'),
                 })
-                self.prev = '%s?%s' % (request.path, urllib.parse.urlencode(p))
+                self.prev = f'{request.path}?{urllib.parse.urlencode(p)}'
             else:
                 display_start = start
 
@@ -708,7 +707,7 @@ class PromotedLinkTraffic(Templated):
                     'after': display_end.strftime('%Y%m%d%H'),
                     'before': None,
                 })
-                self.next = '%s?%s' % (request.path, urllib.parse.urlencode(p))
+                self.next = f'{request.path}?{urllib.parse.urlencode(p)}'
             else:
                 display_end = end
         else:

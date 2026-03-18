@@ -62,7 +62,7 @@ def _get_cutoffs(intervals):
         if interval == "all":
             cutoffs["all"] = 0.0
         else:
-            cutoffs[interval] = epoch_seconds(timeago("1 %s" % interval))
+            cutoffs[interval] = epoch_seconds(timeago(f"1 {interval}"))
 
     return cutoffs
 
@@ -84,18 +84,18 @@ def time_listings(intervals, thing_type):
             if thing.timestamp < cutoff:
                 continue
 
-            yield ("user/%s/top/%s/%d" % (thing.thing_type, interval, thing.author_id),
+            yield (f"user/{thing.thing_type}/top/{interval}/{thing.author_id}",
                    thing_score, thing.timestamp, fname)
-            yield ("user/%s/controversial/%s/%d" % (thing.thing_type, interval, thing.author_id),
+            yield (f"user/{thing.thing_type}/controversial/{interval}/{thing.author_id}",
                    thing_controversy, thing.timestamp, fname)
 
             if thing.spam:
                 continue
 
             if thing.thing_type == "link":
-                yield ("sr/link/top/%s/%d" % (interval, thing.sr_id),
+                yield (f"sr/link/top/{interval}/{thing.sr_id}",
                        thing_score, thing.timestamp, fname)
-                yield ("sr/link/controversial/%s/%d" % (interval, thing.sr_id),
+                yield (f"sr/link/controversial/{interval}/{thing.sr_id}",
                        thing_controversy, thing.timestamp, fname)
 
                 if thing.url:
@@ -105,9 +105,9 @@ def time_listings(intervals, thing_type):
                         continue
 
                     for domain in parsed.domain_permutations():
-                        yield ("domain/link/top/%s/%s" % (interval, domain),
+                        yield (f"domain/link/top/{interval}/{domain}",
                                thing_score, thing.timestamp, fname)
-                        yield ("domain/link/controversial/%s/%s" % (interval, domain),
+                        yield (f"domain/link/controversial/{interval}/{domain}",
                                thing_controversy, thing.timestamp, fname)
 
     mr_tools.mr_map(process)
@@ -129,7 +129,7 @@ def store_keys(key, maxes):
         if thing_cls == "link":
             query = queries.get_domain_links(id, sort, time)
 
-    assert query, 'unknown query type for %s' % (key,)
+    assert query, f'unknown query type for {key}'
 
     item_tuples = [tuple([item[-1]] + [float(x) for x in item[:-1]])
                    for item in maxes]

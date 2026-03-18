@@ -47,7 +47,7 @@ def make_hotp(secret, counter):
     htop = (code_bits & 0x7fffffff) % 1000000
 
     # pad it out as necessary
-    return "%06d" % htop
+    return f"{htop:06d}"
 
 
 def make_totp(secret, skew=0, timestamp=None):

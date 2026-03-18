@@ -299,7 +299,7 @@ class NavButton(Styled):
         Styled.__init__(self, self._style, css_class=css_class)
 
     def build(self, base_path=''):
-        base_path = ("%s/%s/" % (base_path, self.dest)).replace('//', '/')
+        base_path = (f"{base_path}/{self.dest}/").replace('//', '/')
         self.bare_path = _force_unicode(base_path.replace('//', '/')).lower()
         self.bare_path = self.bare_path.rstrip('/')
         self.base_path = base_path

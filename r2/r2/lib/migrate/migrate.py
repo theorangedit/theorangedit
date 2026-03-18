@@ -56,9 +56,9 @@ def subscribe_to_blog_and_annoucements(filename):
         for sr in r_blog, r_announcements:
             if sr.add_subscriber(account):
                 sr._incr("_ups", 1)
-                print ("%d: subscribed %s to %s" % (i, account.name, sr.name))
+                print (f"{i}: subscribed {account.name} to {sr.name}")
             else:
-                print ("%d: didn't subscribe %s to %s" % (i, account.name, sr.name))
+                print (f"{i}: didn't subscribe {account.name} to {sr.name}")
 
 
 def recompute_unread(min_date = None):
@@ -80,7 +80,7 @@ def recompute_unread(min_date = None):
     accounts_m = load_accounts(Inbox.rel(Account, Message))
     for i, a in enumerate(accounts_m):
         a = Account._byID(a)
-        print("%s / %s : %s" % (i, len(accounts_m), a))
+        print(f"{i} / {len(accounts_m)} : {a}")
         queries.get_unread_messages(a).update()
         queries.get_unread_comments(a).update()
         queries.get_unread_selfreply(a).update()
@@ -88,7 +88,7 @@ def recompute_unread(min_date = None):
     accounts = load_accounts(Inbox.rel(Account, Comment)) - accounts_m
     for i, a in enumerate(accounts):
         a = Account._byID(a)
-        print("%s / %s : %s" % (i, len(accounts), a))
+        print(f"{i} / {len(accounts)} : {a}")
         queries.get_unread_comments(a).update()
         queries.get_unread_selfreply(a).update()
 
@@ -181,7 +181,7 @@ def pushup_permacache(verbosity=1000):
     for keys in in_chunks(gen_keys(), verbosity):
         g.reset_caches()
         done += len(keys)
-        print('Done %d: %r' % (done, keys[-1]))
+        print(f'Done {done}: {keys[-1]!r}')
         populate(keys)
 
 
@@ -255,7 +255,7 @@ def populate_spam_filtered():
 
     q = Subreddit._query(sort = asc('_date'))
     for sr in fetch_things2(q):
-        print('Processing %s' % sr.name)
+        print(f'Processing {sr.name}')
         links = Thing._by_fullname(get_spam_links(sr), data=True,
                                    return_dict=False)
         comments = Thing._by_fullname(get_spam_comments(sr), data=True,

@@ -371,12 +371,12 @@ def _scrape_media(url, autoplay=False, maxwidth=600, force=False,
         # media object it just gave us. if not, null out the media object
         # to protect downstream code
         if media_object and not scraper.media_embed(media_object):
-            print("%s made a bad media obj for url %s" % (scraper, url))
+            print(f"{scraper} made a bad media obj for url {url}")
             media_object = None
 
         if (secure_media_object and
             not scraper.media_embed(secure_media_object)):
-            print("%s made a bad secure media obj for url %s" % (scraper, url))
+            print(f"{scraper} made a bad secure media obj for url {url}")
             secure_media_object = None
 
         # If thumbnail can't be found, attempt again using _ThumbnailOnlyScraper
@@ -1022,11 +1022,11 @@ async def run():
         try:
             TimeoutFunction(_set_media, 30)(link, use_cache=True)
         except TimeoutFunctionException:
-            print("Timed out on %s" % fname)
+            print(f"Timed out on {fname}")
         except KeyboardInterrupt:
             raise
         except:
-            print("Error fetching %s" % fname)
+            print(f"Error fetching {fname}")
             print(traceback.format_exc())
 
     await amqp.consume_items('scraper_q', process_link)

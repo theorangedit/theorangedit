@@ -118,27 +118,27 @@ def _base_host(is_mobile_web=False):
         base_domain = domain_prefix + '.' + g.domain
     else:
         base_domain = g.domain
-    return "%s://%s" % (g.default_scheme, base_domain)
+    return f"{g.default_scheme}://{base_domain}"
 
 
 def promo_traffic_url(l): # old traffic url
-    return "%s/traffic/%s/" % (_base_host(), l._id36)
+    return f"{_base_host()}/traffic/{l._id36}/"
 
 def promotraffic_url(l): # new traffic url
-    return "%s/promoted/traffic/headline/%s" % (_base_host(), l._id36)
+    return f"{_base_host()}/promoted/traffic/headline/{l._id36}"
 
 def promo_edit_url(l):
-    return "%s/promoted/edit_promo/%s" % (_base_host(), l._id36)
+    return f"{_base_host()}/promoted/edit_promo/{l._id36}"
 
 def view_live_url(link, campaign, srname):
     is_mobile_web = campaign.platform == "mobile_web"
     host = _base_host(is_mobile_web=is_mobile_web)
     if srname:
-        host += '/r/%s' % srname
-    return '%s/?ad=%s' % (host, link._fullname)
+        host += f'/r/{srname}'
+    return f'{host}/?ad={link._fullname}'
 
 def payment_url(action, link_id36, campaign_id36):
-    path = '/promoted/%s/%s/%s' % (action, link_id36, campaign_id36)
+    path = f'/promoted/{action}/{link_id36}/{campaign_id36}'
     return urllib.parse.urljoin(g.payment_domain, path)
 
 def pay_url(l, campaign):
@@ -352,7 +352,7 @@ def new_campaign(link, dates, target, frequency_cap,
                                     android_version_range, total_budget_pennies,
                                     cost_basis, bid_pennies)
     PromotionWeights.add(link, campaign)
-    PromotionLog.add(link, 'campaign %s created' % campaign._id)
+    PromotionLog.add(link, f'campaign {campaign._id} created')
 
     if not campaign.is_house:
         author = Account._byID(link.author_id, data=True)
@@ -375,8 +375,8 @@ def edit_campaign(link, campaign, dates, target, frequency_cap,
                   android_version_range=None):
     changed = {}
     if dates[0] != campaign.start_date or dates[1] != campaign.end_date:
-        original = '%s to %s' % (campaign.start_date, campaign.end_date)
-        edited = '%s to %s' % (dates[0], dates[1])
+        original = f'{campaign.start_date} to {campaign.end_date}'
+        edited = f'{dates[0]} to {dates[1]}'
         changed['dates'] = (original, edited)
         campaign.start_date = dates[0]
         campaign.end_date = dates[1]
@@ -423,7 +423,7 @@ def edit_campaign(link, campaign, dates, target, frequency_cap,
                                         bid_pennies)
         campaign.bid_pennies = bid_pennies
 
-    change_strs = map(lambda t: '%s: %s -> %s' % (t[0], t[1][0], t[1][1]),
+    change_strs = map(lambda t: f'{t[0]}: {t[1][0]} -> {t[1][1]}',
                       changed.items())
     change_text = ', '.join(change_strs)
     campaign._commit()
@@ -439,7 +439,7 @@ def edit_campaign(link, campaign, dates, target, frequency_cap,
 
     # record the changes
     if change_text:
-        PromotionLog.add(link, 'edited %s: %s' % (campaign, change_text))
+        PromotionLog.add(link, f'edited {campaign}: {change_text}')
 
     hooks.get_hook('promote.edit_campaign').call(link=link, campaign=campaign)
 
@@ -473,8 +473,7 @@ def terminate_campaign(link, campaign):
         update_promote_status(link, PROMOTE_STATUS.finished)
         all_live_promo_srnames(_update=True)
 
-    msg = 'terminated campaign %s (original end %s)' % (campaign._id,
-                                                        original_end.date())
+    msg = f'terminated campaign {campaign._id} (original end {original_end.date()})'
     PromotionLog.add(link, msg)
 
 
@@ -482,7 +481,7 @@ def delete_campaign(link, campaign):
     PromotionWeights.delete(link, campaign)
     void_campaign(link, campaign, reason='deleted_campaign')
     campaign.delete()
-    PromotionLog.add(link, 'deleted campaign %s' % campaign._id)
+    PromotionLog.add(link, f'deleted campaign {campaign._id}')
     hooks.get_hook('promote.delete_campaign').call(link=link, campaign=campaign)
 
 
@@ -491,7 +490,7 @@ def toggle_pause_campaign(link, campaign, should_pause):
     campaign._commit()
 
     action = 'paused' if should_pause else 'resumed'
-    PromotionLog.add(link, '%s campaign %s' % (action, campaign._id))
+    PromotionLog.add(link, f'{action} campaign {campaign._id}')
 
     hooks.get_hook('promote.edit_campaign').call(link=link,
         campaign=campaign)
@@ -505,8 +504,7 @@ def void_campaign(link, campaign, reason):
         authorize.void_transaction(a, bid_record.transaction, campaign._id)
         campaign.trans_id = NO_TRANSACTION
         campaign._commit()
-        text = ('voided transaction for %s: (trans_id: %d)'
-                % (campaign, bid_record.transaction))
+        text = f'voided transaction for {campaign}: (trans_id: {bid_record.transaction})'
         PromotionLog.add(link, text)
 
         if bid_record.transaction > 0:
@@ -544,12 +542,11 @@ def auth_campaign(link, campaign, user, pay_id=None, freebie=False):
             campaign.total_budget_dollars, user, pay_id, link, campaign._id)
 
     if trans_id and not reason:
-        text = ('updated payment and/or budget for campaign %s: '
-                'SUCCESS (trans_id: %d, amt: %0.2f)' %
-                (campaign._id, trans_id, campaign.total_budget_dollars))
+        text = (f'updated payment and/or budget for campaign {campaign._id}: '
+                f'SUCCESS (trans_id: {trans_id}, amt: {campaign.total_budget_dollars:0.2f})')
         PromotionLog.add(link, text)
         if trans_id < 0:
-            PromotionLog.add(link, 'FREEBIE (campaign: %s)' % campaign._id)
+            PromotionLog.add(link, f'FREEBIE (campaign: {campaign._id})')
 
         if trans_id:
             if is_finished(link):
@@ -568,8 +565,7 @@ def auth_campaign(link, campaign, user, pay_id=None, freebie=False):
                 campaign.start_date)
 
     else:
-        text = ("updated payment and/or budget for campaign %s: FAILED ('%s')"
-                % (campaign._id, reason))
+        text = f"updated payment and/or budget for campaign {campaign._id}: FAILED ('{reason}')"
         PromotionLog.add(link, text)
         trans_id = 0
 
@@ -679,12 +675,12 @@ def flag_payment(link, reason):
         return
 
     if link.payment_flagged_reason:
-        link.payment_flagged_reason += (", %s" % reason)
+        link.payment_flagged_reason += f", {reason}"
     else:
         link.payment_flagged_reason = reason
 
     link._commit()
-    PromotionLog.add(link, "payment flagged: %s" % reason)
+    PromotionLog.add(link, f"payment flagged: {reason}")
     queries.set_payment_flagged_link(link)
 
 
@@ -706,7 +702,7 @@ def reject_promotion(link, reason=None, notify_why=True):
     was_live = is_promoted(link)
     update_promote_status(link, PROMOTE_STATUS.rejected)
     if reason:
-        PromotionLog.add(link, "rejected: %s" % reason)
+        PromotionLog.add(link, f"rejected: {reason}")
 
     # Send a rejection email (unless the advertiser requested the reject)
     if not c.user or c.user._id != link.author_id:
@@ -780,7 +776,7 @@ def _is_geotargeted_promo(link):
 
 
 def is_geotargeted_promo(link):
-    key = 'geopromo:%s' % link._id
+    key = f'geopromo:{link._id}'
     from_cache = g.gencache.get(key)
     if not from_cache:
         ret = _is_geotargeted_promo(link)
@@ -835,8 +831,7 @@ def charge_campaign(link, campaign):
             original_trans_id = campaign.trans_id
             campaign.trans_id = NO_TRANSACTION
             campaign._commit()
-            text = ('voided expired transaction for %s: (trans_id: %d)'
-                    % (campaign, original_trans_id))
+            text = f'voided expired transaction for {campaign}: (trans_id: {original_trans_id})'
             PromotionLog.add(link, text)
         return
 
@@ -848,8 +843,7 @@ def charge_campaign(link, campaign):
     emailer.queue_promo(link,
         campaign.total_budget_dollars,
         campaign.trans_id)
-    text = ('auth charge for campaign %s, trans_id: %d' %
-            (campaign._id, campaign.trans_id))
+    text = f'auth charge for campaign {campaign._id}, trans_id: {campaign.trans_id}'
     PromotionLog.add(link, text)
 
 
@@ -929,8 +923,8 @@ def finalize_completed_campaigns(daysago=1):
     missing_traffic = traffic.get_missing_traffic(start.replace(tzinfo=None),
                                                   date.replace(tzinfo=None))
     if missing_traffic:
-        raise ValueError("Can't finalize campaigns finished on %s."
-                         "Missing traffic from %s" % (date, missing_traffic))
+        raise ValueError(f"Can't finalize campaigns finished on {date}."
+                         f"Missing traffic from {missing_traffic}")
 
     links = Link._byID([camp.link_id for camp in campaigns], data=True)
     underdelivered_campaigns = []
@@ -945,12 +939,10 @@ def finalize_completed_campaigns(daysago=1):
 
         if billable_amount >= camp.total_budget_pennies:
             if hasattr(camp, 'cpm'):
-                text = '%s completed with $%s billable (%s impressions @ $%s).'
-                text %= (camp, billable_amount, billable_impressions,
-                    camp.bid_dollars)
+                text = (f'{camp} completed with ${billable_amount} billable '
+                    f'({billable_impressions} impressions @ ${camp.bid_dollars}).')
             else:
-                text = '%s completed with $%s billable (pre-CPM).'
-                text %= (camp, billable_amount) 
+                text = f'{camp} completed with ${billable_amount} billable (pre-CPM).'
             PromotionLog.add(link, text)
             camp.refund_amount = 0.
             camp._commit()
@@ -976,21 +968,18 @@ def refund_campaign(link, camp, refund_amount, billable_amount,
     success, reason = authorize.refund_transaction(
         owner, camp.trans_id, camp._id, refund_amount)
     if not success:
-        text = ('%s $%s refund failed' % (camp, refund_amount))
+        text = f'{camp} ${refund_amount} refund failed'
         PromotionLog.add(link, text)
-        g.log.debug(text + ' (reason: %s)' % reason)
+        g.log.debug(text + ' (reason: %s)', reason)
 
         return False
 
     if billable_impressions:
-        text = ('%s completed with $%s billable (%s impressions @ $%s).'
-                ' %s refunded.' % (camp, billable_amount,
-                                   billable_impressions,
-                                   camp.bid_pennies / 100.,
-                                   refund_amount))
+        text = (f'{camp} completed with ${billable_amount} billable '
+                f'({billable_impressions} impressions @ ${camp.bid_pennies / 100.}). '
+                f'{refund_amount} refunded.')
     else:
-        text = ('%s completed with $%s billable. %s refunded' % (camp,
-            billable_amount, refund_amount))
+        text = f'{camp} completed with ${billable_amount} billable. {refund_amount} refunded'
 
     PromotionLog.add(link, text)
     camp.refund_amount = refund_amount
@@ -1281,9 +1270,9 @@ def Run(verbose=True):
     """
 
     if verbose:
-        print("%s promote.py:Run() - make_daily_promotions()" % datetime.datetime.now(g.tz))
+        print(f"{datetime.datetime.now(g.tz)} promote.py:Run() - make_daily_promotions()")
 
     make_daily_promotions()
 
     if verbose:
-        print("%s promote.py:Run() - finished" % datetime.datetime.now(g.tz))
+        print(f"{datetime.datetime.now(g.tz)} promote.py:Run() - finished")

@@ -772,10 +772,10 @@ class LinkSearchQuery(CloudSearchQuery):
         elif isinstance(sr, AllMinus):
             if not sr.exclude_sr_ids:
                 raise InvalidQuery
-            exclude_srs = ["sr_id:%s" % sr_id for sr_id in sr.exclude_sr_ids]
-            return "(not (or %s))" % ' '.join(exclude_srs)
+            exclude_srs = [f"sr_id:{sr_id}" for sr_id in sr.exclude_sr_ids]
+            return f"(not (or {' '.join(exclude_srs)}))"
         elif not isinstance(sr, FakeSubreddit):
-            return "sr_id:%s" % sr._id
+            return f"sr_id:{sr._id}"
 
         return None
 
@@ -793,7 +793,7 @@ class CloudSearchSubredditSearchQuery(CloudSearchQuery):
         # Expand search for /r/subreddit to include subreddit name.
         sr = query.strip('/').split('/')
         if len(sr) == 2 and sr[0] == 'r' and Subreddit.is_valid_name(sr[1]):
-            query = '"%s" | %s' % (query, sr[1])
+            query = f'"{query}" | {sr[1]}'
         return query
 
     def customize_query(self, bq=u''):

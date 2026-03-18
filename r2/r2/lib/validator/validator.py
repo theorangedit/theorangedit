@@ -187,7 +187,7 @@ class Validator(object):
         except TypeError as e:
             if str(e).startswith('run() takes'):
                 # Prepend our class name so we know *which* run()
-                raise TypeError('%s.%s' % (type(self).__name__, str(e)))
+                raise TypeError(f'{type(self).__name__}.{e}')
             else:
                 raise
 
@@ -419,7 +419,7 @@ class VLang(Validator):
             if not strict:
                 return g.lang
             else:
-                raise ValueError("invalid language %r" % lang)
+                raise ValueError(f"invalid language {lang!r}")
     def run(self, lang):
         return VLang.validate_lang(lang)
 
@@ -602,8 +602,7 @@ class VLimit(Validator):
     def param_docs(self):
         return {
             self.param: "the maximum number of items desired "
-                        "(default: %d, maximum: %d)" % (self.default_limit,
-                                                        self.max_limit),
+                        f"(default: {self.default_limit}, maximum: {self.max_limit})",
         }
 
 class VCssMeasure(Validator):
@@ -643,7 +642,7 @@ class VLength(Validator):
     def param_docs(self):
         return {
             self.param:
-                "a string no longer than %d characters" % self.max_length,
+                f"a string no longer than {self.max_length} characters",
         }
 
 class VUploadLength(VLength):
@@ -658,7 +657,7 @@ class VUploadLength(VLength):
         kibibytes = self.max_length / 1024
         return {
             self.param:
-                "file upload with maximum size of %d KiB" % kibibytes,
+                f"file upload with maximum size of {kibibytes} KiB",
         }
 
 class VPrintable(VLength):
@@ -691,7 +690,7 @@ class VTitle(VLength):
     def param_docs(self):
         return {
             self.param: "title of the submission. "
-                        "up to %d characters long" % self.max_length,
+                        f"up to {self.max_length} characters long",
         }
 
 class VMarkdown(Validator):
@@ -1006,7 +1005,7 @@ class VByName(Validator):
             }
         else:
             return {
-                self.param: "[fullname](#fullnames) of a %s" % thingtype,
+                self.param: f"[fullname](#fullnames) of a {thingtype}",
             }
 
 class VByNameIfAuthor(VByName):
@@ -1118,7 +1117,7 @@ class VModhash(Validator):
 
     def param_docs(self):
         return {
-            '%s / X-Modhash header' % self.param: 'a [modhash](#modhashes)',
+            f'{self.param} / X-Modhash header': 'a [modhash](#modhashes)',
         }
 
 
@@ -1136,7 +1135,7 @@ class VModhashIfLoggedIn(Validator):
 
     def param_docs(self):
         return {
-            '%s / X-Modhash header' % self.param: 'a [modhash](#modhashes)',
+            f'{self.param} / X-Modhash header': 'a [modhash](#modhashes)',
         }
 
 
@@ -1591,7 +1590,7 @@ class VOSVersion(Validator):
         for endpoint in (min, max):
             if endpoint != '':
                 # check that the version is in the global config
-                if endpoint not in getattr(g, '%s_versions' % self.os):
+                if endpoint not in getattr(g, f'{self.os}_versions'):
                     self.assign_error()
                     return
 
@@ -1698,7 +1697,7 @@ class LoginRatelimit(object):
         self.key = key
 
     def __str__(self):
-        return "login-%s-%s" % (self.category, self.key)
+        return f"login-{self.category}-{self.key}"
 
     def __hash__(self):
         return hash(str(self))
@@ -1935,7 +1934,7 @@ class VMessageRecipient(VExistingUname):
         # A user in timeout should only be able to message us, the admins.
         if (c.user.in_timeout and
                 not (is_subreddit and
-                     '/r/%s' % name == g.admin_message_acct)):
+                     f'/r/{name}' == g.admin_message_acct)):
             abort(403, 'forbidden')
 
         if is_subreddit:
@@ -2026,16 +2025,16 @@ class VInt(VNumber):
 
     def param_docs(self):
         if self.min is not None and self.max is not None:
-            description = "an integer between %d and %d" % (self.min, self.max)
+            description = f"an integer between {self.min} and {self.max}"
         elif self.min is not None:
-            description = "an integer greater than %d" % self.min
+            description = f"an integer greater than {self.min}"
         elif self.max is not None:
-            description = "an integer less than %d" % self.max
+            description = f"an integer less than {self.max}"
         else:
             description = "an integer"
 
         if self.num_default is not None:
-            description += " (default: %d)" % self.num_default
+            description += f" (default: {self.num_default})"
 
         return {self.param: description}
 
@@ -2098,7 +2097,7 @@ class VMenu(Validator):
 
     def run(self, sort, where):
         if self.remember:
-            pref = "%s_%s" % (where, self.nav.name)
+            pref = f"{where}_{self.nav.name}"
             user_prefs = copy(c.user.sort_options) if c.user else {}
             user_pref = user_prefs.get(pref)
 
@@ -2122,7 +2121,7 @@ class VMenu(Validator):
 
     def param_docs(self):
         return {
-            self.param[0]: 'one of (%s)' % ', '.join("`%s`" % s
+            self.param[0]: 'one of (%s)' % ', '.join(f"`{s}`"
                                                   for s in self.nav._options),
         }
 
@@ -2133,7 +2132,7 @@ class VRatelimit(Validator):
         self.rate_user = rate_user
         self.rate_ip = rate_ip
         self.name = prefix
-        self.cache_prefix = "rl:%s" % self.name
+        self.cache_prefix = f"rl:{self.name}"
         self.error = error
         self.fatal = fatal
         self.seconds = None
@@ -2191,7 +2190,7 @@ class VRatelimit(Validator):
     def ratelimit(cls, rate_user=False, rate_ip=False, prefix="rate_",
                   seconds=None):
         name = prefix
-        cache_prefix = "rl:%s" % name
+        cache_prefix = f"rl:{name}"
 
         if seconds is None:
             seconds = g.RL_RESET_SECONDS
@@ -2211,7 +2210,7 @@ class VRatelimit(Validator):
 
     @classmethod
     def _record_event(cls, name, event):
-        g.stats.event_count('VRatelimit.%s' % name, event, sample_rate=0.1)
+        g.stats.event_count(f'VRatelimit.{name}', event, sample_rate=0.1)
 
 
 class VRatelimitImproved(Validator):
@@ -2244,7 +2243,7 @@ class VRatelimitImproved(Validator):
 
         @property
         def key(self):
-            return 'ratelimit-%s-%s' % (self.event_type, self.event_id_fn())
+            return f'ratelimit-{self.event_type}-{self.event_id_fn()}'
 
     def __init__(self, user_limit=None, ip_limit=None, error=errors.RATELIMIT,
                  *a, **kw):
@@ -2377,7 +2376,7 @@ class VOneOf(Validator):
 
     def param_docs(self):
         return {
-            self.param: 'one of (%s)' % ', '.join("`%s`" % s
+            self.param: 'one of (%s)' % ', '.join(f"`{s}`"
                                                   for s in self.options),
         }
 
@@ -2547,7 +2546,7 @@ class ValidEmails(Validator):
             # send back original string to the user
             if self.num == 1:
                 self.set_error(errors.BAD_EMAILS,
-                             {'emails': '"%s"' % emails0})
+                             {'emails': f'"{emails0}"'})
             # else report the number expected
             else:
                 self.set_error(errors.TOO_MANY_EMAILS,
@@ -2613,7 +2612,7 @@ class ValidEmailsOrExistingUnames(Validator):
                         # We only wanted one, and we got it as an e-mail,
                         # so complain.
                         self.set_error(errors.BAD_EMAILS,
-                                       {"emails": '"%s"' % items})
+                                       {"emails": f'"{items}"'})
                     else:
                         # Too many total
                         self.set_error(errors.TOO_MANY_EMAILS,
@@ -2876,7 +2875,7 @@ class VOneTimePassword(Validator):
     def validate_otp(cls, secret, password):
         # is the password a valid format and has it been used?
         try:
-            key = "otp:used_%s_%d" % (c.user._id36, int(password))
+            key = f"otp:used_{c.user._id36}_{int(password)}"
         except (TypeError, ValueError):
             valid_and_unused = False
         else:
@@ -2911,7 +2910,7 @@ class VOneTimePassword(Validator):
         if not g.disable_ratelimit:
             current_password = totp.make_totp(secret)
             otp_ratelimit = ratelimit.SimpleRateLimit(
-                name="otp_tries_%s_%s" % (c.user._id36, current_password),
+                name=f"otp_tries_{c.user._id36}_{current_password}",
                 seconds=600,
                 limit=self.ratelimit,
             )
@@ -3091,7 +3090,7 @@ class VValidatedJSON(VJSON):
                 key_docs = spec_docs[key]
                 # indent any new lines
                 key_docs = key_docs.replace('\n', '\n  ')
-                spec_lines.append('  "%s": %s,' % (key, key_docs))
+                spec_lines.append(f'  "{key}": {key_docs},')
             spec_lines.append('}')
             return '\n'.join(spec_lines)
 
@@ -3330,7 +3329,7 @@ class VSigned(Validator):
         # whether we're going to ignore them).
         for code, field in signature.errors:
             g.stats.simple_event(
-                "signing.%s.invalid.%s" % (field, code.lower())
+                f"signing.{field}.invalid.{code.lower()}"
             )
 
         # persistent skew problems on android suggest something deeper is

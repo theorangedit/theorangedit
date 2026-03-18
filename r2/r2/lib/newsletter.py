@@ -55,8 +55,8 @@ def add_subscriber(email, source=""):
     requires a network call.
     """
     if not API_KEY or not LIST_ID:
-        raise NewsletterError("Unable to subscribe user %s to newsletter. "
-                              "API key or list ID not set." % email)
+        raise NewsletterError(f"Unable to subscribe user {email} to newsletter. "
+                              "API key or list ID not set.")
 
     params = {
         "EmailAddress": email
@@ -64,36 +64,33 @@ def add_subscriber(email, source=""):
     if source:
         params["CustomFields"] = [{"Key": "source", "Value": source}]
 
-    timer = g.stats.get_timer('%s.add_subscriber' % STATS_NAMESPACE)
+    timer = g.stats.get_timer(f'{STATS_NAMESPACE}.add_subscriber')
     timer.start()
     try:
         r = requests.post(
-            "%s/subscribers/%s.json" % (BASE_URL, LIST_ID),
+            f"{BASE_URL}/subscribers/{LIST_ID}.json",
             json.dumps(params),
             timeout=5,
             auth=(API_KEY, 'x'),
         )
     except requests.exceptions.Timeout:
-        g.stats.simple_event('%s.request.timeout' % STATS_NAMESPACE)
-        raise NewsletterError("Unable to subscribe user %s to newsletter. "
-                              "Request timed out." % email)
+        g.stats.simple_event(f'{STATS_NAMESPACE}.request.timeout')
+        raise NewsletterError(f"Unable to subscribe user {email} to newsletter. "
+                              "Request timed out.")
     except requests.exceptions.SSLError:
-        g.stats.simple_event('%s.request.ssl_error' % STATS_NAMESPACE)
-        raise NewsletterError("Unable to subscribe user %s to newsletter. "
-                              "SSL Error." % email)
+        g.stats.simple_event(f'{STATS_NAMESPACE}.request.ssl_error')
+        raise NewsletterError(f"Unable to subscribe user {email} to newsletter. "
+                              "SSL Error.")
     else:
         if r.status_code == 201:
             return True
         elif r.status_code == 400:
-            g.stats.simple_event('%s.request.email_unacceptable' %
-                                 STATS_NAMESPACE)
-            raise EmailUnacceptableError("Could not subscribe user %s to"
+            g.stats.simple_event(f'{STATS_NAMESPACE}.request.email_unacceptable')
+            raise EmailUnacceptableError(f"Could not subscribe user {email} to"
                                          "newsletter. Email was unacceptable, "
-                                         "likely due to subscription status." %
-                                         email)
+                                         "likely due to subscription status.")
         else:
-            raise NewsletterError("Could not subscribe user %s to "
-                                  "newsletter. Status code: %s" %
-                                  (email, r.status_code))
+            raise NewsletterError(f"Could not subscribe user {email} to "
+                                  f"newsletter. Status code: {r.status_code}")
     finally:
         timer.stop()

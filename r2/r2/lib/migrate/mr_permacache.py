@@ -120,23 +120,23 @@ def link_listings():
         timestamp = link.timestamp
         fname = make_fullname(Link, link.thing_id)
 
-        yield 'user-submitted-%d' % author_id, timestamp, fname
+        yield f'user-submitted-{author_id}', timestamp, fname
         if not link.spam:
             sr_id = link.sr_id
             ups, downs = link.ups, link.downs
 
-            yield ('sr-hot-all-%d' % sr_id, _hot(ups, downs, timestamp),
+            yield (f'sr-hot-all-{sr_id}', _hot(ups, downs, timestamp),
                    timestamp, fname)
-            yield 'sr-new-all-%d' % sr_id, timestamp, fname
-            yield 'sr-top-all-%d' % sr_id, score(ups, downs), timestamp, fname
-            yield ('sr-controversial-all-%d' % sr_id,
+            yield f'sr-new-all-{sr_id}', timestamp, fname
+            yield f'sr-top-all-{sr_id}', score(ups, downs), timestamp, fname
+            yield (f'sr-controversial-all-{sr_id}',
                    controversy(ups, downs), timestamp, fname)
             for time in '1 year', '1 month', '1 week', '1 day', '1 hour':
                 if timestamp > epoch_seconds(timeago(time)):
                     tkey = time.split(' ')[1]
-                    yield ('sr-top-%s-%d' % (tkey, sr_id),
+                    yield (f'sr-top-{tkey}-{sr_id}',
                            score(ups, downs), timestamp, fname)
-                    yield ('sr-controversial-%s-%d' % (tkey, sr_id),
+                    yield (f'sr-controversial-{tkey}-{sr_id}',
                            controversy(ups, downs),
                            timestamp, fname)
 
@@ -150,7 +150,7 @@ def comment_listings():
     def process(comment):
         assert comment.thing_type == 'comment'
 
-        yield ('user-commented-%d' % comment.author_id,
+        yield (f'user-commented-{comment.author_id}',
                comment.timestamp, make_fullname(Comment, comment.thing_id))
 
     mr_tools.mr_map(process)
@@ -161,7 +161,7 @@ def rel_listings(names, thing2_cls = Link):
     @dataspec_m_rel()
     def process(rel):
         if rel.name in names:
-            yield ('%s-%s' % (names[rel.name], rel.thing1_id), rel.timestamp,
+            yield (f'{names[rel.name]}-{rel.thing1_id}', rel.timestamp,
                    make_fullname(thing2_cls, rel.thing2_id))
     mr_tools.mr_map(process)
 
@@ -249,7 +249,7 @@ def top1k_writefiles(dirname):
 
         with open(filename, 'w') as f:
             for item in maxes:
-                f.write('%s\t' % key)
+                f.write(f'{key}\t')
                 f.write('\t'.join(item))
                 f.write('\n')
         
@@ -276,7 +276,7 @@ def write_permacache_from_dir(dirname):
             write_permacache_from_file(fname)
             os.unlink(fname)
         except:
-            mr_tools.status('failed on %r' % fname)
+            mr_tools.status(f'failed on {fname!r}')
             raise
 
     mr_tools.status('Removing empty directories')
@@ -287,7 +287,7 @@ def write_permacache_from_dir(dirname):
                 os.rmdir(dname)
             except OSError as e:
                 if e.errno == errno.ENOTEMPTY:
-                    mr_tools.status('%s not empty' % (dname,))
+                    mr_tools.status(f'{dname} not empty')
                 else:
                     raise
 

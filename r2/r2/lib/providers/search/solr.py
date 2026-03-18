@@ -145,7 +145,7 @@ class SolrSearchQuery(object):
         if syntax is None:
             syntax = self.default_syntax
         elif syntax not in self.known_syntaxes:
-            raise ValueError("Unknown search syntax: %s" % syntax)
+            raise ValueError(f"Unknown search syntax: {syntax}")
         self.bq = None
         self.query = filters._force_unicode(query or u'')
         self.converted_data = None
@@ -323,7 +323,7 @@ class LinkSearchQuery(SolrSearchQuery):
     def create_boolean_query(cls, queries):
         '''Return an AND clause combining all queries'''
         if len(queries) > 1:
-            bq = ' AND  '.join(['(%s)' %q for q in queries]) 
+            bq = ' AND  '.join([f'({q})' for q in queries])
         else:
             bq = queries[0]
         return bq
@@ -345,22 +345,21 @@ class LinkSearchQuery(SolrSearchQuery):
             return None
         elif isinstance(sr, MultiReddit):
             for sr_id in sr.sr_ids:
-                bq.append("sr_id:%s" % sr_id)
+                bq.append(f"sr_id:{sr_id}")
         elif isinstance(sr, DomainSR):
-            bq = ["site:'%s'" % sr.domain]
+            bq = [f"site:'{sr.domain}'"]
         elif sr == Friends:
             if not c.user_is_loggedin or not c.user.friends:
                 return None
             friend_ids = c.user.friends
-            friends = ["author_fullname:'%s'" %
-                       Account._fullname_from_id36(r2utils.to36(id_))
+            friends = [f"author_fullname:'{Account._fullname_from_id36(r2utils.to36(id_))}'"
                        for id_ in friend_ids]
             bq.extend(friends)
         elif isinstance(sr, AllMinus):
             for sr_id in sr.exclude_sr_ids:
-                bq.append("-sr_id:%s" % sr_id)
+                bq.append(f"-sr_id:{sr_id}")
         elif not isinstance(sr, FakeSubreddit):
-            bq = ["sr_id:%s" % sr._id]
+            bq = [f"sr_id:{sr._id}"]
         return ' OR '.join(bq)
 
 
@@ -385,7 +384,7 @@ def _encode_query(query, faceting, size, start, rank, return_fields):
     if rank: 
         params['sort'] = rank.strip().lower()
         if not params['sort'].split()[-1] in ['asc', 'desc']:
-            params['sort'] = '%s desc' % params['sort']
+            params['sort'] = f"{params['sort']} desc"
     facet_limit = []
     facet_sort = []
     if faceting:
@@ -395,7 +394,7 @@ def _encode_query(query, faceting, size, start, rank, return_fields):
             facet_limit.append(options.get("count", 20))
             if "sort" in options:
                 if not options['sort'].split()[-1] in ['asc', 'desc']:
-                    options['sort'] = '%s desc' % options['sort']
+                    options['sort'] = f"{options['sort']} desc"
                 facet_sort.append(options["sort"])
         params["facet.limit"] = ",".join([str(l) for l in facet_limit])
         params["facet.sort"] = ",".join(facet_sort)
@@ -404,10 +403,9 @@ def _encode_query(query, faceting, size, start, rank, return_fields):
         params["qf"] = ",".join(return_fields)
     encoded_query = urllib.parse.urlencode(params)
     if getattr(g, 'solr_version', '1').startswith('4'):
-        path = '/solr/%s/select?%s' % \
-            (getattr(g, 'solr_core', 'collection1'), encoded_query)
+        path = f"/solr/{getattr(g, 'solr_core', 'collection1')}/select?{encoded_query}"
     else:
-        path = '/solr/select?%s' %  encoded_query
+        path = f'/solr/select?{encoded_query}'
     return path    
 
 
@@ -447,7 +445,7 @@ class SolrSearchUploader(object):
         "delete this from the index"
         
         '''
-        delete = etree.fromstring('<id>%s</id>' % thing._id)
+        delete = etree.fromstring(f'<id>{thing._id}</id>')
         return delete
 
     def delete_ids(self, ids):
@@ -455,7 +453,7 @@ class SolrSearchUploader(object):
         'ids' should be a list of fullnames
         
         '''
-        deletes = [etree.fromstring('<id>%s</id>' % id_) \
+        deletes = [etree.fromstring(f'<id>{id_}</id>')
                 for id_ in ids]
 
 
@@ -549,11 +547,10 @@ class SolrSearchUploader(object):
                     delta=len(warnings))
 
             if not quiet:
-                print("%s Changes: +%i -%i" % (self.__class__.__name__,)
-                                               adds, deletes)
+                print(f"{self.__class__.__name__} Changes:", f"+{adds} -{deletes}")
                 if len(warnings):
-                    print("%s Warnings: %s" % (self.__class__.__name__,)
-                                               "; ".join(warnings))
+                    print(f"{self.__class__.__name__} Warnings:",
+                          "; ".join(warnings))
 
         return cs_time    
 
@@ -574,7 +571,7 @@ class SolrSearchUploader(object):
             for data in chunker:
                 # HTTPLib calculates Content-Length header automatically
                 if getattr(g, 'solr_version', '1').startswith('4'):
-                    connection.request('POST', "/solr/%s/update/" % core,
+                    connection.request('POST', f"/solr/{core}/update/",
                                        data, headers)
                 else:     
                     connection.request('POST', "/solr/update/",
@@ -603,7 +600,7 @@ def chunk_xml(xml, depth=0):
         yield data
     else:
         depth += 1
-        print("WARNING: Chunking (depth=%s)" % depth)
+        print(f"WARNING: Chunking (depth={depth})")
         half = len(xml) // 2
         left_half = xml # for ease of reading
         right_half = etree.Element(root)
@@ -639,11 +636,10 @@ def _run_changed(msgs, chan):
 
     totaltime = (datetime.now(g.tz) - start).total_seconds()
 
-    print ("%s: %d messages in %.2fs seconds (%.2fs secs waiting on "
-           "solr); %d duplicates, %s remaining)" %
-           (start, len(changed), totaltime, solrsearch_time,
-            len(changed) - len(link_fns | sr_fns),
-            msgs[-1].delivery_info.get('message_count', 'unknown')))
+    print(f"{start}: {len(changed)} messages in {totaltime:.2f}s seconds "
+          f"({solrsearch_time:.2f}s secs waiting on solr); "
+          f"{len(changed) - len(link_fns | sr_fns)} duplicates, "
+          f"{msgs[-1].delivery_info.get('message_count', 'unknown')} remaining)")
 
 
 class SolrLinkUploader(SolrSearchUploader):
@@ -700,7 +696,7 @@ class SolrSubredditUploader(SolrSearchUploader):
 
  
 def _progress_key(item):
-    return "%s/%s" % (item._id, item._date)
+    return f"{item._id}/{item._date}"
 
 
 def _rebuild_link_index(start_at=None, sleeptime=1, cls=Link,
@@ -725,7 +721,7 @@ def _rebuild_link_index(start_at=None, sleeptime=1, cls=Link,
             try:
                 uploader.inject()
             except httplib.HTTPException as err:
-                print("Got %s, sleeping %s secs" % (err, x))
+                print(f"Got {err}, sleeping {x} secs")
                 time.sleep(x)
                 continue
             else:
@@ -733,7 +729,7 @@ def _rebuild_link_index(start_at=None, sleeptime=1, cls=Link,
         else:
             raise err
         last_update = chunk[-1]
-        print("last updated %s" % last_update._fullname)
+        print(f"last updated {last_update._fullname}")
         time.sleep(sleeptime)
 
 
@@ -768,7 +764,7 @@ def _translate_raw_sort(sort):
         sort = sort[1:]
         sort_dir = ' desc'
     sort = SORTS_DICT.get(sort, sort) 
-    return '%s%s' % (sort, sort_dir)
+    return f'{sort}{sort_dir}'
 
 class SolrSearchProvider(SearchProvider):
     '''Provider implementation: wrap it all up as a SearchProvider

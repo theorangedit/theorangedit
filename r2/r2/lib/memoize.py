@@ -37,13 +37,13 @@ def memoize(iden, time = 0, stale=False, timeout=30):
             #overwritten no matter what
             update = kw.pop('_update', False)
 
-            key = "memo:%s:%s" % (iden, make_key_id(*a, **kw))
+            key = f"memo:{iden}:{make_key_id(*a, **kw)}"
 
             res = None if update else g.memoizecache.get(key, stale=stale)
 
             if res is None:
                 # not cached, we should calculate it.
-                with g.make_lock("memoize", 'memoize_lock(%s)' % key,
+                with g.make_lock("memoize", f'memoize_lock({key})',
                                  time=timeout, timeout=timeout):
 
                     # see if it was completed while we were waiting
@@ -72,7 +72,7 @@ def memoize(iden, time = 0, stale=False, timeout=30):
 def test(x, y):
     import time
     time.sleep(1)
-    print('calculating %d + %d' % (x, y))
+    print(f'calculating {x} + {y}')
     if x + y == 10:
         return None
     else:

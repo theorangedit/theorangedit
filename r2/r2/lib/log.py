@@ -169,7 +169,7 @@ class RavenErrorReporter(Reporter):
             "/opt/",    # scripts may be run from /opt/REPO/scripts
         ]
         release_str = '|'.join(
-           "%s:%s" % (repo, commit_hash)
+           f"{repo}:{commit_hash}"
            for repo, commit_hash in sorted(g.versions.items())
         )
         release_hash = md5(release_str).hexdigest()
@@ -209,7 +209,7 @@ class RavenErrorReporter(Reporter):
             # OR
             # paster run INIFILE script.py
             # either way sys.argv[-1] will tell us the entry point to the error
-            culprit = 'script: "%s"' % sys.argv[-1]
+            culprit = f'script: "{sys.argv[-1]}"'
         else:
             cls.add_http_context(client)
             cls.add_reddit_context(client)
@@ -218,7 +218,7 @@ class RavenErrorReporter(Reporter):
             routes_dict = request.environ["pylons.routes_dict"]
             controller = routes_dict.get("controller", "unknown")
             action = routes_dict.get("action", "unknown")
-            culprit = "%s.%s" % (controller, action)
+            culprit = f"{controller}.{action}"
 
         try:
             client.captureException(

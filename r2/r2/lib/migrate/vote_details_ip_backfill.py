@@ -32,10 +32,10 @@ def backfill_vote_details(cls):
                             oneweek = ""
                             if ttl < 3600 * 24 * 7:
                                 oneweek = "(<= one week left)"
-                            print("Inserting %s with IP ttl %d %s" % (redacted, ttl, oneweek))
+                            print(f"Inserting {redacted} with IP ttl {ttl:d} {oneweek}")
                             detail_chunk[thing_id36][voter_id36] = json.dumps(redacted)
                             if ttl <= 0:
-                                print("Skipping bogus ttl for %s: %d" % (redacted, ttl))
+                                print(f"Skipping bogus ttl for {redacted}: {ttl:d}")
                                 continue
                             b.insert(thing_fullname, {voter_id36: ip}, ttl=ttl)
         except Exception:

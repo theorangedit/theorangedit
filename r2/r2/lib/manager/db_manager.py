@@ -31,7 +31,7 @@ import traceback
 
 logger = logging.getLogger('dm_manager')
 logger.addHandler(logging.StreamHandler())
-APPLICATION_NAME = "reddit@%s:%d" % (socket.gethostname(), os.getpid())
+APPLICATION_NAME = f"reddit@{socket.gethostname()}:{os.getpid():d}"
 
 
 def get_engine(name, db_host='', db_user='', db_pass='', db_port='5432',
@@ -48,7 +48,7 @@ def get_engine(name, db_host='', db_user='', db_pass='', db_port='5432',
         arguments["user"] = db_user
     if db_pass:
         arguments["password"] = db_pass
-    dsn = "%20".join("%s=%s" % x for x in arguments.items())
+    dsn = "%20".join(f"{k}={v}" for k, v in arguments.items())
 
     engine = sqlalchemy.create_engine(
         'postgresql:///?dsn=' + dsn,
@@ -127,7 +127,7 @@ class db_manager:
             return True
         except Exception:
             logger.error(traceback.format_exc())
-            logger.error("connection failure: %r" % engine)
+            logger.error(f"connection failure: {engine!r}")
             self.mark_dead(engine, g_override)
             return False
 

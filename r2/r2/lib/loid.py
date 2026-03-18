@@ -174,6 +174,6 @@ class LoId(object):
         hook = hooks.get_hook("loid.to_dict")
         hook.call(loid=self, data=d)
         if prefix:
-            d = {"{}{}".format(prefix, k): v for k, v in d.items()}
+            d = {f"{prefix}{k}": v for k, v in d.items()}
 
         return d

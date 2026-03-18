@@ -219,7 +219,7 @@ class Agent(object):
             if d:
                 for subattr in ("name", "version"):
                     if subattr in d:
-                        key = "%s_%s" % (attr, subattr)
+                        key = f"{attr}_{subattr}"
                         setattr(agent, key, d[subattr])
 
         agent.bot = parsed.get('bot')

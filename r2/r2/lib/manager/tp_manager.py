@@ -119,7 +119,7 @@ class tp_manager:
 
         classes = [cls] + list(inspect.getmro(cls)[1:])
         for klass in classes:
-            filename = '/%s.%s' % (klass.__name__.lower(), style)
+            filename = f'/{klass.__name__.lower()}.{style}'
             try:
                 tmpl = jinja_env.get_template(filename)
                 return _Jinja2TemplateWrapper(tmpl, filename=filename)

@@ -31,9 +31,8 @@ class SimpleCampaign(object):
         self.impressions = impressions
 
     def __repr__(self):
-        s = "<%s %s: %s impressions in %s>"
-        return s % (self.__class__.__name__, self.name, self.impressions,
-                    ', '.join(self.target_names))
+        return (f"<{self.__class__.__name__} {self.name}: {self.impressions} impressions in "
+                f"{', '.join(self.target_names)}>")
 
 
 class SimpleTarget(object):
@@ -42,8 +41,7 @@ class SimpleTarget(object):
         self.impressions = impressions
 
     def __repr__(self):
-        return "<%s %s: %s impressions>" % (self.__class__.__name__, self.name,
-                                            self.impressions)
+        return f"<{self.__class__.__name__} {self.name}: {self.impressions} impressions>"
 
 
 class System(object):
@@ -59,10 +57,9 @@ class System(object):
 
     def __repr__(self):
         max_names = ', '.join(self.priority_target_names)
-        all_names = ', '.join("%s (%s)" % (target.name, target.impressions)
+        all_names = ', '.join(f"{target.name} ({target.impressions})"
                               for target in self.targets)
-        return "<%s: max %s in %s>" % (self.__class__.__name__, max_names,
-                                       all_names)
+        return f"<{self.__class__.__name__}: max {max_names} in {all_names}>"
 
     def combine_campaigns(self, campaigns):
         """Combine campaigns with the same target."""

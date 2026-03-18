@@ -180,15 +180,15 @@ def _rewrite_css(css_filename, sprite_path, images, sprite_size):
             position = (position[0] / pixel_ratio, position[1] / pixel_ratio)
 
         css_properties = [
-            'background-image: url(%s);' % sprite_path,
-            'background-position: -%dpx -%dpx;' % position,
-            'background-repeat: %s;' % ('repeat' if should_stretch else 'no-repeat'),
+            f'background-image: url({sprite_path});',
+            f'background-position: -{position[0]:d}px -{position[1]:d}px;',
+            f'background-repeat: {"repeat" if should_stretch else "no-repeat"};',
         ]
 
         if pixel_ratio > 1:
             size = (sprite_size[0] / pixel_ratio, sprite_size[1] / pixel_ratio)
             css_properties.append(
-                'background-size: %dpx %dpx;' % size,
+                f'background-size: {size[0]:d}px {size[1]:d}px;',
             )
 
         return ''.join(css_properties)

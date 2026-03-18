@@ -80,8 +80,7 @@ def join_things(fields, deleted=False, spam=True):
     mr_reduce(process)
     # Print to stderr to avoid getting this caught up in the pipe of
     # compute_time_listings.
-    print('%s items processed, %s skipped' % (, file=sys.stderr)
-                         counters['processed'], counters['skipped'])
+    print(f'{counters["processed"]} items processed, {counters["skipped"]} skipped', file=sys.stderr)
 
 class Mapper(object):
     def __init__(self):
