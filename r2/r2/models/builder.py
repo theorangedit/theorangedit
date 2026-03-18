@@ -269,7 +269,7 @@ class Builder(object):
                     w.banner = ban_info.get('banner')
                     w.banned_at = ban_info.get("banned_at", None)
                     if ban_info.get('note', None) and w.banner:
-                        w.banner += ' (%s)' % ban_info['note']
+                        w.banner += f" ({ban_info['note']})"
                     w.use_big_modbuttons = True
                     if getattr(w, "author", None) and w.author._spam:
                         w.show_spam = "author"
@@ -1096,9 +1096,9 @@ class CommentOrderer(CommentOrdererBase):
                         break
                 else:
                     sort_name = "None"
-                g.stats.simple_event("CommentOrderer.100_plus_sort.%s" % sort_name)
+                g.stats.simple_event(f"CommentOrderer.100_plus_sort.{sort_name}")
 
-            timer_name = "CommentOrderer.by_num_comments.%s" % bucket
+            timer_name = f"CommentOrderer.by_num_comments.{bucket}"
             with g.stats.get_timer(timer_name) as timer:
                 return self._get_comment_order()
 

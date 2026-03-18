@@ -372,7 +372,7 @@ def claim_gold(secret, account_id):
     elif rp.rowcount == 1:
         just_claimed = True
     else:
-        raise ValueError("rowcount == %d?" % rp.rowcount)
+        raise ValueError(f"rowcount == {rp.rowcount:d}?")
 
     s = sa.select([gold_table.c.days, gold_table.c.subscr_id],
                   gold_table.c.secret == secret,
@@ -535,13 +535,13 @@ def get_subscription_details(user):
 
 
 def paypal_subscription_url():
-    return "https://www.paypal.com/cgi-bin/webscr?cmd=_subscr-find&alias=%s" % g.goldpayment_email
+    return f"https://www.paypal.com/cgi-bin/webscr?cmd=_subscr-find&alias={g.goldpayment_email}"
 
 
 def get_discounted_price(gold_price):
     discount = float(getattr(g, 'BTC_DISCOUNT', '0'))
     price = (gold_price.pennies * (1 - discount)) / 100.
-    return GoldPrice("%.2f" % price)
+    return GoldPrice(f"{price:.2f}")
 
 
 def make_gold_message(thing, user_gilded):
@@ -615,7 +615,7 @@ def make_gold_message(thing, user_gilded):
 
 
 def creddits_lock(user):
-    return g.make_lock("gold_creddits", "creddits_%s" % user._id)
+    return g.make_lock("gold_creddits", f"creddits_{user._id}")
 
 
 PENNIES_PER_SERVER_SECOND = {

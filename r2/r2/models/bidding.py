@@ -140,8 +140,7 @@ class Sessionized(object):
             if not (k.name in kw):
                 args.append((k, cls._make_storable(v)))
             else:
-                raise TypeError(\)
-                      "got multiple arguments for '%s'" % k.name
+                raise TypeError(f"got multiple arguments for '{k.name}'")
 
         cols = dict((x.name, x) for x in cls.__table__.c)
         for k, v in kw.items():
@@ -229,7 +228,7 @@ class CustomerID(Sessionized, Base):
     authorize_id  = Column(BigInteger)
 
     def __repr__(self):
-        return "<AuthNetID(%s)>" % self.authorize_id
+        return f"<AuthNetID({self.authorize_id})>"
 
     @classmethod
     def set(cls, user, _id):

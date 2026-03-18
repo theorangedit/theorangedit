@@ -62,7 +62,7 @@ class PriorityLevel(object):
     inventory_override = False
 
     def __repr__(self):
-        return "<PriorityLevel %s>" % self.name
+        return f"<PriorityLevel {self.name}>"
 
     @property
     def text(self):
@@ -458,7 +458,7 @@ class PromoCampaign(Thing):
 
     def priority_name_from_priority(self, priority):
         if not priority in PROMOTE_PRIORITIES.values():
-            raise ValueError("%s is not a valid priority" % priority.name)
+            raise ValueError(f"{priority.name} is not a valid priority")
         return priority.name
 
     @classmethod
