@@ -446,7 +446,7 @@ class ApiController(RedditController):
         resubmit=VBoolean('resubmit'),
     )
     @api_doc(api_section.links_and_comments)
-    def POST_submit(self, form, jquery, url, selftext, kind, title,
+    async def POST_submit(self, form, jquery, url, selftext, kind, title,
                     sr, extension, sendreplies, resubmit):
         """Submit a link to a subreddit.
 
@@ -559,7 +559,7 @@ class ApiController(RedditController):
             ban = is_banned_domain(url)
             if ban:
                 g.stats.simple_event('spam.domainban.link_url')
-                admintools.spam(l, banner = f"domain ({ban.banmsg})")
+                await admintools.spam(l, banner = f"domain ({ban.banmsg})")
                 hooks.get_hook('banned_domain.submit').call(item=l, url=url,
                                                             ban=ban)
 
@@ -1677,7 +1677,7 @@ class ApiController(RedditController):
         other_reason=VLength('other_reason', max_length=100, empty_error=None),
     )
     @api_doc(api_section.links_and_comments)
-    def POST_report(self, form, jquery, thing, reason, site_reason, other_reason):
+    async def POST_report(self, form, jquery, thing, reason, site_reason, other_reason):
         """Report a link, comment or message.
 
         Reporting a thing brings it to the attention of the subreddit's
@@ -1719,7 +1719,7 @@ class ApiController(RedditController):
             if (c.user._id != thing.to_id and
                     not (sr and c.user._id in sr.moderator_ids())):
                 abort(403)
-            admintools.spam(thing, False, True, c.user.name)
+            await admintools.spam(thing, False, True, c.user.name)
         # auto-hide links that are reported
         elif isinstance(thing, Link):
             # don't hide items from admins/moderators when reporting
@@ -1739,7 +1739,7 @@ class ApiController(RedditController):
         if not (c.user._spam or
                 c.user.ignorereports or
                 (sr and sr.is_banned(c.user))):
-            Report.new(c.user, thing, reason)
+            await Report.new(c.user, thing, reason)
             admintools.report(thing)
 
         g.events.report_event(
@@ -3024,7 +3024,7 @@ class ApiController(RedditController):
                 thing = VByName('id'),
                 spam = VBoolean('spam', default=True))
     @api_doc(api_section.moderation)
-    def POST_remove(self, thing, spam):
+    async def POST_remove(self, thing, spam):
         """Remove a link, comment, or modmail message.
 
         If the thing is a link, it will be removed from all subreddit listings.
@@ -3054,7 +3054,7 @@ class ApiController(RedditController):
             train_spam = False
         elif filtered and not spam:
             kw['details'] = 'remove'
-            admintools.unspam(thing, unbanner=c.user.name, insert=False)
+            await admintools.unspam(thing, unbanner=c.user.name, insert=False)
             train_spam = False
         elif not filtered and spam:
             kw['details'] = 'spam'
@@ -3063,7 +3063,7 @@ class ApiController(RedditController):
             kw['details'] = 'remove'
             train_spam = False
 
-        admintools.spam(thing, auto=False,
+        await admintools.spam(thing, auto=False,
                         moderator_banned=not c.user_is_admin,
                         banner=c.user.name,
                         train_spam=train_spam)
@@ -3085,7 +3085,7 @@ class ApiController(RedditController):
                 VSrCanBan('id'),
                 thing = VByName('id'))
     @api_doc(api_section.moderation)
-    def POST_approve(self, thing):
+    async def POST_approve(self, thing):
         """Approve a link or comment.
 
         If the thing was removed, it will be re-inserted into appropriate
@@ -3112,7 +3112,7 @@ class ApiController(RedditController):
             train_spam = False
             insert = False
 
-        admintools.unspam(thing, moderator_unbanned=not c.user_is_admin,
+        await admintools.unspam(thing, moderator_unbanned=not c.user_is_admin,
                           unbanner=c.user.name, train_spam=train_spam,
                           insert=insert)
 
@@ -3949,7 +3949,7 @@ class ApiController(RedditController):
                    text = VFlairText("text"),
                    css_class = VFlairCss("css_class"))
     @api_doc(api_section.flair, uses_site=True)
-    def POST_flair(self, form, jquery, user, link, text, css_class):
+    async def POST_flair(self, form, jquery, user, link, text, css_class):
         if form.has_errors('css_class', errors.BAD_CSS_NAME):
             form.set_text(".status:first", _('invalid css class'))
             return
@@ -4001,7 +4001,7 @@ class ApiController(RedditController):
         user=VFlairAccount("name"),
     )
     @api_doc(api_section.flair, uses_site=True)
-    def POST_deleteflair(self, form, jquery, user):
+    async def POST_deleteflair(self, form, jquery, user):
         if form.has_errors('name', errors.USER_DOESNT_EXIST, errors.NO_USER):
             return
 
@@ -4023,7 +4023,7 @@ class ApiController(RedditController):
             docs={"flair_csv": "comma-seperated flair information"}),
     )
     @api_doc(api_section.flair, uses_site=True)
-    def POST_flaircsv(self, flair_csv):
+    async def POST_flaircsv(self, flair_csv):
         """Change the flair of multiple users in the same subreddit with a
         single API call.
 
@@ -4274,7 +4274,7 @@ class ApiController(RedditController):
         link=VFlairLink('link'),
     )
     @api_doc(api_section.flair, uses_site=True)
-    def POST_flairselector(self, user, link):
+    async def POST_flairselector(self, user, link):
         """Return information about a users's flair options.
 
         If `link` is given, return link flair options.
@@ -4320,7 +4320,7 @@ class ApiController(RedditController):
                    flair_template_id = nop('flair_template_id'),
                    text = VFlairText('text'))
     @api_doc(api_section.flair, uses_site=True)
-    def POST_selectflair(self, form, jquery, user, link, flair_template_id,
+    async def POST_selectflair(self, form, jquery, user, link, flair_template_id,
                          text):
         if link:
             flair_type = LINK_FLAIR

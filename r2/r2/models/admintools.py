@@ -54,14 +54,14 @@ admintools_hooks = HookRegistrar()
 
 class AdminTools(object):
 
-    def spam(self, things, auto=True, moderator_banned=False,
+    async def spam(self, things, auto=True, moderator_banned=False,
              banner=None, date=None, train_spam=True, **kw):
         from r2.lib.db import queries
 
         all_things = tup(things)
         new_things = [x for x in all_things if not x._spam]
 
-        Report.accept(all_things, True)
+        await Report.accept(all_things, True)
 
         for t in all_things:
             if getattr(t, "promoted", None) is not None:
@@ -96,7 +96,7 @@ class AdminTools(object):
             ban_info['note'] = note
 
             t.ban_info = ban_info
-            t._commit()
+            await t._commit()
 
             if auto:
                 amqp.add_item("auto_removed", t._fullname)
@@ -116,7 +116,7 @@ class AdminTools(object):
             elif isinstance(t, Link):
                 amqp.add_item("removed_link", t._fullname)
 
-    def unspam(self, things, moderator_unbanned=True, unbanner=None,
+    async def unspam(self, things, moderator_unbanned=True, unbanner=None,
                train_spam=True, insert=True):
         from r2.lib.db import queries
 
@@ -133,7 +133,7 @@ class AdminTools(object):
         if len(things) > 1:
             things = [x for x in things if x._spam]
 
-        Report.accept(things, False)
+        await Report.accept(things, False)
         for t in things:
             ban_info = copy(getattr(t, 'ban_info', {}))
             ban_info['unbanned_at'] = datetime.now(g.tz)
@@ -149,7 +149,7 @@ class AdminTools(object):
                 t.verdict = 'mod-approved'
             else:
                 t.verdict = 'admin-approved'
-            t._commit()
+            await t._commit()
 
             if isinstance(t, Comment):
                 amqp.add_item("approved_comment", t._fullname)

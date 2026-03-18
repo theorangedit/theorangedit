@@ -146,6 +146,8 @@ class LinkReport(Base):
     account_id: Mapped[int] = mapped_column(BigInteger, ForeignKey('accounts.id', ondelete='CASCADE'), primary_key=True)
     link_id: Mapped[int] = mapped_column(BigInteger, ForeignKey('links.id', ondelete='CASCADE'), primary_key=True)
     reason: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    # -1 = rejected, 0 = unactioned, 1 = accepted
+    state: Mapped[int] = mapped_column(Integer, default=0)
     date: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
 
@@ -155,6 +157,7 @@ class CommentReport(Base):
     account_id: Mapped[int] = mapped_column(BigInteger, ForeignKey('accounts.id', ondelete='CASCADE'), primary_key=True)
     comment_id: Mapped[int] = mapped_column(BigInteger, ForeignKey('comments.id', ondelete='CASCADE'), primary_key=True)
     reason: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    state: Mapped[int] = mapped_column(Integer, default=0)
     date: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
 
@@ -199,6 +202,27 @@ class SubscriptionByDay(Base):
     sr_id: Mapped[int] = mapped_column(BigInteger, ForeignKey('subreddits.id', ondelete='CASCADE'), nullable=False, index=True)
     date: Mapped[date] = mapped_column(Date, nullable=False)
     delta: Mapped[int] = mapped_column(Integer, default=0)
+
+
+class SubredditReport(Base):
+    __tablename__ = 'subreddit_reports'
+
+    account_id: Mapped[int] = mapped_column(BigInteger, ForeignKey('accounts.id', ondelete='CASCADE'), primary_key=True)
+    sr_id: Mapped[int] = mapped_column(BigInteger, ForeignKey('subreddits.id', ondelete='CASCADE'), primary_key=True)
+    reason: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    # -1 = rejected, 0 = unactioned, 1 = accepted
+    state: Mapped[int] = mapped_column(Integer, default=0)
+    date: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
+class MessageReport(Base):
+    __tablename__ = 'message_reports'
+
+    account_id: Mapped[int] = mapped_column(BigInteger, ForeignKey('accounts.id', ondelete='CASCADE'), primary_key=True)
+    message_id: Mapped[int] = mapped_column(BigInteger, ForeignKey('messages.id', ondelete='CASCADE'), primary_key=True)
+    reason: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    state: Mapped[int] = mapped_column(Integer, default=0)
+    date: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
 
 class UserFlair(Base):

@@ -19,171 +19,141 @@
 # All portions of the code written by reddit are Copyright (c) 2006-2015 reddit
 # Inc. All Rights Reserved.
 ###############################################################################
+"""
+Report model — PostgreSQL-backed, fully async.
+
+The four legacy Relation sub-classes (_LinkReport, _CommentReport,
+_SubredditReport, _MessageReport) and the MultiRelation base have been
+replaced by four ORM tables in r2.models.orm.relations.  All public methods
+on Report are now async.
+"""
+
+from __future__ import annotations
 
 from collections import Counter
-
-from r2.lib.db.thing import Relation, MultiRelation
-from r2.lib.utils import tup
-from r2.models import Link, Comment, Message, Subreddit, Account
+from typing import Optional
 
 from r2.lib.context import c
 from r2.lib.app_globals import g
+from r2.models import Account
+import r2.services.reports as _svc
 
 
-_LinkReport = Relation(Account, Link)
-_CommentReport = Relation(Account, Comment)
-_SubredditReport = Relation(Account, Subreddit)
-_MessageReport = Relation(Account, Message)
-REPORT_RELS = (_LinkReport, _CommentReport, _SubredditReport, _MessageReport)
-
-for report_cls in REPORT_RELS:
-    report_cls._cache = g.thingcache
-
-_LinkReport._cache_prefix = classmethod(lambda cls: "reportlink:")
-_CommentReport._cache_prefix = classmethod(lambda cls: "reportcomment:")
-_SubredditReport._cache_prefix = classmethod(lambda cls: "reportsr:")
-_MessageReport._cache_prefix = classmethod(lambda cls: "reportmessage:")
-
-
-class Report(MultiRelation('report', *REPORT_RELS)):
-    _field = 'reported'
+class Report:
+    """Async proxy for the report tables."""
 
     @classmethod
-    def new(cls, user, thing, reason=None):
+    async def new(cls, user, thing, reason: Optional[str] = None):
+        """File a report by *user* against *thing*.
+
+        Increments thing.reported, queues cache updates, and fires the
+        new_report AMQP event.  Returns None if the report was a duplicate.
+        """
         from r2.lib.db import queries
 
-        # check if this report exists already!
-        rel = cls.rel(user, thing)
-        q = rel._fast_query(user, thing, ['-1', '0', '1'])
-        q = [ report for (tupl, report) in q.items() if report ]
-        if q:
-            # stop if we've seen this before, so that we never get the
-            # same report from the same user twice
-            oldreport = q[0]
-            g.log.debug("Ignoring duplicate report %s" % oldreport)
-            return oldreport
+        proxy = await _svc.new_report(c.db, account_id=user._id, thing=thing, reason=reason)
+        if proxy is None:
+            g.log.debug("Ignoring duplicate report on %r", thing)
+            return None
 
-        kw = {}
-        if reason:
-            kw['reason'] = reason
+        # Increment reported counter on the thing
+        thing.reported = getattr(thing, 'reported', 0) + 1
+        await thing._commit()
 
-        r = Report(user, thing, '0', **kw)
-
-        # mark item as reported
-        try:
-            thing._incr(cls._field)
-        except (ValueError, TypeError):
-            g.log.error("%r has bad field %r = %r" % (thing, cls._field,
-                         getattr(thing, cls._field, "(nonexistent)")))
-            raise
-
-        r._commit()
-
+        # Increment reported counter on the author if applicable
         if hasattr(thing, 'author_id'):
-            author = Account._byID(thing.author_id, data=True)
-            author._incr('reported')
+            author = await Account._byID(thing.author_id, data=True)
+            author.reported = getattr(author, 'reported', 0) + 1
+            await author._commit()
 
         if not getattr(thing, "ignore_reports", False):
-            # update the reports queue if it exists
-            queries.new_report(thing, r)
+            queries.new_report(thing, proxy)
 
-            # if the thing is already marked as spam, accept the report
             if thing._spam:
-                cls.accept(thing)
+                await cls.accept(thing)
 
-        return r
-
-    @classmethod
-    def for_thing(cls, thing):
-        rel = cls.rel(Account, thing.__class__)
-        rels = rel._query(rel.c._thing2_id == thing._id, data=True)
-
-        return list(rels)
+        return proxy
 
     @classmethod
-    def accept(cls, things, correct = True):
+    async def for_thing(cls, thing) -> list:
+        """Return all report proxies for *thing*."""
+        return await _svc.get_reports_for_thing(c.db, thing)
+
+    @classmethod
+    async def accept(cls, things, correct: bool = True) -> None:
+        """Mark reports on *things* as accepted (correct=True) or rejected."""
+        from r2.lib.utils import tup
         from r2.lib.db import queries
 
         things = tup(things)
+        await _svc.accept_reports(c.db, things, correct=correct)
 
-        things_by_cls = {}
+        # Flush state changes (reported=0 was set inside accept_reports)
         for thing in things:
-            things_by_cls.setdefault(thing.__class__, []).append(thing)
+            await thing._commit()
 
-        for thing_cls, cls_things in things_by_cls.items():
-            to_clear = []
-            # look up all of the reports for each thing
-            rel_cls = cls.rel(Account, thing_cls)
-            thing_ids = [t._id for t in cls_things]
-            rels = rel_cls._query(rel_cls.c._thing2_id == thing_ids)
-            for r in rels:
-                if r._name == '0':
-                    r._name = '1' if correct else '-1'
-                    r._commit()
-
-            for thing in cls_things:
-                if thing.reported > 0:
-                    thing.reported = 0
-                    thing._commit()
-                    to_clear.append(thing)
-
-            queries.clear_reports(to_clear, rels)
+        queries.clear_reports(things, [])
 
     @classmethod
-    def get_reports(cls, wrapped, max_user_reasons=20):
-        """Get two lists of mod and user reports on the item."""
-        if (wrapped.reported > 0 and
+    async def get_reports(cls, wrapped, max_user_reasons: int = 20):
+        """Return (mod_reports, user_reports) for a wrapped item.
+
+        mod_reports: list of (reason, mod_name) tuples
+        user_reports: list of (reason, count) tuples
+        """
+        if not (wrapped.reported > 0 and
                 (wrapped.can_ban or
                  getattr(wrapped, "promoted", None) and c.user_is_sponsor)):
-            from r2.models import SRMember
-
-            reports = cls.for_thing(wrapped.lookups[0])
-
-            query = SRMember._query(SRMember.c._thing1_id == wrapped.sr_id,
-                                    SRMember.c._name == "moderator")
-            mod_dates = {rel._thing2_id: rel._date for rel in query}
-
-            if g.automoderator_account:
-                automoderator = Account._by_name(g.automoderator_account)
-            else:
-                automoderator = None
-
-            mod_reports = []
-            user_reports = []
-
-            for report in reports:
-                # always include AutoModerator reports
-                if automoderator and report._thing1_id == automoderator._id:
-                    mod_reports.append(report)
-                # include in mod reports if made after the user became a mod
-                elif (report._thing1_id in mod_dates and
-                        report._date >= mod_dates[report._thing1_id]):
-                    mod_reports.append(report)
-                else:
-                    user_reports.append(report)
-
-            # mod reports return as tuples with (reason, name)
-            mods = Account._byID([report._thing1_id
-                                  for report in mod_reports],
-                                 data=True, return_dict=True)
-            mod_reports = [(getattr(report, "reason", None),
-                            mods[report._thing1_id].name)
-                            for report in mod_reports]
-
-            # user reports return as tuples with (reason, count)
-            user_reports = Counter([getattr(report, "reason", None)
-                                    for report in user_reports])
-            user_reports = user_reports.most_common(max_user_reasons)
-
-            return mod_reports, user_reports
-        else:
             return [], []
+
+        reports = await cls.for_thing(wrapped.lookups[0])
+
+        if g.automoderator_account:
+            automoderator = await Account._by_name(g.automoderator_account)
+        else:
+            automoderator = None
+
+        # Moderator date lookup — SubredditModerator table
+        from r2.models.orm.relations import SubredditModerator
+        from sqlalchemy import select
+        mod_rows = await c.db.execute(
+            select(SubredditModerator).where(
+                SubredditModerator.sr_id == wrapped.sr_id
+            )
+        )
+        mod_dates = {row.account_id: row.date for row in mod_rows.scalars().all()}
+
+        mod_report_proxies = []
+        user_reports = []
+
+        for report in reports:
+            if automoderator and report._thing1_id == automoderator._id:
+                mod_report_proxies.append(report)
+            elif (report._thing1_id in mod_dates and
+                    report._date >= mod_dates[report._thing1_id]):
+                mod_report_proxies.append(report)
+            else:
+                user_reports.append(report)
+
+        mods = await Account._byID(
+            [r._thing1_id for r in mod_report_proxies],
+            data=True,
+            return_dict=True,
+        )
+        mod_reports = [
+            (report.reason, mods[report._thing1_id].name)
+            for report in mod_report_proxies
+        ]
+
+        user_reports = Counter(r.reason for r in user_reports)
+        user_reports = user_reports.most_common(max_user_reasons)
+
+        return mod_reports, user_reports
 
     @classmethod
     def get_reasons(cls, wrapped):
-        """Transition method in case API clients were already using this."""
+        """Deprecated — returns a deprecation notice if the item has reports."""
         if wrapped.can_ban and wrapped.reported > 0:
             return [("This attribute is deprecated. Please use mod_reports "
                      "and user_reports instead.")]
-        else:
-            return []
+        return []
