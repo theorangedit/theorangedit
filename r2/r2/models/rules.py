@@ -20,25 +20,8 @@
 # Inc. All Rights Reserved.
 ###############################################################################
 
-import json
-import pytz
-import time
-from datetime import datetime
-# pycassa removed (Cassandra removed in Phase 10) — raise on use so callers surface immediately
-ASCII_TYPE = UTF8_TYPE = TIME_UUID_TYPE = INT_TYPE = 'UTF8Type'  # schema constants — dead code
-class NotFoundException(Exception): pass
-class LongType:
-    def __init__(self, *a, **kw): raise NotImplementedError('pycassa removed')
-class IntegerType:
-    def __init__(self, *a, **kw): raise NotImplementedError('pycassa removed')
-class Mutator:
-    def __init__(self, *a, **kw): raise NotImplementedError('pycassa.batch.Mutator removed — use service layer')
-    def __enter__(self): raise NotImplementedError('pycassa.batch.Mutator removed')
-    def __exit__(self, *a): pass
-def convert_uuid_to_time(u): raise NotImplementedError('pycassa.util.convert_uuid_to_time removed')
+from r2.lib.context import c
 from r2.lib.i18n import _
-
-from r2.lib.db import tdb_cassandra
 
 OLD_SITEWIDE_RULES = [
     _("spam"),
@@ -56,178 +39,49 @@ SITEWIDE_RULES = [
 MAX_RULES_PER_SUBREDDIT = 10
 
 
-class SubredditRules(tdb_cassandra.View):
-    _use_db = True
-    _extra_schema_creation_args = {
-        "key_validation_class": UTF8_TYPE,
-        "column_name_class": UTF8_TYPE,
-        "default_validation_class": UTF8_TYPE,
-    }
-    _compare_with = UTF8_TYPE
-    _read_consistency_level = tdb_cassandra.CL.ONE
-    _write_consistency_level = tdb_cassandra.CL.ONE
-    _connection_pool = "main"
+class SubredditRules:
+    """Async wrapper for subreddit rules, backed by the subreddit_rules table."""
 
-    @classmethod
-    def get_rule_blob(self, short_name, description, priority, kind,
-            created_utc=None):
-        if not created_utc:
-            created_utc = time.mktime(datetime.now(pytz.UTC).timetuple())
-
-        rule_params = {
-            "description": description,
-            "priority": priority,
-            "created_utc": created_utc,
+    @staticmethod
+    def _to_dict(rule) -> dict:
+        return {
+            "short_name": rule.short_name,
+            "description": rule.description or "",
+            "priority": rule.rule_order,
+            "created_utc": 0,
+            "kind": rule.kind,
         }
-        if kind and kind != 'all':
-            rule_params["kind"] = kind
-
-        jsonpacked = json.dumps(rule_params)
-        blob = {short_name: jsonpacked}
-        return blob
 
     @classmethod
-    def create(self, subreddit, short_name, description, kind=None,
-            created_utc=None):
-        """Create a rule and append to the end of the priority list."""
-        try:
-            priority = len(list(self._cf.get(subreddit._id36)))
-        except tdb_cassandra.NotFoundException:
-            priority = 0
-
-        if priority >= MAX_RULES_PER_SUBREDDIT:
-            return
-
-        blob = self.get_rule_blob(short_name, description, priority,
-            kind, created_utc)
-        self._set_values(subreddit._id36, blob)
+    async def create(cls, subreddit, short_name, description, kind=None, created_utc=None):
+        import r2.services.rules as _svc
+        return await _svc.create_rule(
+            c.db, subreddit.id, short_name, description or "", kind or 'all')
 
     @classmethod
-    def remove_rule(self, subreddit, short_name):
-        """Remove a rule and update priorities of remaining rules."""
-        self._remove(subreddit._id36, [short_name])
-
-        rules = self.get_rules(subreddit)
-        blobs = {}
-        for index, rule in enumerate(rules):
-            if rule["priority"] != index:
-                blobs.update(self.get_rule_blob(
-                    short_name=rule["short_name"],
-                    description=rule["description"],
-                    priority=index,
-                    kind=rule.get("kind"),
-                    created_utc=rule["created_utc"],
-                ))
-        self._set_values(subreddit._id36, blobs)
+    async def remove_rule(cls, subreddit, short_name):
+        import r2.services.rules as _svc
+        await _svc.delete_rule(c.db, subreddit.id, short_name)
 
     @classmethod
-    def update(self, subreddit, old_short_name, short_name, description,
-            kind=None):
-        """Update the short_name or description of a rule."""
-        rules = self._cf.get(subreddit._id36)
-        if old_short_name != short_name:
-            old_rule = rules.get(old_short_name, None)
-            self._remove(subreddit._id36, [old_short_name])
-        else:
-            old_rule = rules.get(short_name, None)
-        if not old_rule:
-            return False
-
-        old_rule = json.loads(old_rule)
-        if not old_rule.get("created_utc"):
-                old_rule["created_utc"] = time.mktime(
-                    datetime.strptime(
-                        old_rule.pop("when")[:-6], "%Y-%m-%d %H:%M:%S.%f"
-                    ).timetuple())
-
-        blob = self.get_rule_blob(
-            short_name=short_name,
-            description=description,
-            priority=old_rule["priority"],
-            kind=kind,
-            created_utc=old_rule["created_utc"],
-        )
-        self._set_values(subreddit._id36, blob)
+    async def update(cls, subreddit, old_short_name, short_name, description, kind=None):
+        import r2.services.rules as _svc
+        return await _svc.update_rule(
+            c.db, subreddit.id, old_short_name, short_name, description or "", kind or 'all')
 
     @classmethod
-    def reorder(self, subreddit, short_name, priority):
-        """Update the priority spot of a rule
-
-        Move an existing rule to the desired spot in the rules
-        list and then update the priority of the rules.
-        """
-        rule_to_reorder = self.get_rule(subreddit, short_name)
-        if not rule_to_reorder:
-            return False
-
-        self._remove(subreddit._id36, [short_name])
-        rules = self.get_rules(subreddit)
-
-        priority = min(priority, len(rules))
-        current_priority_index = 0
-        blobs = {}
-        blobs.update(self.get_rule_blob(
-                short_name=rule_to_reorder["short_name"],
-                description=rule_to_reorder["description"],
-                priority=priority,
-                kind=rule_to_reorder.get("kind"),
-                created_utc=rule_to_reorder["created_utc"],
-        ))
-
-        for rule in rules:
-            # Placeholder for rule_to_reorder's new priority
-            if priority == current_priority_index:
-                current_priority_index += 1
-
-            if rule["priority"] != current_priority_index:
-                blobs.update(self.get_rule_blob(
-                    short_name=rule["short_name"],
-                    description=rule["description"],
-                    priority=current_priority_index,
-                    kind=rule.get("kind"),
-                    created_utc=rule["created_utc"],
-                ))
-            current_priority_index += 1
-        self._set_values(subreddit._id36, blobs)
+    async def reorder(cls, subreddit, short_name, priority):
+        import r2.services.rules as _svc
+        return await _svc.reorder_rule(c.db, subreddit.id, short_name, priority)
 
     @classmethod
-    def get_rule(self, subreddit, short_name):
-        """Return rule associated with short_name or None."""
-        try:
-            rules = self._cf.get(subreddit._id36)
-        except tdb_cassandra.NotFoundException:
-            return None
-        rule = rules.get(short_name, None)
-        if not rule:
-            return None
-        rule = json.loads(rule)
-        rule["short_name"] = short_name
-        return rule
+    async def get_rule(cls, subreddit, short_name):
+        import r2.services.rules as _svc
+        rule = await _svc.get_rule(c.db, subreddit.id, short_name)
+        return cls._to_dict(rule) if rule else None
 
     @classmethod
-    def get_rules(self, subreddit, kind=None):
-        """Return list of rules sorted by priority.
-
-        If kind is empty, then all the rules apply.
-        """
-        try:
-            query = self._cf.get(subreddit._id36)
-        except tdb_cassandra.NotFoundException:
-            return []
-
-        result = []
-        for uuid, json_blob in query.items():
-            payload = json.loads(json_blob)
-            if not payload.get("created_utc"):
-                payload["created_utc"] = time.mktime(
-                    datetime.strptime(
-                        payload.pop("when")[:-6], "%Y-%m-%d %H:%M:%S.%f"
-                    ).timetuple())
-            payload["short_name"] = uuid
-
-            if not kind:
-                result.append(payload)
-            elif kind in payload.get("kind", kind):
-                result.append(payload)
-
-        return sorted(result, key=lambda t: t["priority"])
+    async def get_rules(cls, subreddit, kind=None):
+        import r2.services.rules as _svc
+        rules = await _svc.get_rules(c.db, subreddit.id, kind)
+        return [cls._to_dict(r) for r in rules]
