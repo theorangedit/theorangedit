@@ -86,15 +86,13 @@ class MailgunEmailProvider(EmailProvider):
         )
 
         if response.status_code != 200:
-            msg = "mailgun sending email failed {status}: {text}".format(
-                status=response.status_code, text=response.text)
+            msg = f"mailgun sending email failed {response.status_code}: {response.text}"
             raise EmailSendError(msg)
 
         try:
             body = json.loads(response.text)
         except ValueError:
-            msg = "mailgun sending email bad response {status}: {text}".format(
-                status=response.status_code, text=response.text)
+            msg = f"mailgun sending email bad response {response.status_code}: {response.text}"
             g.stats.simple_event("mailgun.outgoing.failure")
             raise EmailSendError(msg)
 

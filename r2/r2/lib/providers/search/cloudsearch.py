@@ -207,11 +207,10 @@ class CloudSearchUploader(object):
                 delta=len(warnings))
 
         if not quiet:
-            print("%s Changes: +%i -%i" % (self.__class__.__name__,)
-                                           adds, deletes)
+            print(f"{self.__class__.__name__} Changes:", f"+{adds} -{deletes}")
             if len(warnings):
-                print("%s Warnings: %s" % (self.__class__.__name__,)
-                                           "; ".join(warnings))
+                print(f"{self.__class__.__name__} Warnings:",
+                      "; ".join(warnings))
 
         return cs_time
 
@@ -310,7 +309,7 @@ def chunk_xml(xml, depth=0):
         yield data
     else:
         depth += 1
-        print("WARNING: Chunking (depth=%s)" % depth)
+        print(f"WARNING: Chunking (depth={depth})")
         half = len(xml) // 2
         left_half = xml # for ease of reading
         right_half = etree.Element("batch")
@@ -346,11 +345,10 @@ def _run_changed(msgs, chan):
 
     totaltime = (datetime.now(g.tz) - start).total_seconds()
 
-    print ("%s: %d messages in %.2fs seconds (%.2fs secs waiting on "
-           "cloudsearch); %d duplicates, %s remaining)" %
-           (start, len(changed), totaltime, cloudsearch_time,
-            len(changed) - len(link_fns | sr_fns),
-            msgs[-1].delivery_info.get('message_count', 'unknown')))
+    print(f"{start}: {len(changed)} messages in {totaltime:.2f}s seconds "
+          f"({cloudsearch_time:.2f}s secs waiting on cloudsearch); "
+          f"{len(changed) - len(link_fns | sr_fns)} duplicates, "
+          f"{msgs[-1].delivery_info.get('message_count', 'unknown')} remaining)")
 
 
 async def run_changed(drain=False, min_size=500, limit=1000, sleep_time=10,
@@ -367,7 +365,7 @@ async def run_changed(drain=False, min_size=500, limit=1000, sleep_time=10,
 
 
 def _progress_key(item):
-    return "%s/%s" % (item._id, item._date)
+    return f"{item._id}/{item._date}"
 
 
 def rebuild_link_index(start_at=None, sleeptime=1, cls=Link,
@@ -392,7 +390,7 @@ def rebuild_link_index(start_at=None, sleeptime=1, cls=Link,
             try:
                 uploader.inject()
             except httplib.HTTPException as err:
-                print("Got %s, sleeping %s secs" % (err, x))
+                print(f"Got {err}, sleeping {x} secs")
                 time.sleep(x)
                 continue
             else:
@@ -400,7 +398,7 @@ def rebuild_link_index(start_at=None, sleeptime=1, cls=Link,
         else:
             raise err
         last_update = chunk[-1]
-        print("last updated %s" % last_update._fullname)
+        print(f"last updated {last_update._fullname}")
         time.sleep(sleeptime)
 
 
@@ -516,13 +514,13 @@ def _encode_query(query, bq, faceting, size, start, rank, rank_expressions,
         params["rank"] = rank
     if rank_expressions:
         for rank, expression in rank_expressions.items():
-            params['rank-%s' % rank] = expression
+            params[f'rank-{rank}'] = expression
     if faceting:
         params["facet"] = ",".join(faceting.keys())
         for facet, options in faceting.items():
-            params["facet-%s-top-n" % facet] = options.get("count", 20)
+            params[f"facet-{facet}-top-n"] = options.get("count", 20)
             if "sort" in options:
-                params["facet-%s-sort" % facet] = options["sort"]
+                params[f"facet-{facet}-sort"] = options["sort"]
     if return_fields:
         params["return-fields"] = ",".join(return_fields)
     encoded_query = urllib.parse.urlencode(params)
@@ -544,7 +542,7 @@ class CloudSearchQuery(object):
         if syntax is None:
             syntax = self.default_syntax
         elif syntax not in self.known_syntaxes:
-            raise ValueError("Unknown search syntax: %s" % syntax)
+            raise ValueError(f"Unknown search syntax: {syntax}")
         self.syntax = syntax
 
         self.query = filters._force_unicode(query or u'')
@@ -758,20 +756,19 @@ class LinkSearchQuery(CloudSearchQuery):
         if isinstance(sr, MultiReddit):
             if not sr.sr_ids:
                 raise InvalidQuery
-            srs = ["sr_id:%s" % sr_id for sr_id in sr.sr_ids]
-            return "(or %s)" % ' '.join(srs)
+            srs = [f"sr_id:{sr_id}" for sr_id in sr.sr_ids]
+            return f"(or {' '.join(srs)})"
         elif isinstance(sr, DomainSR):
-            return "site:'\"%s\"'" % sr.domain
+            return f"site:'\"{sr.domain}\"'"
         elif isinstance(sr, FriendsSR):
             if not c.user_is_loggedin or not c.user.friends:
                 raise InvalidQuery
             # The query limit is roughly 8k bytes. Limit to 200 friends to
             # avoid getting too close to that limit
             friend_ids = c.user.friends[:200]
-            friends = ["author_fullname:'%s'" %
-                       Account._fullname_from_id36(r2utils.to36(id_))
+            friends = [f"author_fullname:'{Account._fullname_from_id36(r2utils.to36(id_))}'"
                        for id_ in friend_ids]
-            return "(or %s)" % ' '.join(friends)
+            return f"(or {' '.join(friends)})"
         elif isinstance(sr, AllMinus):
             if not sr.exclude_sr_ids:
                 raise InvalidQuery

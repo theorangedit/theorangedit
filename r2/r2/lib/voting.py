@@ -39,7 +39,7 @@ from r2.models.vote import Vote, VotesByAccount
 from r2.lib.geoip import organization_by_ips
 
 def prequeued_vote_key(user, item):
-    return 'queuedvote:%s_%s' % (user._id36, item._fullname)
+    return f'queuedvote:{user._id36}_{item._fullname}'
 
 
 def update_vote_lookups(user, thing, direction):
@@ -129,10 +129,7 @@ async def consume_link_vote_queue(qname="vote_link_q"):
         hook = hooks.get_hook('vote.validate_vote_data')
         if hook.call_until_return(msg=msg, vote_data=vote_data) is False:
             # Corrupt records in the queue. Ignore them.
-            print("Ignoring invalid vote by %s on %s %s" % (
-                    vote_data.get('user_id', '<unknown>'),
-                    vote_data.get('thing_fullname', '<unknown>'),
-                    vote_data))
+            print(f"Ignoring invalid vote by {vote_data.get('user_id', '<unknown>')} on {vote_data.get('thing_fullname', '<unknown>')} {vote_data}")
             return
 
         timer = g.stats.get_timer("link_vote_processor")
@@ -143,9 +140,9 @@ async def consume_link_vote_queue(qname="vote_link_q"):
 
         # create the vote and update the voter's liked/disliked under lock so
         # that the vote state and cached query are consistent
-        lock_key = "vote-%s-%s" % (user._id36, link._fullname)
+        lock_key = f"vote-{user._id36}-{link._fullname}"
         with g.make_lock("voting", lock_key, timeout=5):
-            print("Processing vote by %s on %s %s" % (user, link, vote_data))
+            print(f"Processing vote by {user} on {link} {vote_data}")
 
             try:
                 vote = Vote(
@@ -188,7 +185,7 @@ SORTS = ["hot", "top", "controversial"]
 async def add_to_author_query_q(link):
     if g.shard_author_query_queues:
         author_shard = link.author_id % 10
-        queue_name = "author_query_%s_q" % author_shard
+        queue_name = f"author_query_{author_shard}_q"
     else:
         queue_name = "author_query_q"
     await amqp.add_item(queue_name, link._fullname.encode())
@@ -201,7 +198,7 @@ async def consume_author_query_queue(qname="author_query_q", limit=1000):
 
         link_names = {msg.body.decode() if isinstance(msg.body, bytes) else msg.body for msg in msgs}
         links = Link._by_fullname(link_names, return_dict=False)
-        print('Processing %r' % (links,))
+        print(f'Processing {links!r}')
 
         links_by_author_id = defaultdict(list)
         for link in links:
@@ -224,7 +221,7 @@ async def consume_author_query_queue(qname="author_query_q", limit=1000):
 async def add_to_subreddit_query_q(link):
     if g.shard_subreddit_query_queues:
         subreddit_shard = link.sr_id % 10
-        queue_name = "subreddit_query_%s_q" % subreddit_shard
+        queue_name = f"subreddit_query_{subreddit_shard}_q"
     else:
         queue_name = "subreddit_query_q"
     await amqp.add_item(queue_name, link._fullname.encode())
@@ -237,7 +234,7 @@ async def consume_subreddit_query_queue(qname="subreddit_query_q", limit=1000):
 
         link_names = {msg.body.decode() if isinstance(msg.body, bytes) else msg.body for msg in msgs}
         links = Link._by_fullname(link_names, return_dict=False)
-        print('Processing %r' % (links,))
+        print(f'Processing {links!r}')
 
         links_by_sr_id = defaultdict(list)
         for link in links:
@@ -264,7 +261,7 @@ async def add_to_domain_query_q(link):
 
     if g.shard_domain_query_queues:
         domain_shard = hash(parsed.hostname) % 10
-        queue_name = "domain_query_%s_q" % domain_shard
+        queue_name = f"domain_query_{domain_shard}_q"
     else:
         queue_name = "domain_query_q"
     await amqp.add_item(queue_name, link._fullname.encode())
@@ -277,7 +274,7 @@ async def consume_domain_query_queue(qname="domain_query_q", limit=1000):
 
         link_names = {msg.body.decode() if isinstance(msg.body, bytes) else msg.body for msg in msgs}
         links = Link._by_fullname(link_names, return_dict=False)
-        print('Processing %r' % (links,))
+        print(f'Processing {links!r}')
 
         links_by_domain = defaultdict(list)
         for link in links:
@@ -312,10 +309,7 @@ async def consume_comment_vote_queue(qname="vote_comment_q"):
         hook = hooks.get_hook('vote.validate_vote_data')
         if hook.call_until_return(msg=msg, vote_data=vote_data) is False:
             # Corrupt records in the queue. Ignore them.
-            print("Ignoring invalid vote by %s on %s %s" % (
-                    vote_data.get('user_id', '<unknown>'),
-                    vote_data.get('thing_fullname', '<unknown>'),
-                    vote_data))
+            print(f"Ignoring invalid vote by {vote_data.get('user_id', '<unknown>')} on {vote_data.get('thing_fullname', '<unknown>')} {vote_data}")
             return
 
         timer = g.stats.get_timer("comment_vote_processor")
@@ -324,7 +318,7 @@ async def consume_comment_vote_queue(qname="vote_comment_q"):
         user = Account._byID(vote_data.pop("user_id"))
         comment = Comment._by_fullname(vote_data.pop("thing_fullname"))
 
-        print("Processing vote by %s on %s %s" % (user, comment, vote_data))
+        print(f"Processing vote by {user} on {comment} {vote_data}")
 
         try:
             vote = Vote(

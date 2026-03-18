@@ -33,11 +33,11 @@ class tdb_lite(object):
         return metadata
 
     def index_str(self, table, name, on, where = None):
-        index_str = 'create index idx_%s_' % name
+        index_str = f'create index idx_{name}_'
         index_str += table.name
-        index_str += ' on '+ table.name + ' (%s)' % on
+        index_str += ' on '+ table.name + f' ({on})'
         if where:
-            index_str += ' where %s' % where
+            index_str += f' where {where}'
         return index_str
 
     def create_table(self, table, index_commands=None):

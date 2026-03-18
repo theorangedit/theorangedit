@@ -88,7 +88,7 @@ def _stringify_xml(root_element):
 
 def _subreddit_links(subreddits):
     for subreddit in subreddits:
-        path = '/r/{0}/'.format(subreddit)
+        path = f'/r/{subreddit}/'
         yield _absolute_url(path)
 
 
@@ -116,7 +116,6 @@ def sitemap_index(count):
     for i in range(count):
         sitemap_elem = etree.SubElement(sm_elem, 'sitemap')
         loc_elem = etree.SubElement(sitemap_elem, 'loc')
-        url = '{0}/subreddit_sitemap/{1}.xml'.format(
-            g.sitemap_s3_static_host, i)
+        url = f'{g.sitemap_s3_static_host}/subreddit_sitemap/{i}.xml'
         loc_elem.text = url
     return _stringify_xml(sm_elem)

@@ -33,10 +33,7 @@ class ZenDeskProvider(TicketProvider):
     """A provider that interfaces with ZenDesk for managing tickets."""
 
     def build_ticket_url_from_id(self, ticket_id):
-        return '%sagent/tickets/%s' % (
-            g.live_config['ticket_base_url'], 
-            ticket_id,
-        )
+        return f"{g.live_config['ticket_base_url']}agent/tickets/{ticket_id}"
 
     def create(self, 
                subject, 
@@ -73,9 +70,9 @@ class ZenDeskProvider(TicketProvider):
         timer = g.stats.get_timer("providers.zendesk.ticket_create")
         timer.start()
         response = requests.post(
-            '%s/api/v2/tickets.json' % g.live_config['ticket_base_url'], 
+            f"{g.live_config['ticket_base_url']}/api/v2/tickets.json",
             auth=(
-                '%s/token' % g.secrets['zendesk_user'], 
+                f"{g.secrets['zendesk_user']}/token",
                 g.secrets["zendesk_api_key"]
             ),
             headers={'content-type': 'application/json'},
@@ -105,12 +102,9 @@ class ZenDeskProvider(TicketProvider):
         timer = g.stats.get_timer("providers.zendesk.ticket_get")
         timer.start()
         response = requests.get(
-            '%s/api/v2/tickets/%s.json' % (
-                g.live_config['ticket_base_url'], 
-                ticket_id
-            ),
+            f"{g.live_config['ticket_base_url']}/api/v2/tickets/{ticket_id}.json",
             auth=(
-                '%s/token' % g.secrets['zendesk_user'], 
+                f"{g.secrets['zendesk_user']}/token",
                 g.secrets["zendesk_api_key"]
             ),
             headers={'content-type': 'application/json'},
@@ -150,12 +144,9 @@ class ZenDeskProvider(TicketProvider):
         timer = g.stats.get_timer("providers.zendesk.ticket_update")
         timer.start()
         response = requests.put(
-            '%s/api/v2/tickets/%s.json' % (
-                g.live_config['ticket_base_url'], 
-                ticket['id']
-            ),
+            f"{g.live_config['ticket_base_url']}/api/v2/tickets/{ticket['id']}.json",
             auth=(
-                '%s/token' % g.secrets['zendesk_user'], 
+                f"{g.secrets['zendesk_user']}/token",
                 g.secrets["zendesk_api_key"]
             ),
             headers={'content-type': 'application/json'},

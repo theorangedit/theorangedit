@@ -83,7 +83,7 @@ class LiveConfig(object):
         return self.data.items()
 
     def __repr__(self):
-        return "<LiveConfig %r>" % self.data
+        return f"<LiveConfig {self.data!r}>"
 
 
 class LiveList(object):
@@ -146,8 +146,7 @@ class LiveList(object):
         return len(self.data)
 
     def __repr__(self):
-        return "<LiveList %r (%s)>" % (self.data,
-                                       "push" if self.is_watching else "pull")
+        return f"<LiveList {self.data!r} ({'push' if self.is_watching else 'pull'})>"
 
 
 class ReducedLiveList(object):
@@ -212,7 +211,7 @@ class ReducedLiveList(object):
         return len(self.data)
 
     def __repr__(self):
-        return "<%s %r>" % (self.__class__.__name__, self.data)
+        return f"<{self.__class__.__name__} {self.data!r}>"
 
 
 class IPNetworkLiveList(ReducedLiveList):

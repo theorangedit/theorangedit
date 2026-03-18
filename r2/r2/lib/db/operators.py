@@ -25,7 +25,7 @@ class BooleanOp(object):
         self.ops = ops
 
     def __repr__(self):
-        return '<%s_ %s>' % (self.__class__.__name__, str(self.ops))
+        return f'<{self.__class__.__name__}_ {self.ops}>'
 
 class or_(BooleanOp): pass
 class and_(BooleanOp): pass
@@ -38,7 +38,7 @@ class op(object):
         self.lval_name = lval_name
 
     def __repr__(self):
-        return '<%s: %s, %s>' % (self.__class__.__name__, self.lval, self.rval)
+        return f'<{self.__class__.__name__}: {self.lval}, {self.rval}>'
 
     # sorts in a consistent order, required for Query._cache_key()
     def __cmp__(self, other):
@@ -61,7 +61,7 @@ class Slot(object):
             self.name = lval
 
     def __repr__(self):
-        return '<%s: %s>' % (self.__class__.__name__, self.name)
+        return f'<{self.__class__.__name__}: {self.name}>'
 
     def __eq__(self, other):
         return eq(self, self.name, other)
@@ -111,14 +111,14 @@ class timeago(object):
         self.interval = interval
 
     def __repr__(self):
-        return '<interval: %s>' % self.interval
+        return f'<interval: {self.interval}>'
 
 class sort(object):
     def __init__(self, col):
         self.col = col
 
     def __repr__(self):
-        return '<sort:%s %s>' % (self.__class__.__name__, str(self.col))
+        return f'<sort:{self.__class__.__name__} {self.col}>'
 
     def __eq__(self, other):
         return self.__class__ == other.__class__ and self.col == other.col

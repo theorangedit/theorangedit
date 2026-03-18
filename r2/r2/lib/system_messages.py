@@ -76,7 +76,7 @@ def notify_user_added(rel_type, author, user, target):
     srname = target.path.rstrip("/")
     d = {
         "url": srname,
-        "title": "%s: %s" % (srname, target.title),
+        "title": f"{srname}: {target.title}",
         "author": "/u/" + author.name,
         "user": "/u/" + user.name,
     }

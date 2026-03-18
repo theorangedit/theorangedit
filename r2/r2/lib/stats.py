@@ -168,7 +168,7 @@ class StatsdConnection:
             if len(prefix) > 3:
                 prefix_len = len(prefix)
                 compressed_lines.append(
-                    '^%02x%s' % (prefix_len, line[prefix_len:]))
+                    f'^{prefix_len:02x}{line[prefix_len:]}'))
             else:
                 compressed_lines.append(line)
             previous = line
@@ -177,7 +177,7 @@ class StatsdConnection:
     def send(self, data):
         if self.sock is None:
             return
-        data = ('%s:%s' % item for item in data)
+        data = (f'{item[0]}:{item[1]}' for item in data)
         if self.compress:
             data = self._compress(data)
         payload = '\n'.join(data)
@@ -325,10 +325,10 @@ class Stats:
         counter = self.get_counter(counter_name)
         if counter:
             from r2.lib.context import request
-            counter.increment('%s.%s' % (request.environ["pylons.routes_dict"]["action"], name), delta=delta)
+            counter.increment(f'{request.environ["pylons.routes_dict"]["action"]}.{name}', delta=delta)
 
     def action_event_count(self, event_name, state=None, delta=1, true_name="success", false_name="fail"):
-        counter_name = 'event.%s' % event_name
+        counter_name = f'event.{event_name}'
         if state == True:
             self.action_count(counter_name, true_name, delta=delta)
         elif state == False:
@@ -347,7 +347,7 @@ class Stats:
     def event_count(self, event_name, name, sample_rate=None):
         if sample_rate is None:
             sample_rate = 1.0
-        counter = self.get_counter('event.%s' % event_name)
+        counter = self.get_counter(f'event.{event_name}')
         if counter and random.random() < sample_rate:
             counter.increment(name)
             counter.increment('total')
@@ -453,9 +453,9 @@ class CacheStats:
     def __init__(self, parent, cache_name):
         self.parent = parent
         self.cache_name = cache_name
-        self.hit_stat_name = '%s.hit' % self.cache_name
-        self.miss_stat_name = '%s.miss' % self.cache_name
-        self.total_stat_name = '%s.total' % self.cache_name
+        self.hit_stat_name = f'{self.cache_name}.hit'
+        self.miss_stat_name = f'{self.cache_name}.miss'
+        self.total_stat_name = f'{self.cache_name}.total'
         self.hit_stat_template = '%s.%%s.hit' % self.cache_name
         self.miss_stat_template = '%s.%%s.miss' % self.cache_name
         self.total_stat_template = '%s.%%s.total' % self.cache_name
@@ -490,9 +490,9 @@ class CacheStats:
 class StaleCacheStats(CacheStats):
     def __init__(self, parent, cache_name):
         CacheStats.__init__(self, parent, cache_name)
-        self.stale_hit_name = '%s.stale.hit' % self.cache_name
-        self.stale_miss_name = '%s.stale.miss' % self.cache_name
-        self.stale_total_name = '%s.stale.total' % self.cache_name
+        self.stale_hit_name = f'{self.cache_name}.stale.hit'
+        self.stale_miss_name = f'{self.cache_name}.stale.miss'
+        self.stale_total_name = f'{self.cache_name}.stale.total'
         self.stale_hit_stat_template = '%s.stale.%%s.hit' % self.cache_name
         self.stale_miss_stat_template = '%s.stale.%%s.miss' % self.cache_name
         self.stale_total_stat_template = '%s.stale.%%s.total' % self.cache_name

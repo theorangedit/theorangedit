@@ -94,12 +94,12 @@ def get_aggregate(interval, category_cls):
             try:
                 txt = get_text_from_s3(s3_connection, path)
             except S3ResponseError as e:
-                print('S3ResponseError on %s, retrying' % path)
+                print(f'S3ResponseError on {path}, retrying')
                 sleep(300)
             else:
                 break
         else:
-            print('Could not retrieve %s' % path)
+            print(f'Could not retrieve {path}')
             raise e
 
         for line in txt.splitlines():
@@ -114,8 +114,7 @@ def get_aggregate(interval, category_cls):
         part += 1
 
     if not data:
-        raise ValueError("No data for %s/%s" % (interval,
-                                                category_cls.__name__))
+        raise ValueError(f"No data for {interval}/{category_cls.__name__}")
 
     return data
 
@@ -188,13 +187,13 @@ def _report_interval(interval):
     else:
         raise
 
-    pg_interval = "%04d-%02d-%02d %02d:00:00" % tuple(pieces)
-    print('reporting interval %s (%s)' % (pg_interval, interval_type))
+    pg_interval = f"{pieces[0]:04d}-{pieces[1]:02d}-{pieces[2]:02d} {pieces[3]:02d}:00:00"
+    print(f'reporting interval {pg_interval} ({interval_type})')
 
     # Read aggregates and write to traffic db
     for category_cls in traffic_categories:
         now = datetime.datetime.now()
-        print('*** %s - %s - %s' % (category_cls.__name__, interval, now))
+        print(f'*** {category_cls.__name__} - {interval} - {now}')
         data = get_aggregate(interval, category_cls)
         len_data = len(data)
         step = max(len_data // 5, 100)
@@ -203,14 +202,14 @@ def _report_interval(interval):
                 for n in tup(name):
                     str(n)
             except UnicodeDecodeError:
-                print('%s - %s - %s - %s' % (category_cls.__name__, name,)
-                                             uniques, pageviews)
+                print(f'{category_cls.__name__} - {name}',
+                      uniques, pageviews)
                 continue
 
             if i % step == 0:
                 now = datetime.datetime.now()
-                print('%s - %s - %s/%s - %s' % (interval, category_cls.__name__,)
-                                                i, len_data, now)
+                print(f'{interval} - {category_cls.__name__}',
+                      f'{i}/{len_data}', now)
 
             kw = {'date': pg_interval, 'interval': interval_type,
                   'unique_count': uniques, 'pageview_count': pageviews}
@@ -226,7 +225,7 @@ def _report_interval(interval):
 
     Session.remove()
     now = datetime.datetime.now()
-    print('finished reporting %s (%s) - %s' % (pg_interval, interval_type, now))
+    print(f'finished reporting {pg_interval} ({interval_type}) - {now}')
 
 
 def process_pixel_log(log_path, fast=False):
@@ -245,12 +244,12 @@ def process_pixel_log(log_path, fast=False):
     else:
         date_fields = os.path.basename(log_path).split('.', 1)[0].split('-')
     year, month, day, hour = (int(i) for i in date_fields)
-    hour_date = '%s-%02d-%02d-%02d' % (year, month, day, hour)
-    day_date = '%s-%02d-%02d' % (year, month, day)
-    month_date = '%s-%02d' % (year, month)
+    hour_date = f'{year}-{month:02d}-{day:02d}-{hour:02d}'
+    day_date = f'{year}-{month:02d}-{day:02d}'
+    month_date = f'{year}-{month:02d}'
 
     # All logs from this day use the same jobflow
-    jobflow_name = 'Traffic Processing %s' % day_date
+    jobflow_name = f'Traffic Processing {day_date}'
 
     output_path = os.path.join(PROCESSED_DIR, 'hour', hour_date)
     extract_hour(emr_connection, jobflow_name, log_path, output_path,
@@ -265,7 +264,7 @@ def process_pixel_log(log_path, fast=False):
 
     if hour == 23 or (not fast and (hour == 0 or hour % 4 == 3)):
         # Don't aggregate and report day on every hour
-        input_path = os.path.join(PROCESSED_DIR, 'hour', '%s-*' % day_date)
+        input_path = os.path.join(PROCESSED_DIR, 'hour', f'{day_date}-*')
         output_path = os.path.join(AGGREGATE_DIR, day_date)
         aggregate_interval(emr_connection, jobflow_name, input_path,
                            output_path, log_uri=AWS_LOG_DIR)
@@ -274,7 +273,7 @@ def process_pixel_log(log_path, fast=False):
 
     if hour == 23:
         # Special tasks for final hour of the day
-        input_path = os.path.join(PROCESSED_DIR, 'hour', '%s-*' % day_date)
+        input_path = os.path.join(PROCESSED_DIR, 'hour', f'{day_date}-*')
         output_path = os.path.join(PROCESSED_DIR, 'day', day_date)
         coalesce_interval(emr_connection, jobflow_name, input_path,
                           output_path, log_uri=AWS_LOG_DIR)
@@ -286,8 +285,8 @@ def process_pixel_log(log_path, fast=False):
 
 
 def aggregate_month(month_date):
-    jobflow_name = 'Traffic Processing %s' % month_date
-    input_path = os.path.join(PROCESSED_DIR, 'day', '%s-*' % month_date)
+    jobflow_name = f'Traffic Processing {month_date}'
+    input_path = os.path.join(PROCESSED_DIR, 'day', f'{month_date}-*')
     output_path = os.path.join(AGGREGATE_DIR, month_date)
     aggregate_interval(emr_connection, jobflow_name, input_path, output_path,
                        log_uri=AWS_LOG_DIR, slave_instance_type='m2.2xlarge')
@@ -311,14 +310,14 @@ def process_month_hours(month_date, start_hour=0, days=None):
 
     for day in days:
         for hour in hours:
-            hour_date = '%04d-%02d-%02d-%02d' % (year, month, day, hour)
-            log_path = os.path.join(RAW_LOG_DIR, '%s.log.gz' % hour_date)
+            hour_date = f'{year:04d}-{month:02d}-{day:02d}-{hour:02d}'
+            log_path = os.path.join(RAW_LOG_DIR, f'{hour_date}.log.gz')
             if not s3_key_exists(s3_connection, log_path):
-                log_path = os.path.join(RAW_LOG_DIR, '%s.log.bz2' % hour_date)
+                log_path = os.path.join(RAW_LOG_DIR, f'{hour_date}.log.bz2')
                 if not s3_key_exists(s3_connection, log_path):
-                    print('Missing log for %s' % hour_date)
+                    print(f'Missing log for {hour_date}')
                     continue
-            print('Processing %s' % log_path)
+            print(f'Processing {log_path}')
             process_pixel_log(log_path, fast=True)
         hours = range(24)
 
@@ -331,18 +330,18 @@ def report_entire_month(month_date, start_hour=0, start_day=1):
 
     for day in range(start_day, calendar.monthrange(year, month)[1] + 1):
         for hour in hours:
-            hour_date = '%04d-%02d-%02d-%02d' % (year, month, day, hour)
+            hour_date = f'{year:04d}-{month:02d}-{day:02d}-{hour:02d}'
             try:
                 report_interval(hour_date, background=False)
             except ValueError:
-                print('Failed for %s' % hour_date)
+                print(f'Failed for {hour_date}')
                 continue
         hours = range(24)
-        day_date = '%04d-%02d-%02d' % (year, month, day)
+        day_date = f'{year:04d}-{month:02d}-{day:02d}'
         try:
             report_interval(day_date, background=False)
         except ValueError:
-            print('Failed for %s' % day_date)
+            print(f'Failed for {day_date}')
             continue
     report_interval(month_date, background=False)
 
@@ -355,7 +354,7 @@ def verify_month_outputs(month_date):
 
     for day in range(1, calendar.monthrange(year, month)[1] + 1):
         for hour in range(24):
-            hour_date = '%04d-%02d-%02d-%02d' % (year, month, day, hour)
+            hour_date = f'{year:04d}-{month:02d}-{day:02d}-{hour:02d}'
             for category_cls in traffic_categories:
                 for d in [AGGREGATE_DIR, os.path.join(PROCESSED_DIR, 'hour')]:
                     path = _get_processed_path(d, hour_date, category_cls,
@@ -363,7 +362,7 @@ def verify_month_outputs(month_date):
                     if not s3_key_exists(s3_connection, path):
                         missing.append(hour_date)
 
-        day_date = '%04d-%02d-%02d' % (year, month, day)
+        day_date = f'{year:04d}-{month:02d}-{day:02d}'
         for category_cls in traffic_categories:
             for d in [AGGREGATE_DIR, os.path.join(PROCESSED_DIR, 'day')]:
                 path = _get_processed_path(d, day_date, category_cls,
@@ -371,7 +370,7 @@ def verify_month_outputs(month_date):
                 if not s3_key_exists(s3_connection, path):
                     missing.append(day_date)
 
-    month_date = '%04d-%02d' % (year, month)
+    month_date = f'{year:04d}-{month:02d}'
     for c in traffic_categories:
         path = _get_processed_path(AGGREGATE_DIR, month_date, category_cls,
                                    'part-r-00000')
@@ -390,10 +389,10 @@ def verify_month_inputs(month_date):
 
     for day in range(1, calendar.monthrange(year, month)[1] + 1):
         for hour in range(24):
-            hour_date = '%04d-%02d-%02d-%02d' % (year, month, day, hour)
-            log_path = os.path.join(RAW_LOG_DIR, '%s.log.gz' % hour_date)
+            hour_date = f'{year:04d}-{month:02d}-{day:02d}-{hour:02d}'
+            log_path = os.path.join(RAW_LOG_DIR, f'{hour_date}.log.gz')
             if not s3_key_exists(s3_connection, log_path):
-                log_path = os.path.join(RAW_LOG_DIR, '%s.log.bz2' % hour_date)
+                log_path = os.path.join(RAW_LOG_DIR, f'{hour_date}.log.bz2')
                 if not s3_key_exists(s3_connection, log_path):
                     missing.append(hour_date)
 
@@ -413,13 +412,13 @@ def process_hour(hour_date):
     SLEEPTIME = 180
 
     log_dir = os.path.join(RAW_LOG_DIR, hour_date)
-    files_missing = [os.path.join(log_dir, '%s.log.bz2' % h)
+    files_missing = [os.path.join(log_dir, f'{h}.log.bz2')
                      for h in g.TRAFFIC_LOG_HOSTS]
     files_missing = [f for f in files_missing
                        if not s3_key_exists(s3_connection, f)]
 
     while files_missing:
-        print('Missing log(s) %s, sleeping' % files_missing)
+        print(f'Missing log(s) {files_missing}, sleeping')
         sleep(SLEEPTIME)
         files_missing = [f for f in files_missing
                            if not s3_key_exists(s3_connection, f)]

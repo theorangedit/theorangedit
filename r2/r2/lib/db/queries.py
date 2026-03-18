@@ -287,7 +287,7 @@ class CachedResults(object):
         g.permacache.set(self.iden, self.data)
 
     def __repr__(self):
-        return '<CachedResults %s %s>' % (self.query._rules, self.query._sort)
+        return f'<CachedResults {self.query._rules} {self.query._sort}>'
 
     def __iter__(self):
         self.fetch()
@@ -323,7 +323,7 @@ class MergedCachedResults(object):
 
 
     def __repr__(self):
-        return '<MergedCachedResults %r>' % (self.cached_results,)
+        return f'<MergedCachedResults {self.cached_results!r}>'
 
     def __iter__(self):
         for x in self.data:
@@ -799,7 +799,7 @@ def set_promote_status(link, promote_status):
     link.promote_status = promote_status
     link._commit()
 
-    text = "set promote status to '%s'" % PROMOTE_STATUS.name[promote_status]
+    text = f"set promote status to '{PROMOTE_STATUS.name[promote_status]}'"
     PromotionLog.add(link, text)
 
 
@@ -1009,7 +1009,7 @@ def add_queries(queries, insert_items=None, delete_items=None):
             with g.stats.get_timer('permacache.foreground.delete'):
                 q.delete(delete_items)
         else:
-            raise Exception("Cannot update query %r!" % (q,))
+            raise Exception(f"Cannot update query {q!r}!")
 
     # dual-write any queries that are being migrated to the new query cache
     with CachedQueryMutator() as m:
@@ -1069,7 +1069,7 @@ def add_to_commentstree_q(comment):
     if utils.to36(comment.link_id) in g.live_config["fastlane_links"]:
         amqp.add_item('commentstree_fastlane_q', comment._fullname)
     elif g.shard_commentstree_queues:
-        amqp.add_item('commentstree_%d_q' % (comment.link_id % 10),
+        amqp.add_item(f'commentstree_{comment.link_id % 10}_q',
                       comment._fullname)
     else:
         amqp.add_item('commentstree_q', comment._fullname)
@@ -1223,7 +1223,7 @@ def update_unread_queries(inbox_rels, insert=True, mutator=None):
         elif isinstance(thing, Message):
             query = get_unread_messages(user._id)
         else:
-            raise ValueError("can't handle %s" % thing.__class__.__name__)
+            raise ValueError(f"can't handle {thing.__class__.__name__}")
 
         if insert:
             m.insert(query, [inbox_rel])
@@ -1309,7 +1309,7 @@ def unnotify(thing, possible_recipients=None):
     deduce all possible recipients and remove their notifications.
     """
     from r2.lib import butler
-    error_message = ("Unable to unnotify thing of type: %r" % thing)
+    error_message = f"Unable to unnotify thing of type: {thing!r}"
     notification_handler(thing,
         notify_function=butler.remove_mention_notification,
         error_message=error_message,
@@ -1325,7 +1325,7 @@ def renotify(thing, possible_recipients=None):
     This is used when unspamming comments.
     """
     from r2.lib import butler
-    error_message = ("Unable to renotify thing of type: %r" % thing)
+    error_message = f"Unable to renotify thing of type: {thing!r}"
     notification_handler(thing,
         notify_function=butler.readd_mention_notification,
         error_message=error_message,
@@ -1753,7 +1753,7 @@ async def run_commentstree(qname="commentstree_q", limit=400):
     async def _run_commentstree(msgs, chan):
         fnames = [msg.body.decode() if isinstance(msg.body, bytes) else msg.body for msg in msgs]
         comments = Comment._by_fullname(fnames, data=True, return_dict=False)
-        print('Processing %r' % (comments,))
+        print(f'Processing {comments!r}')
 
         if comments:
             add_comments(comments)

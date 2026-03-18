@@ -152,7 +152,7 @@ def souptest_fragment(fragment):
     # We also need to wrap everything in a div, as lxml throws out
     # comments outside the root tag. This also ensures that attempting an
     # entity declaration or similar shenanigans will cause a syntax error.
-    documentized_fragment = "%s<div>%s</div>" % (souptest_doctype, fragment)
+    documentized_fragment = f"{souptest_doctype}<div>{fragment}</div>"
     s = StringIO(documentized_fragment)
 
     try:
@@ -188,7 +188,7 @@ class SoupReprError(SoupError):
         self.obj = obj
 
     def __str__(self):
-        return "HAX: %s: %r" % (self.HUMAN_MESSAGE, self.obj)
+        return f"HAX: {self.HUMAN_MESSAGE}: {self.obj!r}"
 
 
 class SoupSyntaxError(SoupReprError):

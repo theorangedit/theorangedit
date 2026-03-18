@@ -71,7 +71,7 @@ def upload_sitemap(key, sitemap):
 
 def store_subreddit_sitemap(bucket, index, sitemap):
     key = Key(bucket)
-    key.key = 'subreddit_sitemap/{0}.xml'.format(index)
+    key.key = f'subreddit_sitemap/{index}.xml'
     g.log.debug("Uploading %r", key)
 
     upload_sitemap(key, sitemap)

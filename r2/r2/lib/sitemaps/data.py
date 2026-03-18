@@ -64,7 +64,7 @@ def _read_subreddit_etl_from_s3(s3path):
         key_count += 1
 
     if key_count == 0:
-        raise ValueError('{0} contains no readable keys.'.format(s3path))
+        raise ValueError(f'{s3path} contains no readable keys.')
 
 
 def find_all_subreddits(s3path):

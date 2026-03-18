@@ -87,11 +87,9 @@ def field(name=None, cloudsearch_type=str, lucene_type=SAME_AS_CLOUDSEARCH):
     if lucene_type is SAME_AS_CLOUDSEARCH:
         lucene_type = cloudsearch_type
     if cloudsearch_type not in FIELD_TYPES + (None,):
-        raise ValueError("cloudsearch_type %r not in %r" %
-                         (cloudsearch_type, FIELD_TYPES))
+        raise ValueError(f"cloudsearch_type {cloudsearch_type!r} not in {FIELD_TYPES!r}")
     if lucene_type not in FIELD_TYPES + (None,):
-        raise ValueError("lucene_type %r not in %r" %
-                         (lucene_type, FIELD_TYPES))
+        raise ValueError(f"lucene_type {lucene_type!r} not in {FIELD_TYPES!r}")
     if callable(name):
         # Simple case; decorated as '@field'; act as a decorator instead
         # of a decorator factory
@@ -328,10 +326,7 @@ class Results(object):
         self._subreddits = []
 
     def __repr__(self):
-        return '%s(%r, %r, %r)' % (self.__class__.__name__,
-                                   self.docs,
-                                   self.hits,
-                                   self._facets)
+        return f'{self.__class__.__name__}({self.docs!r}, {self.hits!r}, {self._facets!r})'
 
     @property
     def subreddit_facets(self):

@@ -173,7 +173,7 @@ def get_impression_pixel_url(codename):
     """Return a URL to use for tracking impressions of the given advert."""
     # TODO: use HMAC here
     mac = codename + hashlib.sha1(codename + g.tracking_secret).hexdigest()
-    v_param = "?v=%s&" % _get_encrypted_user_slug()
+    v_param = f"?v={_get_encrypted_user_slug()}&"
     hash_and_id_params = urllib.parse.urlencode({"hash": mac,
                                            "id": codename,})
     return g.adframetracker_url + v_param + hash_and_id_params

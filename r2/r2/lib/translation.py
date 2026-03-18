@@ -59,7 +59,7 @@ def _get_translator(lang, graceful_fail=False, **kwargs):
         if graceful_fail:
             translator = NullTranslations()
         else:
-            raise LanguageError('IOError: %s' % ioe)
+            raise LanguageError(f'IOError: {ioe}')
     translator.pylons_lang = lang
     return translator
 

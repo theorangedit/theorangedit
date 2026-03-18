@@ -91,7 +91,7 @@ def post_takedown_notice_to_external_site(title,
     timer = g.stats.get_timer('lumendatabase.takedown_create')
     timer.start()
     response = requests.post(
-        '%snotices' % g.live_config['lumendatabase_org_api_base_url'],
+        f"{g.live_config['lumendatabase_org_api_base_url']}notices",
         headers={
             'Content-type': 'application/json',
             'Accept': 'application/json',

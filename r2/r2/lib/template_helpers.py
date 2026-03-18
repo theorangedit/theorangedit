@@ -330,11 +330,11 @@ def class_dict():
     t_cls = [Link, Comment, Message, Subreddit]
     l_cls = [Listing, OrganicListing]
 
-    classes  = [('%s: %s') % ('t'+ str(cl._type_id), cl.__name__ ) for cl in t_cls] \
-             + [('%s: %s') % (cl.__name__, cl._js_cls) for cl in l_cls]
+    classes  = [f't{cl._type_id}: {cl.__name__}' for cl in t_cls] \
+             + [f'{cl.__name__}: {cl._js_cls}' for cl in l_cls]
 
     res = ', '.join(classes)
-    return unsafe('{ %s }' % res)
+    return unsafe(f'{{ {res} }}')
 
 
 def comment_label(num_comments=None):
@@ -423,7 +423,7 @@ def replace_render(listing, item, render_func):
             rv = unsafe(res)
             if g.debug:
                 for leftover in re.findall('<\$>(.+?)(?:<|$)', rv):
-                    print("replace_render didn't replace %s" % leftover)
+                    print(f"replace_render didn't replace {leftover}")
 
             return rv
 
@@ -543,11 +543,11 @@ def style_line(button_width = None, bgcolor = "", bordercolor = ""):
     bordercolor = c.bordercolor or bordercolor
     bgcolor     = c.bgcolor or bgcolor
     if bgcolor:
-        style_line += "background-color: #%s;" % bgcolor
+        style_line += f"background-color: #{bgcolor};"
     if bordercolor:
-        style_line += "border: 1px solid #%s;" % bordercolor
+        style_line += f"border: 1px solid #{bordercolor};"
     if button_width:
-        style_line += "width: %spx;" % button_width
+        style_line += f"width: {button_width}px;"
     return style_line
 
 def choose_width(link, width):
@@ -619,7 +619,7 @@ def add_attr(attrs, kind, label=None, link=None, cssclass=None, symbol=None):
         if not link:
             raise ValueError ("Need a link")
     else:
-        raise ValueError ("Got weird kind [%s]" % kind)
+        raise ValueError(f"Got weird kind [{kind}]")
 
     attrs.append( (priority, symbol, cssclass, label, link) )
 
@@ -629,7 +629,7 @@ def add_admin_distinguish(distinguish_attribs_list):
 
 
 def add_moderator_distinguish(distinguish_attribs_list, subreddit):
-    link = '/r/%s/about/moderators' % subreddit.name
+    link = f'/r/{subreddit.name}/about/moderators'
     label = _('moderator of /r/%(reddit)s, speaking officially')
     label %= {'reddit': subreddit.name}
     add_attr(distinguish_attribs_list, 'M', label=label, link=link)
@@ -637,7 +637,7 @@ def add_moderator_distinguish(distinguish_attribs_list, subreddit):
 
 def add_friend_distinguish(distinguish_attribs_list, note=None):
     if note:
-        label = u"%s (%s)" % (_("friend"), _force_unicode(note))
+        label = f"{_('friend')} ({_force_unicode(note)})"
     else:
         label = None
     add_attr(distinguish_attribs_list, 'F', label)
@@ -646,7 +646,7 @@ def add_friend_distinguish(distinguish_attribs_list, note=None):
 def add_cakeday_distinguish(distinguish_attribs_list, user):
     label = _("%(user)s just celebrated a reddit birthday!")
     label %= {"user": user.name}
-    link = "/user/%s" % user.name
+    link = f"/user/{user.name}"
     add_attr(distinguish_attribs_list, kind="cake", label=label, link=link)
 
 
@@ -675,7 +675,7 @@ def search_url(query, subreddit, restrict_sr="off", sort=None, recent=None, ref=
         url_query["sort"] = sort
     if recent:
         url_query["t"] = recent
-    path = "/r/%s/search?" % subreddit if subreddit else "/search?"
+    path = f"/r/{subreddit}/search?" if subreddit else "/search?"
     path += urllib.parse.urlencode(url_query)
     return path
 
@@ -702,7 +702,7 @@ def html_datetime(date):
 
 
 def js_timestamp(date):
-    return '%d' % (calendar.timegm(date.timetuple()) * 1000)
+    return f'{calendar.timegm(date.timetuple()) * 1000}'
 
 
 def simplified_timesince(date, include_tense=True):
@@ -777,8 +777,8 @@ def get_linkflair_css_classes(thing, prefix="linkflair-", on_class="has-linkflai
     if has_linkflair and show_linkflair:
         if thing.flair_css_class:
             flair_css_classes = thing.flair_css_class.split()
-            prefixed_css_classes = ["%s%s" % (prefix, css_class) for css_class in flair_css_classes]
-            on_class = "%s %s" % (on_class, ' '.join(prefixed_css_classes))
+            prefixed_css_classes = [f"{prefix}{css_class}" for css_class in flair_css_classes]
+            on_class = f"{on_class} {' '.join(prefixed_css_classes)}"
         return on_class
     else:
         return off_class

@@ -43,7 +43,7 @@ SIGNATURE_V4_ALGORITHM = "AWS4-HMAC-SHA256"
 def _to_path(bucket, key):
     if not bucket:
         raise ValueError
-    return 's3://%s/%s' % (bucket, key)
+    return f's3://{bucket}/{key}'
 
 
 def _from_path(path):
@@ -54,7 +54,7 @@ def _from_path(path):
     """
 
     if not path.startswith('s3://'):
-        raise ValueError('Bad S3 path %s' % path)
+        raise ValueError(f'Bad S3 path {path}')
 
     r = path[len('s3://'):].split('/', 1)
     bucket = key = None
@@ -65,7 +65,7 @@ def _from_path(path):
         bucket = r[0]
 
     if not bucket:
-        raise ValueError('Bad S3 path %s' % path)
+        raise ValueError(f'Bad S3 path {path}')
 
     return bucket, key
 
@@ -112,7 +112,7 @@ def s3_key_exists(s3_connection, path):
 
 def copy_to_s3(s3_connection, local_path, dst_path, verbose=False):
     def callback(trans, total):
-        sys.stdout.write('%s/%s' % trans, total)
+        sys.stdout.write(f'{trans}/{total}')
         sys.stdout.flush()
 
     dst_bucket_name, dst_key_name = _from_path(dst_path)
@@ -128,7 +128,7 @@ def copy_to_s3(s3_connection, local_path, dst_path, verbose=False):
 
     kw = {}
     if verbose:
-        print('Uploading %s to %s' % (local_path, dst_path))
+        print(f'Uploading {local_path} to {dst_path}')
         kw['cb'] = callback
 
     k.set_contents_from_filename(logfile, **kw)
@@ -164,12 +164,7 @@ def delete_keys(bucket_name, prefix, connection=None):
 
 
 def _get_v4_credential(aws_access_key_id, date, service_name, region_name):
-    return ("%(aws_access_key_id)s/%(datestamp)s/%(region_name)s/%(service_name)s/aws4_request" % {
-        "aws_access_key_id": aws_access_key_id,
-        "datestamp": date.strftime("%Y%m%d"),
-        "region_name": region_name,
-        "service_name": service_name,
-    })
+    return f"{aws_access_key_id}/{date.strftime('%Y%m%d')}/{region_name}/{service_name}/aws4_request"
 
 def _get_upload_policy(
         bucket, key, credential, date, acl,
@@ -372,6 +367,6 @@ def get_post_args(
     })
 
     return {
-        "action": "//%s.%s" % (bucket, g.s3_media_domain),
+        "action": f"//{bucket}.{g.s3_media_domain}",
         "fields": fields,
     }

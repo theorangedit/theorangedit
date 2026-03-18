@@ -84,10 +84,7 @@ class SigningResult(object):
         self.errors = {}
 
     def __repr__(self):
-        return "<%s (%s)>" % (
-            self.__class__.__name__,
-            ", ".join("%s=%r" % (k, getattr(self, k)) for k in self.__slots__)
-        )
+        return f"<{self.__class__.__name__} ({', '.join(f'{k}={getattr(self, k)!r}' for k in self.__slots__)})>"
 
     def add_error(self, error, field=None, details=None):
         """Add an error.
@@ -172,12 +169,12 @@ def current_epoch():
 def valid_epoch(platform, epoch, max_age=5 * 60):
     now = current_epoch()
     dt = abs(now - epoch)
-    g.stats.simple_timing("signing.%s.skew" % platform, dt * 1000)
+    g.stats.simple_timing(f"signing.{platform}.skew", dt * 1000)
     return dt < max_age
 
 
 def epoch_wrap(epoch, payload):
-    return "Epoch:{}|{}".format(epoch, payload)
+    return f"Epoch:{epoch}|{payload}"
 
 
 def versioned_hmac(secret, body, global_version=GLOBAL_TOKEN_VERSION):
@@ -189,7 +186,7 @@ def versioned_hmac(secret, body, global_version=GLOBAL_TOKEN_VERSION):
     # If we want to change the hashing algo or anything else about this hmac,
     # this is the place to make that change based on global_version.
     assert global_version <= GLOBAL_TOKEN_VERSION, (
-        "Invalid version signing version '%s'!" % global_version
+        f"Invalid version signing version '{global_version}'!"
     )
     return hmac.new(secret, body, hashlib.sha256).hexdigest()
 
@@ -204,11 +201,7 @@ def get_secret_token(platform, version, global_version=GLOBAL_TOKEN_VERSION):
     old versions of tokens in `is_invalid_token` and trust that the client
     isn't lying to us.
     """
-    token_identifier = "{global_version}:{platform}:{version}".format(
-        global_version=global_version,
-        platform=platform,
-        version=version,
-    )
+    token_identifier = f"{global_version}:{platform}:{version}"
     # NOTE: this is the only place in this file where we reference g.secrets.
     # If we wanted to rotate the global secret, this is the place to do it.
     global_secret = g.secrets["request_signature_secret"]
@@ -223,7 +216,7 @@ def is_invalid_token(platform, version):
 def valid_post_signature(request, signature_header=SIGNATURE_BODY_HEADER):
     "Validate that the request has a properly signed body."
     return valid_signature(
-        "Body:{}".format(request.body),
+        f"Body:{request.body}",
         request.headers.get(signature_header),
         field="body",
     )
@@ -236,7 +229,7 @@ def valid_ua_signature(
 ):
     "Validate that the request has a properly signed user-agent."
     payload = "|".join(
-        "{}:{}".format(h, request.headers.get(h) or "")
+        f"{h}:{request.headers.get(h) or ''}"
         for h in signed_headers
     )
     return valid_signature(
@@ -344,10 +337,4 @@ def sign_v1_message(body, platform, version, epoch=None):
     epoch = int(epoch or current_epoch())
     payload = epoch_wrap(epoch, body)
     signature = versioned_hmac(token, payload, global_version=1)
-    return "{global_version}:{platform}:{version}:{epoch}:{signature}".format(
-        global_version=1,
-        platform=platform,
-        version=version,
-        epoch=epoch,
-        signature=signature,
-    )
+    return f"1:{platform}:{version}:{epoch}:{signature}"
