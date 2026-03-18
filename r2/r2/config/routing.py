@@ -32,8 +32,6 @@ def not_in_sr(environ, results):
             'domain' not in environ)
 
 
-# FIXME: submappers with path prefixes are broken in Routes 1.11. Once we
-# upgrade, we should be able to replace this ugliness with submappers.
 def partial_connect(mc, **override_args):
     def connect(path, **kwargs):
         if 'path_prefix' in override_args:

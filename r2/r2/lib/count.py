@@ -29,11 +29,6 @@ from r2.lib.app_globals import g
 
 count_period = g.rising_period
 
-#stubs
-
-def incr_counts(wrapped):
-    pass
-
 def get_link_counts(period = count_period):
     links = Link._query(Link.c._date >= utils.timeago(period),
                         limit=50, data = True)
