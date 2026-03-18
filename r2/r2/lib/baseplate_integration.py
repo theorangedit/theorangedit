@@ -91,7 +91,7 @@ class R2ServerSpanObserver(ServerSpanObserver):
 
 class R2SpanObserver(SpanObserver):
     def __init__(self, span_name):
-        self.metric_name = "providers.{}".format(span_name)
+        self.metric_name = f"providers.{span_name}"
         self.timer = g.stats.get_timer(self.metric_name)
 
     def on_start(self):
@@ -103,4 +103,4 @@ class R2SpanObserver(SpanObserver):
         if exc_info:
             error = exc_info[1]
             g.log.warning("%s: error: %s", self.metric_name, error)
-            g.stats.simple_event("{}.error".format(self.metric_name))
+            g.stats.simple_event(f"{self.metric_name}.error")

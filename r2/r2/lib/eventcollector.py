@@ -72,7 +72,7 @@ def parse_agent(ua):
         if d:
             for subattr in ("name", "version"):
                 if subattr in d:
-                    key = "%s_%s" % (attr, subattr)
+                    key = f"{attr}_{subattr}"
                     agent_summary[key] = d[subattr]
 
     agent_summary['bot'] = parsed.get('bot')
@@ -388,7 +388,7 @@ class EventQueue(object):
                     target = Account._by_name(request.POST.get("username"))
                 elif action_name in ("delete_sr_header", "delete_sr_icon",
                         "delete_sr_banner"):
-                    details_text = "%s" % action_name.replace("ete_sr", "")
+                    details_text = action_name.replace("ete_sr", "")
                     action_name = "editsettings"
                     target = context.site
                 elif action_name in ("bannedlisting", "mutedlisting",
@@ -405,7 +405,7 @@ class EventQueue(object):
 
         event = Event(
             topic="forbidden_actions",
-            event_type="ss.forbidden_%s" % action_name,
+            event_type=f"ss.forbidden_{action_name}",
             request=request,
             context=context,
         )
@@ -697,7 +697,7 @@ class EventQueue(object):
         """
         event = Event(
             topic="loid_events",
-            event_type='ss.%s' % action_name,
+            event_type=f'ss.{action_name}',
             request=request,
             context=context,
         )
@@ -725,7 +725,7 @@ class EventQueue(object):
         """
         event = Event(
             topic="login_events",
-            event_type='ss.%s' % action_name,
+            event_type=f'ss.{action_name}',
             request=request,
             context=context,
         )
@@ -747,7 +747,7 @@ class EventQueue(object):
             event.add("signature_version", signature.version)
             event.add("signature_valid", signature.is_valid())
             sigerror = ", ".join(
-                "%s_%s" % (field, code) for code, field in signature.errors
+                f"{field}_{code}" for code, field in signature.errors
             )
             event.add("signature_errors", sigerror)
             if signature.epoch:
@@ -874,7 +874,7 @@ class Event(object):
     def add_text(self, key, value, obfuscate=False):
         self.add(key, value, obfuscate=obfuscate)
         for k, v in charset_summary(value).items():
-            self.add("{}_{}".format(key, k), v)
+            self.add(f"{key}_{k}", v)
 
     def add_target_fields(self, target):
         if not target:
@@ -1072,7 +1072,7 @@ class EventPublisher(object):
 
     def _make_signature(self, payload):
         mac = hmac.new(self.secret, payload, hashlib.sha256).hexdigest()
-        return "key={key}, mac={mac}".format(key=self.signature_key, mac=mac)
+        return f"key={self.signature_key}, mac={mac}"
 
     def _publish(self, events):
         # Note: If how the JSON payload is created is changed,

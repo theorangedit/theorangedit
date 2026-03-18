@@ -297,7 +297,7 @@ class SRRecommendation(tdb_cassandra.View):
         srid36s = tup(srid36)
         to_omit = set(to_omit)
         to_omit.update(srid36s)  # don't show the originals
-        rowkeys = ['%s.%s' % (source, srid36) for srid36 in srid36s]
+        rowkeys = [f'{source}.{srid36}' for srid36 in srid36s]
 
         # fetch multiple sets of recommendations, one for each input srid36
         rows = cls._byID(rowkeys, return_dict=False)

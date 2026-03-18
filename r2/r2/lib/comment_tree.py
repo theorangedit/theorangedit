@@ -81,7 +81,7 @@ def calculate_comment_scores(link, sort, comments):
         cid_tree = comment_tree.tree
         scores = _calculate_qa_comment_scores(link, cid_tree, comments)
     else:
-        raise ValueError("unsupported comment sort %s" % sort)
+        raise ValueError(f"unsupported comment sort {sort}")
 
     return scores
 
@@ -172,10 +172,7 @@ def get_comment_scores(link, sort, comment_ids, timer):
             # up to once per minute write the scores to limit writes but
             # eventually return us to the correct state.
             if not g.disallow_db_writes:
-                write_key = "lock:score_{link}{sort}".format(
-                    link=link._id36,
-                    sort=sort,
-                )
+                write_key = f"lock:score_{link._id36}{sort}"
                 should_write = g.lock_cache.add(write_key, "", time=60)
                 if should_write:
                     CommentScoresByLink.set_scores(

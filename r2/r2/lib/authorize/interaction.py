@@ -130,7 +130,7 @@ def auth_transaction(amount, user, payment_method_id, link, campaign_id):
         return None, "invalid payment method"
 
     profile_id = CustomerID.get_id(user._id)
-    invoice = "T%dC%d" % (link._id, campaign_id)
+    invoice = f"T{link._id}C{campaign_id}"
 
     try:
         transaction_id = api.create_authorization_hold(

@@ -236,7 +236,7 @@ class RedditError(Exception):
         yield ('message', _(self.message))
 
     def __repr__(self):
-        return '<RedditError: %s>' % self.name
+        return f'<RedditError: {self.name}>'
 
     def __str__(self):
         return repr(self)
@@ -266,7 +266,7 @@ class ErrorSet(object):
         return self.errors[name]
 
     def __repr__(self):
-        return "<ErrorSet %s>" % list(self)
+        return f"<ErrorSet {list(self)}>"
 
     def __iter__(self):
         for x in self.errors:

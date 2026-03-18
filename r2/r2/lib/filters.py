@@ -149,13 +149,13 @@ def _plugin_reddit(md):
         return 'spoiler', m.group(1)
 
     def render_slash_link(text):
-        return '<a href="/%s">%s</a>' % (text.lstrip('/'), text)
+        return f'<a href="/{text.lstrip("/")}">{text}</a>'
 
     def render_u_link(text):
-        return '<a href="/%s">%s</a>' % (text, text)
+        return f'<a href="/{text}">{text}</a>'
 
     def render_spoiler(text):
-        return '<span class="spoiler">%s</span>' % _mistune.escape(text)
+        return f'<span class="spoiler">{_mistune.escape(text)}</span>'
 
     md.inline.register('slash_link', SLASH_PATTERN, parse_slash_link, before='link')
     md.inline.register('u_link', U_PATTERN, parse_u_link, before='link')
@@ -233,7 +233,7 @@ class _SnudownCompat:
                 if nofollow and 'nofollow' not in attrs:
                     attrs += ' rel="nofollow"'
                 if target and 'target=' not in attrs:
-                    attrs += ' target="%s"' % target
+                    attrs += f' target="{target}"'
                 return '<a ' + attrs.strip() + '>'
             html = _re.sub(r'<a\s+([^>]*)>', _fix_link, html)
 
@@ -502,21 +502,21 @@ def generate_table_of_contents(soup, prefix):
         # Convert html entities to avoid ugly header ids
         aid = str(BeautifulSoup(contents, convertEntities=BeautifulSoup.XML_ENTITIES))
         # Prefix with PREFIX_ to avoid ID conflict with the rest of the page
-        aid = u'%s_%s' % (prefix, aid.replace(" ", "_").lower())
+        aid = f'{prefix}_{aid.replace(" ", "_").lower()}'
         # Convert down to ascii replacing special characters with hex
-        aid = str(title_re.sub(lambda c: '.%X' % ord(c.group()), aid))
+        aid = str(title_re.sub(lambda c: f'.{ord(c.group()):X}', aid))
         
         # Check to see if a tag with the same ID exists
         id_num = header_ids[aid] + 1
         header_ids[aid] += 1
         # Only start numbering ids with the second instance of an id
         if id_num > 1:
-            aid = '%s%d' % (aid, id_num)
+            aid = f'{aid}{id_num}'
         
         header['id'] = aid
         
         li = Tag(soup, "li", [("class", aid)])
-        a = Tag(soup, "a", [("href", "#%s" % aid)])
+        a = Tag(soup, "a", [("href", f"#{aid}")])
         a.string = contents
         li.append(a)
         

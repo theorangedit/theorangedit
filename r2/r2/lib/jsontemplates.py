@@ -49,10 +49,10 @@ from r2.models.wiki import ImagesByWikiPage
 
 
 def make_typename(typ):
-    return 't%s' % to36(typ._type_id)
+    return f't{to36(typ._type_id)}'
 
 def make_fullname(typ, _id):
-    return '%s_%s' % (make_typename(typ), to36(_id))
+    return f'{make_typename(typ)}_{to36(_id)}'
 
 
 class ObjectTemplate(StringTemplate):
@@ -647,8 +647,8 @@ def get_author_attributes(item):
         data["author"] = author.name
 
         if author.flair_enabled_in_sr(sr_id):
-            flair_text = getattr(author, 'flair_%s_text' % sr_id, None)
-            flair_css = getattr(author, 'flair_%s_css_class' % sr_id, None)
+            flair_text = getattr(author, f'flair_{sr_id}_text', None)
+            flair_css = getattr(author, f'flair_{sr_id}_css_class', None)
         else:
             flair_text = None
             flair_css = None
@@ -1432,7 +1432,7 @@ class StylesheetTemplate(ThingJsonTemplate):
         images = []
         for name, url in sr_images.items():
             images.append({'name': name,
-                           'link': 'url(%%%%%s%%%%)' % name,
+                           'link': f'url(%%{name}%%)',
                            'url': url})
         return images
 

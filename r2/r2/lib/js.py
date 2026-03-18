@@ -111,7 +111,8 @@ class FileSource(Source):
         return static(os.path.join(*path), absolute, mangle_name)
 
     def use(self, **kwargs):
-        return script_tag.format(src=self.url(**kwargs))
+        src = self.url(**kwargs)
+        return f'<script type="text/javascript" src="{src}"></script>\n'
 
     @property
     def dependencies(self):
@@ -178,10 +179,10 @@ class Module(Source):
                 source = self.wrap.format(content=source, name=self.name)
 
             if self.should_compile:
-                print("Compiling {0}...".format(self.name),, file=sys.stderr)
+                print(f"Compiling {self.name}...", file=sys.stderr)
                 minifier.compile(source, out)
             else:
-                print("Concatenating {0}...".format(self.name),, file=sys.stderr)
+                print(f"Concatenating {self.name}...", file=sys.stderr)
                 out.write(source)
         print(" done.", file=sys.stderr)
 
@@ -197,7 +198,8 @@ class Module(Source):
             sources = self.get_flattened_sources([])
             return "".join(source.use(**kwargs) for source in sources)
         else:
-            return script_tag.format(src=self.url(**kwargs))
+            src = self.url(**kwargs)
+            return f'<script type="text/javascript" src="{src}"></script>\n'
 
     @property
     def dependencies(self):
@@ -228,7 +230,7 @@ class DataSource(Source):
     def use(self):
         from r2.lib.filters import SC_OFF, SC_ON, websafe_json
         escaped_json = websafe_json(self.get_source())
-        return (SC_OFF + inline_script_tag.format(content=escaped_json) +
+        return (SC_OFF + f'<script type="text/javascript">{escaped_json}</script>' +
                 SC_ON + "\n")
 
     @property
@@ -254,10 +256,10 @@ class PermissionsDataSource(DataSource):
             props = []
             for key, value in obj.items():
                 value_encoded = cls._make_marked_json(value)
-                props.append("%s: %s" % (key, value_encoded))
-            return "{%s}" % ",".join(props)
+                props.append(f"{key}: {value_encoded}")
+            return "{" + ",".join(props) + "}"
         elif isinstance(obj, str):
-            return "r.N_(%s)" % json.dumps(obj)
+            return f"r.N_({json.dumps(obj)})"
         else:
             raise ValueError("unsupported type")
 
@@ -265,7 +267,7 @@ class PermissionsDataSource(DataSource):
         permission_set_info = {k: v.info for k, v in
                                self.permission_sets.items()}
         permissions = self._make_marked_json(permission_set_info)
-        return "r.permissions = _.extend(r.permissions || {}, %s)" % permissions
+        return f"r.permissions = _.extend(r.permissions || {{}}, {permissions})"
 
     @property
     def dependencies(self):
@@ -316,7 +318,7 @@ class StringsSource(LocaleSpecificSource):
             return
 
         if self.invalid_formatting_specifier_re.search(string):
-            raise ValueError("Invalid string formatting specifier: %r" % string)
+            raise ValueError(f"Invalid string formatting specifier: {string!r}")
 
     def get_localized_source(self, lang):
         catalog = get_catalog(lang)
@@ -337,14 +339,14 @@ class StringsSource(LocaleSpecificSource):
             # so we'll just make it null
             strings = tup(msg.string)
             data[key] = [None] + list(strings)
-        return "r.i18n.addMessages(%s)" % json.dumps(data)
+        return f"r.i18n.addMessages({json.dumps(data)})"
 
 
 class PluralForms(LocaleSpecificSource):
     def get_localized_source(self, lang):
         catalog = get_catalog(lang)
         validate_plural_forms(catalog.plural_expr)
-        return "r.i18n.setPluralForms('%s')" % catalog.plural_expr
+        return f"r.i18n.setPluralForms('{catalog.plural_expr}')"
 
 
 class LocalizedModule(Module):
@@ -412,14 +414,15 @@ class LocalizedModule(Module):
 
             lines = [Module.use(self, **kwargs)]
             for appendix in localized_appendices:
-                line = SC_OFF + inline_script_tag.format(
-                    content=appendix.get_localized_source(c.lang)) + SC_ON
+                content = appendix.get_localized_source(c.lang)
+                line = SC_OFF + f'<script type="text/javascript">{content}</script>' + SC_ON
                 lines.append(line)
             return "\n".join(lines)
         else:
             langs = get_lang() or [g.lang]
             url = LocalizedModule.languagize_path(self.name, langs[0])
-            return script_tag.format(src=static(url), **kwargs)
+            src = static(url)
+            return f'<script type="text/javascript" src="{src}"></script>\n'
 
     @property
     def outputs(self):

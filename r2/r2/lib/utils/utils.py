@@ -424,11 +424,11 @@ def trunc_string(text, max_length, suffix='...'):
 def trunc_time(time, mins, hours=None):
     if hours is not None:
         if hours < 1 or hours > 60:
-            raise ValueError("Hours %d is weird" % mins)
+            raise ValueError(f"Hours {mins} is weird")
         time = time.replace(hour = hours * (time.hour // hours))
 
     if mins < 1 or mins > 60:
-        raise ValueError("Mins %d is weird" % mins)
+        raise ValueError(f"Mins {mins} is weird")
 
     return time.replace(minute = mins * (time.minute // mins),
                         second = 0,
@@ -608,7 +608,7 @@ class UrlParser(object):
     def canonicalize(self):
         subdomain = extract_subdomain(self.hostname)
         if subdomain == '' or is_language_subdomain(subdomain):
-            self.hostname = 'www.{0}'.format(g.domain)
+            self.hostname = f'www.{g.domain}'
         if not self.path.endswith('/'):
             self.path += '/'
         self.scheme = 'https'
@@ -640,7 +640,7 @@ class UrlParser(object):
             if extension == subdomain_extension:
                 new_subdomain = subdomain
                 break
-        self.hostname = '%s.%s' % (new_subdomain, g.domain)
+        self.hostname = f'{new_subdomain}.{g.domain}'
 
     def unparse(self):
         """
@@ -780,7 +780,7 @@ class UrlParser(object):
         if not valid_subdomain or not self.hostname or not g.offsite_subdomains:
             return valid_subdomain
         return not any(
-            is_subdomain(self.hostname, "%s.%s" % (subdomain, g.domain))
+            is_subdomain(self.hostname, f"{subdomain}.{g.domain}")
             for subdomain in g.offsite_subdomains
         )
 
@@ -807,7 +807,7 @@ class UrlParser(object):
         return self.hostname
 
     def __repr__(self):
-        return "<URL %s>" % repr(self.unparse())
+        return f"<URL {self.unparse()!r}>"
 
     def domain_permutations(self, fragments=False, subdomains=True):
         """
@@ -1161,17 +1161,15 @@ def fix_if_broken(thing, delete = True, fudge_links = False):
             if isinstance(thing, Link) and fudge_links:
                 if attr == "sr_id":
                     thing.sr_id = 6
-                    print("Fudging %s.sr_id to %d" % (thing._fullname,)
-                                                      thing.sr_id)
+                    print(f"Fudging {thing._fullname}.sr_id to {thing.sr_id}")
                 elif attr == "author_id":
                     thing.author_id = 8244672
-                    print("Fudging %s.author_id to %d" % (thing._fullname,)
-                                                          thing.author_id)
+                    print(f"Fudging {thing._fullname}.author_id to {thing.author_id}")
                 else:
-                    print("Got weird attr %s; can't fudge" % attr)
+                    print(f"Got weird attr {attr}; can't fudge")
 
             if not thing._deleted:
-                print("%s is missing %r, deleting" % (thing._fullname, attr))
+                print(f"{thing._fullname} is missing {attr!r}, deleting")
                 thing._deleted = True
 
             thing._commit()
@@ -1212,7 +1210,7 @@ def timeit(func):
 def lineno():
     "Returns the current line number in our program."
     import inspect
-    print("%s\t%s" % (datetime.now(),inspect.currentframe().f_back.f_lineno))
+    print(f"{datetime.now()}\t{inspect.currentframe().f_back.f_lineno}")
 
 def IteratorFilter(iterator, fn):
     for x in iterator:
@@ -1267,13 +1265,12 @@ def unicode_title_to_ascii(title, max_length=50):
 
 def dbg(s):
     import sys
-    sys.stderr.write('%s\n' % (s,))
+    sys.stderr.write(f'{s}\n')
 
 def trace(fn):
     def new_fn(*a,**kw):
         ret = fn(*a,**kw)
-        dbg("Fn: %s; a=%s; kw=%s\nRet: %s"
-            % (fn,a,kw,ret))
+        dbg(f"Fn: {fn}; a={a}; kw={kw}\nRet: {ret}")
         return ret
     return new_fn
 
@@ -1415,19 +1412,19 @@ def progress(it, verbosity=100, key=repr, estimate=None, persec=True):
 
         if s >= (24*60*60):
             days = int(s//(24*60*60))
-            ret.append('%dd' % days)
+            ret.append(f'{days}d')
             s -= days*(24*60*60)
         if s >= 60*60:
             hours = int(s//(60*60))
-            ret.append('%dh' % hours)
+            ret.append(f'{hours}h')
             s -= hours*(60*60)
         if s >= 60:
             minutes = int(s//60)
-            ret.append('%dm' % minutes)
+            ret.append(f'{minutes}m')
             s -= minutes*60
         if s >= 1:
             seconds = int(s)
-            ret.append('%ds' % seconds)
+            ret.append(f'{seconds}s')
             s -= seconds
 
         if not ret:
@@ -1446,7 +1443,7 @@ def progress(it, verbosity=100, key=repr, estimate=None, persec=True):
                 and d1.month == d2.month
                 and d1.year  == d2.year)
 
-    sys.stderr.write('Starting at %s\n' % (start,))
+    sys.stderr.write(f'Starting at {start}\n')
 
     # we're going to islice it so we need to start an iterator
     it = iter(it)
@@ -1478,45 +1475,35 @@ def progress(it, verbosity=100, key=repr, estimate=None, persec=True):
             # changes in speed)
             remaining = ((elapsed/seen)*estimate)-elapsed
             completion = now + remaining
-            count_str = ('%d/%d %.2f%%'
-                         % (seen, estimate, float(seen)/estimate*100))
+            count_str = (f'{seen}/{estimate} {float(seen)/estimate*100:.2f}%')
             completion_str = format_datetime(completion, not deq(completion,now))
-            estimate_str = (' (%s remaining; completion %s)'
-                            % (format_timedelta(remaining),
-                               completion_str))
+            estimate_str = (f' ({format_timedelta(remaining)} remaining; completion {completion_str})')
         else:
-            count_str = '%d' % seen
+            count_str = f'{seen}'
             estimate_str = ''
 
         if key:
-            key_str = ': %s' % key(item)
+            key_str = f': {key(item)}'
         else:
             key_str = ''
 
         # unlike the estimate, the persec count is the number per
         # second for *this* batch only, without smoothing
         if persec and thischunk_seconds > 0:
-            persec_str = ' (%.1f/s)' % (float(this_chunk)/thischunk_seconds,)
+            persec_str = f' ({float(this_chunk)/thischunk_seconds:.1f}/s)'
         else:
             persec_str = ''
 
-        sys.stderr.write('%s%s, %s%s%s\n'
-                         % (count_str, persec_str,
-                            format_timedelta(elapsed), estimate_str, key_str))
+        sys.stderr.write(f'{count_str}{persec_str}, {format_timedelta(elapsed)}{estimate_str}{key_str}\n')
 
     now = datetime.now()
     elapsed = now - start
     elapsed_seconds = timedelta_to_seconds(elapsed)
     if persec and seen > 0 and elapsed_seconds > 0:
-        persec_str = ' (@%.1f/sec)' % (float(seen)/elapsed_seconds)
+        persec_str = f' (@{float(seen)/elapsed_seconds:.1f}/sec)'
     else:
         persec_str = ''
-    sys.stderr.write('Processed %d%s items in %s..%s (%s)\n'
-                     % (seen,
-                        persec_str,
-                        format_datetime(start, not deq(start, now)),
-                        format_datetime(now, not deq(start, now)),
-                        format_timedelta(elapsed)))
+    sys.stderr.write(f'Processed {seen}{persec_str} items in {format_datetime(start, not deq(start, now))}..{format_datetime(now, not deq(start, now))} ({format_timedelta(elapsed)})\n')
 
 class Hell(object):
     def __str__(self):
@@ -1564,8 +1551,7 @@ def strordict_fullname(item, key='fullname'):
     if (not isinstance(d, dict)
         or key not in d
         or not isinstance(d[key], str)):
-        raise ValueError('Error trying to migrate %r (%r)'
-                         % (item, d))
+        raise ValueError(f'Error trying to migrate {item!r} ({d!r})')
 
     return d
 
@@ -1573,16 +1559,14 @@ def thread_dump(*a):
     import sys, traceback
     from datetime import datetime
 
-    sys.stderr.write('%(t)s Thread Dump @%(d)s %(t)s\n' % dict(t='*'*15,
-                                                               d=datetime.now()))
+    sys.stderr.write(f"{'*'*15} Thread Dump @{datetime.now()} {'*'*15}\n")
 
     for thread_id, stack in sys._current_frames().items():
-        sys.stderr.write('\t-- Thread ID: %s--\n' %  (thread_id,))
+        sys.stderr.write(f'\t-- Thread ID: {thread_id}--\n')
 
         for filename, lineno, fnname, line in traceback.extract_stack(stack):
-            sys.stderr.write('\t\t%(filename)s(%(lineno)d): %(fnname)s\n'
-                             % dict(filename=filename, lineno=lineno, fnname=fnname))
-            sys.stderr.write('\t\t\t%(line)s\n' % dict(line=line))
+            sys.stderr.write(f'\t\t{filename}({lineno}): {fnname}\n')
+            sys.stderr.write(f'\t\t\t{line}\n')
 
 
 def constant_time_compare(actual, expected):
@@ -1718,14 +1702,14 @@ def weighted_lottery(weights, _random=random.random):
     t = 0
     for key, weight in weights.items():
         if weight < 0:
-            raise ValueError("weight for %r must be non-negative" % key)
+            raise ValueError(f"weight for {key!r} must be non-negative")
         t += weight
         if t > r:
             return key
 
     # this point should never be reached
     raise ValueError(
-        "weighted_lottery messed up: r=%r, t=%r, total=%r" % (r, t, total))
+        f"weighted_lottery messed up: r={r!r}, t={t!r}, total={total!r}")
 
 
 class GoldPrice(object):
@@ -1744,10 +1728,10 @@ class GoldPrice(object):
         return type(self)(self.decimal / other)
 
     def __str__(self):
-        return "$%s" % self.decimal.quantize(Decimal("1.00"))
+        return f"${self.decimal.quantize(Decimal('1.00'))}"
 
     def __repr__(self):
-        return "%s(%s)" % (type(self).__name__, self)
+        return f"{type(self).__name__}({self})"
 
     @property
     def pennies(self):

@@ -22,9 +22,9 @@
 
 
 funny_translatable_strings = {
-    "500_page": ["Funny 500 page message %d" % i for i in range(1, 11)],
+    "500_page": [f"Funny 500 page message {i}" for i in range(1, 11)],
     "create_subreddit": [
-        "Reason to create a reddit %d" % i for i in range(1, 21)],
+        f"Reason to create a reddit {i}" for i in range(1, 21)],
 }
 
 def generate_strings():
@@ -41,7 +41,7 @@ def generate_strings():
     TYPES = ("uniques", "pageviews", "traffic", "impressions", "clicks")
     for interval in INTERVALS:
         for type in TYPES:
-            print("print _('%s by %s')" % (type, interval))
+            print(f"print _('{type} by {interval}')")
 
 
 if __name__ == "__main__":

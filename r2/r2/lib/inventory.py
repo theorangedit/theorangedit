@@ -196,7 +196,7 @@ def get_predicted_pageviews(srs, location=None):
 
 
 def make_target_name(target):
-    name = ("collection: %s" % target.collection.name if target.is_collection
+    name = (f"collection: {target.collection.name}" if target.is_collection
                                            else target.subreddit_name)
     return name
 

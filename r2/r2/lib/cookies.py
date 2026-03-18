@@ -78,8 +78,7 @@ class Cookie(object):
             return "other"
 
     def __repr__(self):
-        return ("Cookie(value=%r, expires=%r, domain=%r, dirty=%r)"
-                % (self.value, self.expires, self.domain, self.dirty))
+        return (f"Cookie(value={self.value!r}, expires={self.expires!r}, domain={self.domain!r}, dirty={self.dirty!r})")
 
 
 # Cookies that might need the secure flag toggled

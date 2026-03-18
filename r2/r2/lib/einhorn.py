@@ -87,7 +87,7 @@ def run_gunicorn_worker():
         sys.exit(1)
 
     app = PasterApplication()
-    util._setproctitle("worker [%s]" % app.cfg.proc_name)
+    util._setproctitle(f"worker [{app.cfg.proc_name}]")
     worker = EinhornSyncWorker(app.cfg, app)
     worker.init_process()
 

@@ -67,7 +67,7 @@ class HardCacheBackend(object):
                 if c == '!profile':
                     self.profile_categories[category] = True
                 elif c.startswith("!"):
-                    raise ValueError("WTF is [%s] in hardcache_overrides?" % c)
+                    raise ValueError(f"WTF is [{c}] in hardcache_overrides?")
                 else:
                     all_enginenames.add(c)
                     enginenames_by_category[category].append(c)
@@ -97,7 +97,7 @@ class HardCacheBackend(object):
         elif type == 'readslave':
             return random.choice(engines[1:])
         else:
-            raise ValueError("invalid type %s" % type)
+            raise ValueError(f"invalid type {type}")
 
     def profile_start(self, operation, category):
         if category == COUNT_CATEGORY:
@@ -214,13 +214,11 @@ class HardCacheBackend(object):
         elif rp.rowcount == 0:
             existing_value = self.get(category, ids, force_write_table=True)
             if existing_value is None:
-                raise ValueError("[%s][%s] can't be incr()ed -- it's not set" %
-                                 (category, ids))
+                raise ValueError(f"[{category}][{ids}] can't be incr()ed -- it's not set")
             else:
-                raise ValueError("[%s][%s] has non-integer value %r" %
-                                 (category, ids, existing_value))
+                raise ValueError(f"[{category}][{ids}] has non-integer value {existing_value!r}")
         else:
-            raise ValueError("Somehow %d rows got updated" % rp.rowcount)
+            raise ValueError(f"Somehow {rp.rowcount} rows got updated")
 
     def get(self, category, ids, force_write_table=False):
         if force_write_table:
@@ -269,7 +267,7 @@ class HardCacheBackend(object):
 
         for row in rows:
           if row.expiration >= datetime.now(TZ):
-              k = "%s-%s" % (category, row.ids)
+              k = f"{category}-{row.ids}"
               results[k] = self.tdb.db2py(row.value, row.kind)
 
         return results

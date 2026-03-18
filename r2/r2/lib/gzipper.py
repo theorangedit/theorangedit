@@ -120,7 +120,7 @@ class GzipMiddleware(object):
         # make sure this is one of the content-types we're allowed to encode
         content_type = headers["Content-Type"]
         type, subtype, params = parse_mime_type(content_type)
-        if "%s/%s" % (type, subtype) not in ENCODABLE_CONTENT_TYPES:
+        if f"{type}/{subtype}" not in ENCODABLE_CONTENT_TYPES:
             return False
 
         return True

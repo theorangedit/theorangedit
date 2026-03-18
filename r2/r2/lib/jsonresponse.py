@@ -230,7 +230,7 @@ class JQueryResponse(JsonResponse):
             self._new_captcha = True
         
     def get_input(self, name):
-        return self.find("*[name=%s]" % name)
+        return self.find(f"*[name={name}]")
 
     def set_inputs(self, **kw):
         for k, v in kw.items():

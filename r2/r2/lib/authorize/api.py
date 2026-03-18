@@ -92,8 +92,7 @@ class TransactionError(Exception):
 class DuplicateTransactionError(TransactionError):
     def __init__(self, transaction_id):
         self.transaction_id = transaction_id
-        message = ('DuplicateTransactionError with transaction_id %d' %
-                   transaction_id)
+        message = f'DuplicateTransactionError with transaction_id {transaction_id}'
         super().__init__(message)
 
 
@@ -119,11 +118,10 @@ class SimpleXMLObject(object):
 
     @staticmethod
     def simple_tag(name, content, **attrs):
-        attrs = " ".join('%s="%s"' % (k, v) for k, v in attrs.items())
+        attrs = " ".join(f'{k}="{v}"' for k, v in attrs.items())
         if attrs:
             attrs = " " + attrs
-        return ("<%(name)s%(attrs)s>%(content)s</%(name)s>" %
-                dict(name=name, content=content, attrs=attrs))
+        return f"<{name}{attrs}>{content}</{name}>"
 
     def toXML(self):
         content = []
@@ -157,9 +155,7 @@ class SimpleXMLObject(object):
 
 
     def __repr__(self):
-        return "<%s {%s}>" % (self.__class__.__name__,
-                              ",".join("%s=%s" % (k, repr(getattr(self, k)))
-                                       for k in self._used_keys))
+        return f"<{self.__class__.__name__} {{{','.join(f'{k}={getattr(self, k)!r}' for k in self._used_keys)}}}>"
 
     def _name(self):
         name = self.__class__.__name__
@@ -299,7 +295,8 @@ class AuthorizeNetRequest(SimpleXMLObject):
 
     _autoclose_re = re.compile("<([^/]+)/>")
     def _autoclose_handler(self, m):
-        return "<%(m)s></%(m)s>" % dict(m=m.groups()[0])
+        m_val = m.groups()[0]
+        return f"<{m_val}></{m_val}>"
 
     def handle_response(self, res):
         res = self._autoclose_re.sub(self._autoclose_handler, res)
@@ -485,8 +482,7 @@ class CreateCustomerProfileTransactionRequest(AuthorizeNetRequest):
 
     @property
     def extraOptions(self):
-        return "<![CDATA[%s]]>" % "&".join("%s=%s" % x
-                                            for x in self._extra.items())
+        return f"<![CDATA[{'&'.join(f'{k}={v}' for k, v in self._extra.items())}]]>"
 
     def process_response(self, res):
         return (True, self.package_response(res))

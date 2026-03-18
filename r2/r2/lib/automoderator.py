@@ -179,7 +179,7 @@ class AutoModeratorSyntaxError(ValueError):
         yaml_lines = yaml.splitlines()
         if len(yaml_lines) > 10:
             yaml = "\n".join(yaml_lines[:10]) + "\n..."
-        self.message = "%s in rule:\n\n%s" % (message, yaml)
+        self.message = f"{message} in rule:\n\n{yaml}"
 
 
 class AutoModeratorRuleTypeError(AutoModeratorSyntaxError):
@@ -217,7 +217,7 @@ class Ruleset(object):
                 parsed = yaml.safe_load(section)
             except Exception as e:
                 raise ValueError(
-                    "YAML parsing error in section %s: %s" % (section_num, e))
+                    f"YAML parsing error in section {section_num}: {e}")
 
             # only keep the section if the parsed result is a dict (otherwise
             # it's generally just a comment)
@@ -254,7 +254,7 @@ class Ruleset(object):
                     standard_values = standard_rules.get(standard_name, None)
                 if not standard_values:
                     raise AutoModeratorSyntaxError(
-                        "Invalid standard: `%s`" % standard_name,
+                        f"Invalid standard: `{standard_name}`",
                         rule_def.yaml,
                     )
 
@@ -631,7 +631,7 @@ class RuleTarget(object):
                 if value is not None:
                     if not component.validate(value):
                         raise AutoModeratorSyntaxError(
-                            "invalid value for `%s`: `%s`" % (key, value),
+                            f"invalid value for `{key}`: `{value}`",
                             self.parent.yaml,
                         )
                             
@@ -646,7 +646,7 @@ class RuleTarget(object):
             else:
                 if key in values:
                     raise AutoModeratorRuleTypeError(
-                        "Can't use `%s` on this type" % key,
+                        f"Can't use `{key}` on this type",
                         self.parent.yaml,
                     )
 
@@ -676,7 +676,7 @@ class RuleTarget(object):
         matches = self._match_field_key_regex.match(key)
         if not matches:
             raise AutoModeratorSyntaxError(
-                "Invalid search check: `%s`" % key,
+                f"Invalid search check: `{key}`",
                 self.parent.yaml,
             )
         parsed = {}
@@ -688,7 +688,7 @@ class RuleTarget(object):
         for field in fields:
             if field not in all_valid_fields:
                 raise AutoModeratorSyntaxError(
-                    "Unknown field: `%s`" % field,
+                    f"Unknown field: `{field}`",
                     self.parent.yaml,
                 )
 
@@ -697,7 +697,7 @@ class RuleTarget(object):
 
         if not fields:
             raise AutoModeratorRuleTypeError(
-                "Can't search `%s` on this type" % key,
+                f"Can't search `{key}` on this type",
                 self.parent.yaml,
             )
 
@@ -709,7 +709,7 @@ class RuleTarget(object):
         for mod in modifiers:
             if mod not in self._match_modifiers:
                 raise AutoModeratorSyntaxError(
-                    "Unknown modifier `%s` in `%s`" % (mod, key),
+                    f"Unknown modifier `{mod}` in `{key}`",
                     self.parent.yaml,
                 )
 
@@ -770,7 +770,7 @@ class RuleTarget(object):
                 match_patterns[key] = re.compile(pattern, flags)
             except Exception as e:
                 raise AutoModeratorSyntaxError(
-                    "Generated an invalid regex for `%s`: %s" % (key, e),
+                    f"Generated an invalid regex for `{key}`: {e}",
                     self.parent.yaml,
                 )
 
@@ -898,7 +898,7 @@ class RuleTarget(object):
                 # if it's just a number, default to days
                 try:
                     compare_value = int(compare_value)
-                    compare_value = "%s days" % compare_value
+                    compare_value = f"{compare_value} days"
                 except ValueError:
                     pass
 
@@ -1026,7 +1026,7 @@ class RuleTarget(object):
                 ModAction.create(data["subreddit"], ACCOUNT, log_action,
                     target=item, details=reason)
 
-            g.stats.simple_event("automoderator.%s" % self.action)
+            g.stats.simple_event(f"automoderator.{self.action}")
 
         if self.action == "report":
             if self.action_reason:
@@ -1224,7 +1224,7 @@ class Rule(object):
                 value = values.pop(key)
                 if not component.validate(value):
                     raise AutoModeratorSyntaxError(
-                        "invalid value for `%s`: `%s`" % (key, value),
+                        f"invalid value for `{key}`: `{value}`",
                         self.yaml,
                     )
                 setattr(self, key, value)
@@ -1489,9 +1489,9 @@ class Rule(object):
         """Generate the text to post as a comment or send as a message."""
         message = text
         if disclaimer:
-            message = "%s\n\n%s" % (message, DISCLAIMER)
+            message = f"{message}\n\n{DISCLAIMER}"
         if permalink and "{{permalink}}" not in message:
-            message = "{{permalink}}\n\n%s" % message
+            message = f"{{{{permalink}}}}\n\n{message}"
         message = replace_placeholders(message, data, self.matches)
 
         message = VMarkdown('').run(message)
@@ -1513,7 +1513,7 @@ async def run():
             subreddit = item.subreddit_slow
             
             wiki_page_id = wiki_id(subreddit._id36, "config/automoderator")
-            wiki_page_fullname = "WikiPage_%s" % wiki_page_id
+            wiki_page_fullname = f"WikiPage_{wiki_page_id}"
             last_edited = LastModified.get(wiki_page_fullname, "Edit")
             if not last_edited:
                 return
@@ -1538,7 +1538,7 @@ async def run():
                 try:
                     rules = Ruleset(wp.content, timer)
                 except (AutoModeratorSyntaxError, AutoModeratorRuleTypeError):
-                    print("ERROR: Invalid config in /%s/%s" % (g.brander_community_abbr, subreddit.name))
+                    print(f"ERROR: Invalid config in /{g.brander_community_abbr}/{subreddit.name}")
                     return
 
                 rules_by_subreddit[subreddit._id] = rules
@@ -1550,13 +1550,13 @@ async def run():
 
             try:
                 TimeoutFunction(rules.apply_to_item, 2)(item)
-                print("Checked %s from /%s/%s" % (item, g.brander_community_abbr, subreddit.name))
+                print(f"Checked {item} from /{g.brander_community_abbr}/{subreddit.name}")
             except TimeoutFunctionException:
-                print("Timed out on %s from /%s/%s" % (item, g.brander_community_abbr, subreddit.name))
+                print(f"Timed out on {item} from /{g.brander_community_abbr}/{subreddit.name}")
             except KeyboardInterrupt:
                 raise
             except:
-                print("Error on %s from /%s/%s" % (item, g.brander_community_abbr, subreddit.name))
+                print(f"Error on {item} from /{g.brander_community_abbr}/{subreddit.name}")
                 print(traceback.format_exc())
 
     await amqp.consume_items('automoderator_q', process_message, verbose=False)

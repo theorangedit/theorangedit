@@ -45,7 +45,7 @@ class ConfigValue(object):
         try:
             return ConfigValue._bool_map[v.lower()]
         except KeyError:
-            raise ValueError("Unknown value for %r: %r" % (key, v))
+            raise ValueError(f"Unknown value for {key!r}: {v!r}")
 
     @staticmethod
     def tuple(v, key=None):
@@ -83,7 +83,7 @@ class ConfigValue(object):
             try:
                 return choices[v]
             except KeyError:
-                raise ValueError("Unknown option for %r: %r not in %r" % (key, v, choices.keys()))
+                raise ValueError(f"Unknown option for {key!r}: {v!r} not in {choices.keys()!r}")
         return parse_choice
 
     @staticmethod

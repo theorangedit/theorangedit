@@ -27,9 +27,9 @@ __all__ = ["export", "ExportError"]
 
 class ExportError(Exception):
     def __init__(self, module):
-        msg = "Missing __all__ declaration in module %s.  " \
-              "@export cannot be used without declaring __all__ " \
-              "in that module." % (module)
+        msg = (f"Missing __all__ declaration in module {module}.  "
+               "@export cannot be used without declaring __all__ "
+               "in that module.")
         Exception.__init__(self, msg)
 
 

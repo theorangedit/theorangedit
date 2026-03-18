@@ -154,7 +154,7 @@ class PermissionFilteredEmployeeList(object):
         return any(item.lower() == username.lower() for username in self)
 
     def __repr__(self):
-        return "<PermissionFilteredEmployeeList %r>" % (list(self),)
+        return f"<PermissionFilteredEmployeeList {list(self)!r}>"
 
 
 SHUTDOWN_CALLBACKS = []
@@ -496,7 +496,7 @@ class Globals(object):
         if not name.startswith('_') and name in self.config:
             return self.config[name]
         else:
-            raise AttributeError("g has no attr %r" % name)
+            raise AttributeError(f"g has no attr {name!r}")
 
     def setup(self):
         self.env = ''

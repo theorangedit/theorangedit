@@ -261,8 +261,7 @@ def send_queued_mail(test = False):
         try:
             mimetext = email.to_MIMEText()
             if mimetext is None:
-                print ("Got None mimetext for email from %r and to %r"
-                       % (email.fr_addr, email.to_addr))
+                print(f"Got None mimetext for email from {email.fr_addr!r} and to {email.to_addr!r}")
             if test:
                 print(mimetext.as_string())
                 print(g.smtp_server)
@@ -307,8 +306,7 @@ def send_queued_mail(test = False):
                                       leave = False).render(style = "email")
             # handle unknown types here
             elif not email.body:
-                print ("Rejecting email with an empty body from %r and to %r"
-                       % (email.fr_addr, email.to_addr))
+                print(f"Rejecting email with an empty body from {email.fr_addr!r} and to {email.to_addr!r}")
                 email.set_sent(rejected = True)
                 continue
             sendmail(email)
