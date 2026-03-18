@@ -45,7 +45,7 @@ from r2.lib.comment_tree import (
     user_messages,
 )
 from r2.lib.wrapped import Wrapped
-from r2.lib.db import operators, tdb_cassandra
+from r2.lib.db import operators
 from r2.lib.filters import _force_unicode
 from r2.lib.jsontemplates import get_trimmed_sr_dicts
 from r2.lib.utils import (
@@ -59,15 +59,9 @@ from r2.lib.utils import (
 from r2.models import (
     Account,
     Comment,
-    CommentSavesByAccount,
     Link,
-    LinkSavesByAccount,
     Message,
-    MoreChildren,
-    MoreMessages,
-    MoreRecursion,
     Subreddit,
-    Thing,
     wiki,
 )
 from r2.models.admintools import ip_span
@@ -79,6 +73,37 @@ from r2.models.vote import Vote
 
 EXTRA_FACTOR = 1.5
 MAX_RECURSION = 10
+
+
+# ── Comment/message tree sentinel objects ─────────────────────────────────────
+# These are plain Python objects used to represent "load more" placeholders in
+# comment and message trees. They were previously Thing subclasses; now they
+# are simple data holders.
+
+class MoreChildren:
+    """Placeholder for hidden child comments that can be loaded on demand."""
+    def __init__(self, link, sort, depth=0, parent_id=None):
+        self.link = link
+        self.sort = sort
+        self.depth = depth
+        self.parent_id = parent_id
+        self.children = []
+        self.count = 0
+
+
+class MoreRecursion:
+    """Placeholder inserted when a comment thread exceeds max display depth."""
+    def __init__(self, link, depth=0, parent_id=None):
+        self.link = link
+        self.depth = depth
+        self.parent_id = parent_id
+
+
+class MoreMessages:
+    """Placeholder for a collapsed chain of messages."""
+    def __init__(self, parent, child_listing):
+        self.parent = parent
+        self.child_listing = child_listing
 
 
 class InconsistentCommentTreeError(Exception):
@@ -131,8 +156,8 @@ class Builder(object):
         #get likes/dislikes
         try:
             likes = queries.get_likes(user, items)
-        except tdb_cassandra.TRANSIENT_EXCEPTIONS as e:
-            g.log.warning("Cassandra vote lookup failed: %r", e)
+        except Exception as e:
+            g.log.warning("Vote lookup failed: %r", e)
             likes = {}
 
         types = {}
@@ -534,10 +559,33 @@ class QueryBuilder(Builder):
                 before_count,
                 after_count)
 
+async def _by_fullname_multi(names):
+    """Look up a mixed list of fullnames across Link, Comment, and Message."""
+    import asyncio
+    results = {}
+    link_names = [n for n in names if n.startswith('t3_')]
+    comment_names = [n for n in names if n.startswith('t1_')]
+    message_names = [n for n in names if n.startswith('t4_')]
+    other_names = [n for n in names if n not in link_names + comment_names + message_names]
+
+    async def _lookup(cls, ns):
+        for name in ns:
+            try:
+                results[name] = await cls._by_fullname(name)
+            except Exception:
+                pass
+
+    await asyncio.gather(
+        _lookup(Link, link_names),
+        _lookup(Comment, comment_names),
+        _lookup(Message, message_names),
+    )
+    return [results[n] for n in names if n in results]
+
+
 class IDBuilder(QueryBuilder):
-    def thing_lookup(self, names):
-        return Thing._by_fullname(names, data=True, return_dict=False,
-                                  stale=self.stale)
+    async def thing_lookup(self, names):
+        return await _by_fullname_multi(names)
 
     def init_query(self):
         names = list(tup(self.query))
@@ -1908,13 +1956,12 @@ class UserListBuilder(QueryBuilder):
 
 class SavedBuilder(IDBuilder):
     def wrap_items(self, items):
-        categories = LinkSavesByAccount.fast_query(c.user, items).items()
-        categories += CommentSavesByAccount.fast_query(c.user, items).items()
-        categories = {item[1]._id: category for item, category in categories if category}
+        # Save categories (user-defined labels) were stored in Cassandra and
+        # have not yet been migrated to PostgreSQL. All saved items show with
+        # an empty category for now.
         wrapped = QueryBuilder.wrap_items(self, items)
         for w in wrapped:
-            category = categories.get(w._id, '')
-            w.savedcategory = category
+            w.savedcategory = ''
         return wrapped
 
 
