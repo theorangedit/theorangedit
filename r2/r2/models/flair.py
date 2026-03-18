@@ -20,12 +20,13 @@
 # Inc. All Rights Reserved.
 ###############################################################################
 """
-Flair model shim — replaces the Cassandra-backed FlairTemplate and
-FlairTemplateBySubredditIndex classes.
+Flair models — PostgreSQL-backed, fully async.
 
-All flair-template data now lives in the ``flair_templates`` PostgreSQL table
-via the ORM model at r2.models.orm.flair.  The public API of each class is
-preserved so existing call-sites require only minimal changes (adding await).
+* FlairTemplate / FlairTemplateBySubredditIndex: link/user flair templates
+  stored in the ``flair_templates`` table.
+* UserFlair: per-(subreddit, user) flair stored in the ``user_flair`` table.
+
+No legacy Thing/Relation/UserRel imports remain.
 """
 
 from __future__ import annotations
@@ -33,12 +34,9 @@ from __future__ import annotations
 from typing import List, Optional
 
 from r2.lib.context import c
-from r2.lib.db.thing import Relation
-from r2.lib.db.userrel import UserRel
-from r2.lib.app_globals import g
-from r2.models import Account, Subreddit
 from r2.models.orm.flair import FlairTemplate as _ORMFlairTemplate
 import r2.services.flair_templates as _svc
+import r2.services.flair as _flair_svc
 
 
 # ---------------------------------------------------------------------------
@@ -58,25 +56,57 @@ NotFound = type('NotFound', (Exception,), {})
 
 
 # ---------------------------------------------------------------------------
-# Flair relation (PostgreSQL — unchanged)
+# Flair — per-(subreddit, user) flair assignment
 # ---------------------------------------------------------------------------
 
-class Flair(Relation(Subreddit, Account)):
-    _cache = g.thingcache
+class Flair:
+    """Async proxy for a user_flair row."""
+
+    def __init__(self, sr_id: int, account_id: int,
+                 flair_text: Optional[str] = None,
+                 flair_css_class: Optional[str] = None) -> None:
+        self.sr_id = sr_id
+        self.account_id = account_id
+        self.flair_text = flair_text or ''
+        self.flair_css_class = flair_css_class or ''
 
     @classmethod
-    def _cache_prefix(cls):
-        return "flair:"
+    async def get(cls, sr_id: int, account_id: int) -> Optional['Flair']:
+        """Return the Flair for *(sr_id, account_id)*, or None."""
+        row = await _flair_svc.get_flair(c.db, sr_id=sr_id, account_id=account_id)
+        if row is None:
+            return None
+        return cls(row.sr_id, row.account_id, row.flair_text, row.flair_css_class)
 
+    @classmethod
+    async def set(
+        cls,
+        sr_id: int,
+        account_id: int,
+        flair_text: Optional[str],
+        flair_css_class: Optional[str],
+    ) -> Optional['Flair']:
+        """Upsert flair; returns None when both values are empty (row deleted)."""
+        row = await _flair_svc.set_flair(
+            c.db,
+            sr_id=sr_id,
+            account_id=account_id,
+            flair_text=flair_text,
+            flair_css_class=flair_css_class,
+        )
+        if row is None:
+            return None
+        return cls(row.sr_id, row.account_id, row.flair_text, row.flair_css_class)
 
-Subreddit.__bases__ += (
-    UserRel(
-        name='flair',
-        relation=Flair,
-        disable_ids_fn=True,
-        disable_reverse_ids_fn=True,
-    ),
-)
+    @classmethod
+    async def for_subreddit(
+        cls,
+        sr_id: int,
+        account_ids: Optional[List[int]] = None,
+    ) -> List['Flair']:
+        """Return all Flair rows for *sr_id*, optionally scoped to *account_ids*."""
+        rows = await _flair_svc.get_flairs_for_sr(c.db, sr_id=sr_id, account_ids=account_ids)
+        return [cls(r.sr_id, r.account_id, r.flair_text, r.flair_css_class) for r in rows]
 
 
 # ---------------------------------------------------------------------------
@@ -135,18 +165,12 @@ class FlairTemplate:
         Raises NotFound if the row does not exist.
         """
         orm = await _svc.get_by_id(c.db, ft_id)
-        # get_by_id raises _svc.NotFound; re-raise as our NotFound
         return cls(orm)
 
     # -- Business logic -----------------------------------------------------
 
     def covers(self, other_template) -> bool:
-        """Return True if *other_template* is a subset of this template.
-
-        *other_template* may be another FlairTemplate or a ``(text,
-        css_class)`` tuple.  The tuple form is treated as a template that
-        does not permit editable text.
-        """
+        """Return True if *other_template* is a subset of this template."""
         if isinstance(other_template, FlairTemplate):
             text_editable = other_template.text_editable
             text, css_class = other_template.text, other_template.css_class
@@ -269,6 +293,8 @@ class FlairTemplateBySubredditIndex:
 
         Returns True if a row was deleted.
         """
+        from r2.lib.app_globals import g
+
         if flair_type:
             flair_types = [flair_type]
         else:
@@ -291,10 +317,7 @@ class FlairTemplateBySubredditIndex:
         flair_type: str = USER_FLAIR,
         position: Optional[int] = None,
     ) -> None:
-        """Move/insert *ft_id* to *position* within *sr_id* / *flair_type*.
-
-        A *position* of None appends at the end.
-        """
+        """Move/insert *ft_id* to *position* within *sr_id* / *flair_type*."""
         await _svc.reorder(
             c.db,
             sr_id=sr_id,
@@ -310,9 +333,7 @@ class FlairTemplateBySubredditIndex:
         flair_type: str,
         position: Optional[int],
     ) -> List[str]:
-        """Return the full ordered ID list after inserting *ft_id* at *position*."""
         ids = await cls.get_template_ids(sr_id, flair_type=flair_type)
-        # Remove if already present (move semantics)
         if ft_id in ids:
             ids.remove(ft_id)
         if position is None:

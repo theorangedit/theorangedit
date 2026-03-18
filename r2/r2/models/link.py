@@ -153,6 +153,13 @@ async def _link_commit(self):
     link_svc._cache_set(self)
 
 
+async def _link_set_flair(self, text: Optional[str], css_class: Optional[str], **_kwargs) -> None:
+    """Write flair directly onto the link's own columns and persist."""
+    self.flair_text = text or None
+    self.flair_css_class = css_class or None
+    await self._commit()
+
+
 # -- property shims ----------------------------------------------------------
 
 def _link_prop_id(self) -> int:
@@ -197,6 +204,7 @@ _LinkORM._byID = _link_byID
 _LinkORM._by_fullname = _link_by_fullname
 _LinkORM._by_url = _link_by_url
 _LinkORM._commit = _link_commit
+_LinkORM.set_flair = _link_set_flair
 
 _LinkORM._id = property(_link_prop_id)
 _LinkORM._fullname = property(_link_prop_fullname_shim)

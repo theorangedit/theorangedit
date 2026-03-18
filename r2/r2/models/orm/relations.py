@@ -199,3 +199,17 @@ class SubscriptionByDay(Base):
     sr_id: Mapped[int] = mapped_column(BigInteger, ForeignKey('subreddits.id', ondelete='CASCADE'), nullable=False, index=True)
     date: Mapped[date] = mapped_column(Date, nullable=False)
     delta: Mapped[int] = mapped_column(Integer, default=0)
+
+
+class UserFlair(Base):
+    """Per-(subreddit, user) flair assignment."""
+
+    __tablename__ = 'user_flair'
+    __table_args__ = (UniqueConstraint('sr_id', 'account_id'),)
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+    sr_id: Mapped[int] = mapped_column(BigInteger, ForeignKey('subreddits.id', ondelete='CASCADE'), nullable=False, index=True)
+    account_id: Mapped[int] = mapped_column(BigInteger, ForeignKey('accounts.id', ondelete='CASCADE'), nullable=False, index=True)
+    flair_text: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    flair_css_class: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    date: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())

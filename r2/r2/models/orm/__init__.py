@@ -24,6 +24,7 @@ from r2.models.orm.relations import (
     MessageInbox,
     BlockedSubreddit,
     SubscriptionByDay,
+    UserFlair,
 )
 from r2.models.orm.tokens import Token, OAuthClient, OAuthClientDeveloper
 from r2.models.orm.modaction import ModAction
@@ -49,7 +50,7 @@ __all__ = [
     'SubredditBanned', 'SubredditWikibanned', 'SubredditWikicontributor',
     'SubredditMuted', 'LinkSave', 'CommentSave', 'LinkHide', 'LinkVisit',
     'LinkVote', 'CommentVote', 'LinkReport', 'CommentReport',
-    'CommentInbox', 'MessageInbox', 'BlockedSubreddit', 'SubscriptionByDay',
+    'CommentInbox', 'MessageInbox', 'BlockedSubreddit', 'SubscriptionByDay', 'UserFlair',
     'Token', 'OAuthClient', 'OAuthClientDeveloper',
     'ModAction',
     'WikiPage', 'WikiRevision', 'FlairTemplate',

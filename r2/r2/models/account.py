@@ -216,6 +216,27 @@ async def incr_karma(self, kind: str, sr, amt: int) -> None:
     )
 
 
+async def set_flair(self, sr, text: Optional[str], css_class: Optional[str], **_kwargs) -> None:
+    """Set (or clear) user flair in *sr*."""
+    import r2.services.flair as _flair_svc
+    await _flair_svc.set_flair(c.db, sr_id=sr.id, account_id=self.id,
+                               flair_text=text, flair_css_class=css_class)
+
+
+async def flair_text(self, sr_id: int, obey_disabled: bool = False) -> str:
+    """Return this account's flair text in *sr_id*, or ''."""
+    import r2.services.flair as _flair_svc
+    row = await _flair_svc.get_flair(c.db, sr_id=sr_id, account_id=self.id)
+    return (row.flair_text or '') if row else ''
+
+
+async def flair_css_class(self, sr_id: int, obey_disabled: bool = False) -> str:
+    """Return this account's flair CSS class in *sr_id*, or ''."""
+    import r2.services.flair as _flair_svc
+    row = await _flair_svc.get_flair(c.db, sr_id=sr_id, account_id=self.id)
+    return (row.flair_css_class or '') if row else ''
+
+
 # ---------------------------------------------------------------------------
 # Patch all compat members onto the ORM class
 # ---------------------------------------------------------------------------
@@ -241,6 +262,9 @@ _AccountORM.comment_karma = property(_prop_comment_karma)
 _AccountORM.make_cookie = make_cookie
 _AccountORM.verify_password = verify_password
 _AccountORM.incr_karma = incr_karma
+_AccountORM.set_flair = set_flair
+_AccountORM.flair_text = flair_text
+_AccountORM.flair_css_class = flair_css_class
 
 # Public name – everything in the codebase imports `Account` from here.
 Account = _AccountORM

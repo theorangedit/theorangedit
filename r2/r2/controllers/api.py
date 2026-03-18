@@ -3968,7 +3968,7 @@ class ApiController(RedditController):
             VNotInTimeout().run(action_name="editflair", details_text="set",
                 target=link)
 
-            link.set_flair(text, css_class, set_by=c.user)
+            await link.set_flair(text, css_class, set_by=c.user)
         else:
             if form.has_errors("name", errors.BAD_FLAIR_TARGET):
                 return
@@ -3977,7 +3977,7 @@ class ApiController(RedditController):
             VNotInTimeout().run(action_name="editflair", details_text="set",
                 target=user)
 
-            user.set_flair(c.site, text, css_class, set_by=c.user)
+            await user.set_flair(c.site, text, css_class, set_by=c.user)
 
             # XXX: this is still gross with all the UI code in here
             if not text and not css_class:
@@ -4007,7 +4007,7 @@ class ApiController(RedditController):
 
         VNotInTimeout().run(action_name="editflair", details_text="delete",
             target=user)
-        user.set_flair(c.site, None, None, set_by=c.user)
+        await user.set_flair(c.site, None, None, set_by=c.user)
 
         jquery(f'#flairrow_{user._id36}').remove()
         unflair = WrappedUser(
@@ -4077,7 +4077,7 @@ class ApiController(RedditController):
                 continue
 
             # all validation passed, enflair the user
-            user.set_flair(
+            await user.set_flair(
                 c.site, text, css_class, set_by=c.user, log_details="csv")
 
             if text or css_class:
@@ -4365,7 +4365,7 @@ class ApiController(RedditController):
         if flair_type == LINK_FLAIR:
             VNotInTimeout().run(action_name="editflair", details_text="select",
                 target=link)
-            link.set_flair(text, css_class, set_by=c.user)
+            await link.set_flair(text, css_class, set_by=c.user)
 
             # XXX: gross UI code
             # Push some client-side updates back to the browser.
@@ -4390,7 +4390,7 @@ class ApiController(RedditController):
         else:
             VNotInTimeout().run(action_name="editflair", details_text="select",
                 target=user)
-            user.set_flair(subreddit, text, css_class, set_by=c.user)
+            await user.set_flair(subreddit, text, css_class, set_by=c.user)
 
             # XXX: gross UI code
             # Push some client-side updates back to the browser.
