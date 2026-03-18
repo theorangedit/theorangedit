@@ -49,7 +49,7 @@ def renderurl_cached(path):
         return fp, proxyurl(u)
     except HTTPError as e:
         if e.code != 404:
-            print("error %s" % e.code)
+            print(f"error {e.code}")
             print(e.fp.read())
         return (None, None)
 
@@ -87,8 +87,7 @@ class EmbedController(RedditController):
     GET_help = POST_help = renderurl
 
     def GET_blog(self):
-        return self.redirect("https://blog.%s/" %
-                             get_domain(subreddit=False, no_www=True))
+        return self.redirect(f"https://blog.{get_domain(subreddit=False, no_www=True)}/")
 
     def GET_faq(self):
         if c.default_sr:

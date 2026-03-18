@@ -43,5 +43,5 @@ async def cache_health():
             results[server] = "OK"
         except pylibmc.Error as e:
             g.log.warning("Health check for %s FAILED: %s", server, e)
-            results[server] = "FAILED %s" % e
+            results[server] = f"FAILED {e}"
     return JSONResponse(results)

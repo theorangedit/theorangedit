@@ -322,7 +322,7 @@ class MultiApiController(RedditController):
             to_multi.description_md += '\n\n'
         to_multi.description_md += _('copied from %(source)s') % {
             # force markdown linking since /user/foo is not autolinked
-            'source': '[%s](%s)' % (from_path, from_path)
+            'source': f'[{from_path}]({from_path})'
         }
         to_multi.visibility = 'private'
         if display_name:

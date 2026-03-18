@@ -286,10 +286,10 @@ class SubredditListingController(ListingController):
         # This doesn't handle `max_length`s shorter than `sr_fragment`.
         # Unknown what the behavior should be, but realistically it shouldn't
         # happen, since this is scoped pretty small.
-        max_title_length = max_length - len(u" • %s" % sr_fragment)
+        max_title_length = max_length - len(f" • {sr_fragment}")
         title = trunc_string(title, max_title_length)
 
-        return u"%s • %s" % (_force_unicode(title), sr_fragment)
+        return f"{_force_unicode(title)} • {sr_fragment}"
 
     def canonical_link(self):
         """Return the canonical link of the subreddit.
@@ -622,7 +622,7 @@ class BrowseController(ListingWithPromos):
         """For merged time-listings, don't show items that are too old
            (this can happen when mr_top hasn't run in a while)"""
         if self.time != 'all' and c.default_sr:
-            oldest = timeago('1 %s' % (str(self.time),))
+            oldest = timeago(f'1 {self.time}')
             def keep(item):
                 if isinstance(c.site, AllSR):
                     if not item.subreddit.discoverable:
@@ -780,9 +780,9 @@ class UserController(ListingController):
                                         css_class='primary')]
                 for srname in srnames:
                     sr_buttons.append(QueryButton(srname, srname, query_param='sr'))
-                base_path = '/user/%s/saved' % self.vuser.name
+                base_path = f'/user/{self.vuser.name}/saved'
                 if self.savedcategory:
-                    base_path += '/%s' % urllib.parse.quote(self.savedcategory)
+                    base_path += f'/{urllib.parse.quote(self.savedcategory)}'
                 sr_menu = NavMenu(sr_buttons, base_path=base_path,
                                   title=_('filter by subreddit'),
                                   type='lightdrop')
@@ -796,14 +796,14 @@ class UserController(ListingController):
                     cat_buttons.append(NavButton(cat,
                                                  urllib.parse.quote(cat),
                                                  use_params=True))
-                base_path = '/user/%s/saved/' % self.vuser.name
+                base_path = f'/user/{self.vuser.name}/saved/'
                 cat_menu = NavMenu(cat_buttons, base_path=base_path,
                                    title=_('filter by category'),
                                    type='lightdrop')
                 res.append(cat_menu)
         elif (self.where == 'gilded' and
                 (c.user == self.vuser or c.user_is_admin)):
-            path = '/user/%s/gilded/' % self.vuser.name
+            path = f'/user/{self.vuser.name}/gilded/'
             buttons = [NavButton(_("gildings received"), dest='/'),
                        NavButton(_("gildings given"), dest='/given')]
             res.append(NavMenu(buttons, base_path=path, type='flatlist'))
@@ -846,7 +846,7 @@ class UserController(ListingController):
                     return False
 
             if (self.time != 'all' and
-                item._date <= utils.timeago('1 %s' % str(self.time))):
+                item._date <= utils.timeago(f'1 {self.time}')):
                 return False
 
             if self.where == 'gilded' and item.gildings <= 0:
@@ -1070,7 +1070,7 @@ class UserController(ListingController):
 
     @validate(VUser())
     def GET_rel_user_redirect(self, rest=""):
-        url = "/user/%s/%s" % (c.user.name, rest)
+        url = f"/user/{c.user.name}/{rest}"
         if request.query_string:
             url += "?" + request.query_string
         return self.redirect(url, code=302)
@@ -1788,10 +1788,7 @@ class UserListListingController(ListingController):
         # having this suffix, to make similar tabs on different subreddits
         # distinct.
         if self.where == 'moderators':
-            return '%(section)s - /r/%(subreddit)s' % {
-                'section': section_title,
-                'subreddit': c.site.name,
-            }
+            return f'{section_title} - /r/{c.site.name}'
 
         return section_title
 

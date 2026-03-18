@@ -87,7 +87,7 @@ redditbroke =  \
 FAILIEN_COUNT = 3
 def make_failien_url():
     failien_number = random.randint(1, FAILIEN_COUNT)
-    failien_name = "youbrokeit%d.png" % failien_number
+    failien_name = f"youbrokeit{failien_number}.png"
     return static(failien_name)
 
 
@@ -118,7 +118,7 @@ class ErrorController(RedditController):
             # ignore an attempt to redirect from an error page
             pass
         except Exception as e:
-            handle_awful_failure("ErrorController.__before__: %r" % e)
+            handle_awful_failure(f"ErrorController.__before__: {e!r}")
 
         # c.error_page is special-cased in a couple places to bypass
         # c.site checks. We shouldn't allow the user to get here other
@@ -130,13 +130,13 @@ class ErrorController(RedditController):
         try:
             RedditController.__after__(self)
         except Exception as e:
-            handle_awful_failure("ErrorController.__after__: %r" % e)
+            handle_awful_failure(f"ErrorController.__after__: {e!r}")
 
     def __call__(self, environ, start_response):
         try:
             return RedditController.__call__(self, environ, start_response)
         except Exception as e:
-            return handle_awful_failure("ErrorController.__call__: %r" % e)
+            return handle_awful_failure(f"ErrorController.__call__: {e!r}")
 
 
     def send400(self):
@@ -260,7 +260,7 @@ class ErrorController(RedditController):
             else:
                 return "page not found"
         except Exception as e:
-            return handle_awful_failure("ErrorController.GET_document: %r" % e)
+            return handle_awful_failure(f"ErrorController.GET_document: {e!r}")
 
     POST_document = GET_document
     PUT_document = GET_document

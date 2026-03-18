@@ -101,31 +101,29 @@ def get_blob(code):
         if not blob:
             raise NotFound("No payment_blob-" + code)
         if blob.get('status', None) != 'initialized':
-            raise ValueError("payment_blob %s has status = %s" %
-                             (code, blob.get('status', None)))
+            raise ValueError(f"payment_blob {code} has status = {blob.get('status', None)}")
         blob['status'] = "locked"
         g.hardcache.set(key, blob, BLOB_TTL)
     return key, blob
 
 
 def update_blob(code, updates=None):
-    blob = g.hardcache.get("payment_blob-%s" % code)
+    blob = g.hardcache.get(f"payment_blob-{code}")
     if not blob:
         raise NotFound("No payment_blob-" + code)
     if blob.get('account_id', None) != c.user._id:
-        raise ValueError("%s doesn't have access to payment_blob %s" %
-                         (c.user._id, code))
+        raise ValueError(f"{c.user._id} doesn't have access to payment_blob {code}")
 
     for item, value in updates.items():
         blob[item] = value
-    g.hardcache.set("payment_blob-%s" % code, blob, BLOB_TTL)
+    g.hardcache.set(f"payment_blob-{code}", blob, BLOB_TTL)
 
 
 def has_blob(custom):
     if not custom:
         return False
 
-    blob = g.hardcache.get('payment_blob-%s' % custom)
+    blob = g.hardcache.get(f'payment_blob-{custom}')
     return bool(blob)
 
 def dump_parameters(parameters):
@@ -155,7 +153,7 @@ def check_payment_status(payment_status):
     elif psl == '':
         return (None, psl)
     else:
-        raise ValueError("Unknown IPN status: %r" % payment_status)
+        raise ValueError(f"Unknown IPN status: {payment_status!r}")
 
 def check_txn_type(txn_type, psl):
     if txn_type == 'subscr_signup':
@@ -180,8 +178,7 @@ def check_txn_type(txn_type, psl):
     elif txn_type == "paypal_here":
         return ("Ok", None)
     else:
-        raise ValueError("Unknown IPN txn_type / psl %r" %
-                         ((txn_type, psl),))
+        raise ValueError(f"Unknown IPN txn_type / psl {(txn_type, psl)!r}")
 
 
 async def existing_subscription(subscr_id, paying_id, custom):
@@ -263,7 +260,7 @@ async def send_gift(buyer, recipient, months, days, signed, giftmessage,
 
     if signed:
         sender = buyer.name
-        md_sender = "/u/%s" % sender
+        md_sender = f"/u/{sender}"
         repliable = True
     else:
         sender = "An anonymous redditor"
@@ -279,10 +276,10 @@ async def send_gift(buyer, recipient, months, days, signed, giftmessage,
     if months == 1:
         amount = "a month"
     else:
-        amount = "%d months" % months
+        amount = f"{months} months"
 
     if not thing:
-        subject = 'Let there be gold! %s just sent you reddit gold!' % sender
+        subject = f'Let there be gold! {sender} just sent you reddit gold!'
         message = strings.youve_got_gold % dict(sender=md_sender, amount=amount)
     else:
         url = thing.make_permalink_slow()
@@ -338,7 +335,7 @@ def send_gold_code(buyer, months, days,
     if months == 1:
         amount = "a month"
     else:
-        amount = "%d months" % months
+        amount = f"{months} months"
 
     subject = _('Your gold gift code has been generated!')
     message = _('Here is your gift code for %(amount)s of reddit gold:\n\n'
@@ -378,15 +375,13 @@ class IpnController(RedditController):
 
         blob_key, payment_blob = get_blob(passthrough)
         if payment_blob["goldtype"] not in ("gift", "code", "onetime"):
-            raise ValueError("/spendcreddits payment_blob %s has goldtype %s" %
-                             (passthrough, payment_blob["goldtype"]))
+            raise ValueError(f"/spendcreddits payment_blob {passthrough} has goldtype {payment_blob['goldtype']}")
 
         if payment_blob["account_id"] != c.user._id:
-            fmt = ("/spendcreddits payment_blob %s has userid %d " +
-                   "but c.user._id is %d")
-            raise ValueError(fmt % passthrough,
-                             payment_blob["account_id"],
-                             c.user._id)
+            raise ValueError(
+                f"/spendcreddits payment_blob {passthrough} has userid "
+                f"{payment_blob['account_id']} but c.user._id is {c.user._id}"
+            )
 
         if payment_blob["goldtype"] == "gift":
             signed = payment_blob["signed"]
@@ -396,8 +391,7 @@ class IpnController(RedditController):
             try:
                 recipient = await Account._by_name(recipient_name)
             except NotFound:
-                raise ValueError("Invalid username %s in spendcreddits, buyer = %s"
-                                 % (recipient_name, c.user.name))
+                raise ValueError(f"Invalid username {recipient_name} in spendcreddits, buyer = {c.user.name}")
 
             if recipient._deleted:
                 form.set_text(".status", _("that user has deleted their account"))
@@ -408,9 +402,7 @@ class IpnController(RedditController):
 
         with creddits_lock(c.user):
             if not c.user.employee and c.user.gold_creddits < months:
-                msg = "%s is trying to sneak around the creddit check"
-                msg %= c.user.name
-                raise ValueError(msg)
+                raise ValueError(f"{c.user.name} is trying to sneak around the creddit check")
 
             if payment_blob["goldtype"] == "gift":
                 thing_fullname = payment_blob.get("thing")
@@ -482,13 +474,13 @@ class IpnController(RedditController):
         elif subscription == "cancel":
             cancel_subscription(parameters['subscr_id'])
         else:
-            raise ValueError("Weird subscription: %r" % subscription)
+            raise ValueError(f"Weird subscription: {subscription!r}")
 
         if response:
             return response
 
         if mc_currency != 'USD':
-            raise ValueError("Somehow got non-USD IPN %r" % mc_currency)
+            raise ValueError(f"Somehow got non-USD IPN {mc_currency!r}")
 
         if not (txn_id and paying_id and payer_email and mc_gross):
             dump_parameters(parameters)
@@ -522,8 +514,7 @@ class IpnController(RedditController):
 
         if not custom:
             dump_parameters(parameters)
-            raise ValueError("Got IPN with txn_id=%s and no custom"
-                             % txn_id)
+            raise ValueError(f"Got IPN with txn_id={txn_id} and no custom")
 
         self.finish(parameters, "P" + txn_id,
                     payer_email, paying_id, subscr_id,
@@ -547,13 +538,12 @@ class IpnController(RedditController):
                 buyer = await Account._byID(buyer_id, data=True)
             except NotFound:
                 dump_parameters(parameters)
-                raise ValueError("Invalid buyer_id %d in IPN with custom='%s'"
-                                 % (buyer_id, custom))
+                raise ValueError(f"Invalid buyer_id {buyer_id} in IPN with custom='{custom}'")
         else:
             buyer_email = payment_blob.get('email')
             if not buyer_email:
                 dump_parameters(parameters)
-                error = "No buyer_id or email in IPN with custom='%s'" % custom
+                error = f"No buyer_id or email in IPN with custom='{custom}'"
                 raise ValueError(error)
 
         if subscr_id:
@@ -594,8 +584,7 @@ class IpnController(RedditController):
                 recipient = await Account._by_name(recipient_name)
             except NotFound:
                 dump_parameters(parameters)
-                raise ValueError("Invalid recipient_name %s in IPN/GC with custom='%s'"
-                                 % (recipient_name, custom))
+                raise ValueError(f"Invalid recipient_name {recipient_name} in IPN/GC with custom='{custom}'")
             signed = payment_blob.get("signed", False)
             giftmessage = _force_unicode(payment_blob.get("giftmessage", ""))
             thing_fullname = payment_blob.get("thing")
@@ -614,7 +603,7 @@ class IpnController(RedditController):
             pass
         else:
             dump_parameters(parameters)
-            raise ValueError("Got status '%s' in IPN/GC" % payment_blob['status'])
+            raise ValueError(f"Got status '{payment_blob['status']}' in IPN/GC")
 
         if payment_blob['goldtype'] == 'code':
             send_gold_code(buyer, months, days, txn_id, payer_email,
@@ -677,7 +666,7 @@ class Webhook(object):
         self.thing = thing._fullname if thing else None
 
     def __repr__(self):
-        return '<%s: transaction %s>' % (self.__class__.__name__, self.transaction_id)
+        return f'<{self.__class__.__name__}: transaction {self.transaction_id}>'
 
 
 class GoldPaymentController(RedditController):
@@ -848,15 +837,14 @@ class GoldPaymentController(RedditController):
             elif goldtype == 'creddits':
                 buyer._incr('gold_creddits', months)
                 subject = "thanks for buying creddits!"
-                message = ("To spend them, visit %s://%s/gold or your "
-                           "favorite person's userpage." % (g.default_scheme,
-                                                            g.domain))
+                message = (f"To spend them, visit {g.default_scheme}://{g.domain}/gold or your "
+                           "favorite person's userpage.")
 
             elif goldtype == 'gift':
                 send_gift(buyer, recipient, months, days, signed, giftmessage,
                           thing)
                 subject = "thanks for giving reddit gold!"
-                message = "Your gift to %s has been delivered." % recipient.name
+                message = f"Your gift to {recipient.name} has been delivered."
 
             try:
                 create_claimed_gold(transaction_id, payer_email, payer_id,
@@ -964,14 +952,14 @@ class StripeController(GoldPaymentController):
 
         event_type = cls.event_type_mappings.get(status)
         if not event_type:
-            raise ValueError('Stripe: unrecognized status %s' % status)
+            raise ValueError(f'Stripe: unrecognized status {status}')
         elif event_type == 'noop':
             return status, None
 
         charge = event.data.object
         description = charge.description
         invoice_id = charge.invoice
-        transaction_id = 'S%s' % charge.id
+        transaction_id = f'S{charge.id}'
         pennies = charge.amount
         months, days = months_and_days_from_pennies(pennies)
 
@@ -1001,7 +989,7 @@ class StripeController(GoldPaymentController):
                 # don't raise exception if charge date is within the past hour
                 # db replication lag may cause the account lookup to fail
                 if charge_date < timeago('1 hour'):
-                    raise ValueError('no buyer for charge: %s' % charge.id)
+                    raise ValueError(f'no buyer for charge: {charge.id}')
                 else:
                     abort(404, "not found")
             webhook = Webhook(transaction_id=transaction_id,
@@ -1046,7 +1034,7 @@ class StripeController(GoldPaymentController):
             amount=pennies,
             currency="usd",
             customer=customer['id'],
-            description='%s-%s' % (passthrough, description),
+            description=f'{passthrough}-{description}',
         )
         return charge
 
@@ -1203,7 +1191,7 @@ class CoinbaseController(GoldPaymentController):
             return 'payout', None
 
         order = event_dict['order']
-        transaction_id = 'C%s' % order['id']
+        transaction_id = f"C{order['id']}"
         status = order['status']    # new/completed/cancelled
         pennies = int(order['total_native']['cents'])
         months, days = months_and_days_from_pennies(pennies, discount=True)
@@ -1240,7 +1228,7 @@ class RedditGiftsController(GoldPaymentController):
     async def process_response(self):
         data = request.POST
 
-        transaction_id = 'RG%s' % data['transaction_id']
+        transaction_id = f"RG{data['transaction_id']}"
         pennies = int(data['pennies'])
         months = int(data['months'])
         status = 'succeeded'
@@ -1273,7 +1261,7 @@ async def validate_blob(custom):
     if not custom:
         raise GoldException('no custom')
 
-    payment_blob = g.hardcache.get('payment_blob-%s' % str(custom))
+    payment_blob = g.hardcache.get(f'payment_blob-{custom}')
     if not payment_blob:
         raise GoldException('no payment_blob')
 
@@ -1344,7 +1332,7 @@ async def reverse_gold_purchase(transaction_id):
     transaction = retrieve_gold_transaction(transaction_id)
 
     if not transaction:
-        raise GoldException('gold_table %s not found' % transaction_id)
+        raise GoldException(f'gold_table {transaction_id} not found')
 
     buyer = await Account._byID(int(transaction.account_id), data=True)
     recipient = None
@@ -1389,7 +1377,7 @@ def cancel_stripe_subscription(customer_id):
 
 
 def subscr_pm(pennies, months, new_subscr=True):
-    price = "$%0.2f" % (pennies/100.0)
+    price = f"${pennies/100.0:.2f}"
     if new_subscr:
         if months % 12 == 0:
             message = _("You have created a yearly Reddit Gold subscription "

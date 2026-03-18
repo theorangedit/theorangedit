@@ -71,7 +71,7 @@ class ButtonsController(RedditController):
         if not buttontype:
             abort(404)
 
-        return self.redirect('/static/button/button%s.js' % buttontype,
+        return self.redirect(f'/static/button/button{buttontype}.js',
                              code=301)
 
     @validate(buttonimage = VInt('i', 0, 14),

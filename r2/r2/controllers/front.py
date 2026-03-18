@@ -107,15 +107,14 @@ class FrontController(RedditController):
             if not article.subreddit_slow.can_view(c.user):
                 self.abort403()
 
-            new_url = "/%s/%s/%s" % \
-                      (dest, article._id36,
-                       quote_plus(title_to_url(article.title).encode('utf-8')))
+            title_encoded = quote_plus(title_to_url(article.title).encode('utf-8'))
+            new_url = f"/{dest}/{article._id36}/{title_encoded}"
             if not c.default_sr:
-                new_url = "/r/%s%s" % (c.site.name, new_url)
+                new_url = f"/r/{c.site.name}{new_url}"
             if comment:
-                new_url = new_url + "/%s" % comment._id36
+                new_url = new_url + f"/{comment._id36}"
             if c.extension:
-                new_url = new_url + "/.%s" % c.extension
+                new_url = new_url + f"/.{c.extension}"
 
             new_url = new_url + query_string(request.GET)
 
@@ -543,7 +542,7 @@ class FrontController(RedditController):
         else:
             link_text = _("show %d") % max_comm
 
-        limit_param = "?limit=%d" % max_comm
+        limit_param = f"?limit={max_comm}"
 
         if gold:
             link_class = "gold"
@@ -926,7 +925,7 @@ class FrontController(RedditController):
             return self.abort404()
         else:
             VNotInTimeout().run(action_name="pageview",
-                details_text="editreddit_%s" % location, target=c.site)
+                details_text=f"editreddit_{location}", target=c.site)
             return await self._edit_normal_reddit(location, created)
 
     @require_oauth2_scope("read")

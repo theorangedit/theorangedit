@@ -399,7 +399,7 @@ class ApiController(RedditController):
         else:
             # Only let users in timeout message the admins
             if (to and not (isinstance(to, Subreddit) and
-                    '/r/%s' % to.name == g.admin_message_acct)):
+                    f'/r/{to.name}' == g.admin_message_acct)):
                 VNotInTimeout().run(target=to)
             m, inbox_rel = Message._new(c.user, to, subject, body, request.ip)
 
@@ -559,7 +559,7 @@ class ApiController(RedditController):
             ban = is_banned_domain(url)
             if ban:
                 g.stats.simple_event('spam.domainban.link_url')
-                admintools.spam(l, banner = "domain (%s)" % ban.banmsg)
+                admintools.spam(l, banner = f"domain ({ban.banmsg})")
                 hooks.get_hook('banned_domain.submit').call(item=l, url=url,
                                                             ban=ban)
 
@@ -573,7 +573,7 @@ class ApiController(RedditController):
 
         path = add_sr(l.make_permalink_slow())
         if extension:
-            path += ".%s" % extension
+            path += f".{extension}"
 
         form.redirect(path)
         form._send_data(url=path)
@@ -1003,9 +1003,9 @@ class ApiController(RedditController):
                 not c.user_is_admin and
                 container.use_quotas):
             sr_ratelimit = SimpleRateLimit(
-                name="sr_%s_%s" % (str(type), container._id36),
+                name=f"sr_{type}_{container._id36}",
                 seconds=g.sr_quota_time,
-                limit=getattr(g, "sr_%s_quota" % type),
+                limit=getattr(g, f"sr_{type}_quota"),
             )
             if not sr_ratelimit.record_and_check():
                 form.set_text(".status", errors.SUBREDDIT_RATELIMIT)
@@ -1027,7 +1027,7 @@ class ApiController(RedditController):
             if form.has_errors("ban_message", errors.TOO_LONG):
                 return
             if ban_reason and note:
-                note = "%s: %s" % (ban_reason, note)
+                note = f"{ban_reason}: {note}"
             elif ban_reason:
                 note = ban_reason
 
@@ -1108,7 +1108,7 @@ class ApiController(RedditController):
                         duration,
                     )
                     log_details = "changed to " if not new else ""
-                    log_details += "%d days" % duration
+                    log_details += f"{duration} days"
             elif not new and existing_ban:
                 # Preexisting temp ban and no duration specified means turn
                 # the temporary ban into a permanent one.
@@ -1425,10 +1425,7 @@ class ApiController(RedditController):
             if not was_deleted:
                 # get lock before writing to avoid multiple decrements when
                 # there are simultaneous duplicate requests
-                lock_key = "lock:del_{link}_{comment}".format(
-                    link=link._id36,
-                    comment=thing._id36,
-                )
+                lock_key = f"lock:del_{link._id36}_{thing._id36}"
                 if g.lock_cache.add(lock_key, "", time=60):
                     link._incr('num_comments', -1)
 
@@ -1755,14 +1752,14 @@ class ApiController(RedditController):
         )
 
         if isinstance(thing, (Link, Message)):
-            button = jquery(".id-%s .report-button" % thing._fullname)
+            button = jquery(f".id-{thing._fullname} .report-button")
         elif isinstance(thing, Comment):
-            button = jquery(".id-%s .entry:first .report-button" % thing._fullname)
+            button = jquery(f".id-{thing._fullname} .entry:first .report-button")
         else:
             return
 
         button.text(_("reported"))
-        parent_div = jquery(".report-%s.reportform" % thing._fullname)
+        parent_div = jquery(f".report-{thing._fullname}.reportform")
         parent_div.removeClass("active")
         parent_div.html("")
 
@@ -1896,7 +1893,7 @@ class ApiController(RedditController):
 
             if subreddit.use_quotas:
                 sr_ratelimit = SimpleRateLimit(
-                    name="sr_muted_%s" % subreddit._id36,
+                    name=f"sr_muted_{subreddit._id36}",
                     seconds=g.sr_quota_time,
                     limit=g.sr_muted_quota,
                 )
@@ -2143,7 +2140,7 @@ class ApiController(RedditController):
                     sr = await Subreddit._byID(parent.sr_id, data=True)
                     if sr:
                         sr_name = sr.name
-                is_messaging_admins = ('/r/%s' % sr_name) == g.admin_message_acct
+                is_messaging_admins = (f'/r/{sr_name}') == g.admin_message_acct
 
                 # Users in timeout can only message the admins.
                 if not (sr_name and is_messaging_admins):
@@ -2230,24 +2227,23 @@ class ApiController(RedditController):
 
         if getattr(link, "promoted", None) and link.disable_comments:
             message = blockquote_text(message) + "\n\n" if message else ""
-            message += '\n%s\n\n%s\n\n' % (link_title, link.url)
+            message += f'\n{link_title}\n\n{link.url}\n\n'
             email_message = pm_message = message
         else:
             message = blockquote_text(message) + "\n\n" if message else ""
-            message += '\n%s\n' % link_title
+            message += f'\n{link_title}\n'
 
             message_body = '\n'
 
             # Deliberately not translating this, as it'd be in the
             # sender's language
             if link.num_comments:
-                count = ("There are currently %(num_comments)s comments " +
-                         "on this link.  You can view them here:")
+                numcom = (f"There are currently {link.num_comments} comments "
+                          "on this link.  You can view them here:")
                 if link.num_comments == 1:
-                    count = ("There is currently %(num_comments)s " +
-                             "comment on this link.  You can view it here:")
-                numcom = count % {'num_comments': link.num_comments}
-                message_body = message_body + "%s\n\n" % numcom
+                    numcom = (f"There is currently {link.num_comments} "
+                              "comment on this link.  You can view it here:")
+                message_body = message_body + f"{numcom}\n\n"
             else:
                 message_body = message_body + "You can leave a comment here:\n\n"
 
@@ -2258,22 +2254,17 @@ class ApiController(RedditController):
             url_parser.update_query(ref_source="pm")
             pm_comments_url = url_parser.unparse()
 
-            message_body += '%(comments_url)s'
-            email_message = message + message_body % {
-                    "comments_url": email_comments_url,
-                }
-            pm_message = message + message_body % {
-                    "comments_url": pm_comments_url,
-                }
+            email_message = message + message_body + email_comments_url
+            pm_message = message + message_body + pm_comments_url
         
         # E-mail everyone
         emailer.share(link, emails, body=email_message or "")
 
         # Send the PMs
-        subject = "%s has shared a link with you!" % c.user.name
+        subject = f"{c.user.name} has shared a link with you!"
         # Prepend this subject to the message - we're repeating ourselves
         # because it looks very abrupt without it.
-        pm_message = "%s\n\n%s" % (subject, pm_message)
+        pm_message = f"{subject}\n\n{pm_message}"
         
         for target in users:
             m, inbox_rel = Message._new(c.user, target, subject,
@@ -2674,7 +2665,7 @@ class ApiController(RedditController):
 
             details_text = "upload_image"
             if not upload_type == "img":
-                details_text = "upload_image_%s" % upload_type
+                details_text = f"upload_image_{upload_type}"
             VNotInTimeout().run(action_name="editsettings",
                 details_text=details_text, target=c.site)
 
@@ -3000,8 +2991,7 @@ class ApiController(RedditController):
                         collections.append(collection.name)
 
                 if collections:
-                    msg = "%s now NSFW, in collection(s) %s"
-                    msg %= (sr.name, ', '.join(collections))
+                    msg = f"{sr.name} now NSFW, in collection(s) {', '.join(collections)}"
                     emailer.sales_email(msg)
 
             for k, v in kw.items():
@@ -3636,7 +3626,7 @@ class ApiController(RedditController):
         else:
             days, subscr_id = rv
             if days <= 0:
-                raise ValueError("days = %r?" % days)
+                raise ValueError(f"days = {days!r}?")
 
             if subscr_id:
                 c.user.gold_subscr_id = subscr_id
@@ -3670,7 +3660,7 @@ class ApiController(RedditController):
         # Activate any errors we just manually set
         if not form.has_errors("code", errors.INVALID_CODE, errors.CLAIMED_CODE,
                                errors.NO_TEXT):
-            form.redirect("/gold/thanks?v=%s" % status)
+            form.redirect(f"/gold/thanks?v={status}")
 
     @csrf_exempt
     @validatedForm(
@@ -3871,7 +3861,7 @@ class ApiController(RedditController):
             g.events.quarantine_event('quarantine_opt_in', sr,
                 request=request, context=c)
             QuarantinedSubredditOptInsByAccount.opt_in(c.user, sr)
-        return self.redirect('/r/%s' % sr.name)
+        return self.redirect(f'/r/{sr.name}')
 
     @validatedForm(VAdmin(),
                    VModhash(),
@@ -3887,10 +3877,10 @@ class ApiController(RedditController):
         if form.has_error():
             return
 
-        key = "error_nickname-%s" % str(hexkey)
+        key = f"error_nickname-{hexkey}"
         g.hardcache.set(key, nickname, 86400 * 365)
 
-        key = "error_status-%s" % str(hexkey)
+        key = f"error_status-{hexkey}"
         g.hardcache.set(key, status, 86400 * 365)
 
         form.set_text(".status", _('saved'))
@@ -3991,16 +3981,15 @@ class ApiController(RedditController):
 
             # XXX: this is still gross with all the UI code in here
             if not text and not css_class:
-                jquery('#flairrow_%s' % user._id36).hide()
+                jquery(f'#flairrow_{user._id36}').hide()
             elif not c.site.is_flair(user):
-                jquery.redirect('?name=%s' % user.name)
+                jquery.redirect(f'?name={user.name}')
                 return
 
             wrapped_user = WrappedUser(
                 user, force_show_flair=True, include_flair_selector=True)
             rendered = wrapped_user.render(style='html')
-            jquery('.tagline .flairselectable.id-%s'
-                % user._fullname).parent().html(rendered)
+            jquery(f'.tagline .flairselectable.id-{user._fullname}').parent().html(rendered)
             jquery('input[name="text"]').data('saved', text)
             jquery('input[name="css_class"]').data('saved', css_class)
             form.set_text('.status', _('saved'))
@@ -4020,10 +4009,10 @@ class ApiController(RedditController):
             target=user)
         user.set_flair(c.site, None, None, set_by=c.user)
 
-        jquery('#flairrow_%s' % user._id36).remove()
+        jquery(f'#flairrow_{user._id36}').remove()
         unflair = WrappedUser(
             user, include_flair_selector=True).render(style='html')
-        jquery('.tagline .id-%s' % user._fullname).parent().html(unflair)
+        jquery(f'.tagline .id-{user._fullname}').parent().html(unflair)
 
     @require_oauth2_scope("modflair")
     @validate(
@@ -4061,7 +4050,7 @@ class ApiController(RedditController):
             line_no = i + 1
             if line_no > limit:
                 line_result.error('row',
-                                  'limit of %d rows per call reached' % limit)
+                                  f'limit of {limit} rows per call reached')
                 break
 
             try:
@@ -4073,21 +4062,18 @@ class ApiController(RedditController):
             user = VFlairAccount('name').run(name)
             if not user:
                 line_result.error('user',
-                                  "unable to resolve user `%s', ignoring"
-                                  % name)
+                                  f"unable to resolve user `{name}', ignoring")
                 continue
 
             orig_text = text
             text = VFlairText('text').run(orig_text)
             if text and orig_text and len(text) < len(orig_text):
                 line_result.warn('text',
-                                 'truncating flair text to %d chars'
-                                 % len(text))
+                                 f'truncating flair text to {len(text)} chars')
 
             if css_class and not VFlairCss('css_class').run(css_class):
                 line_result.error('css',
-                                  "invalid css class `%s', ignoring"
-                                  % css_class)
+                                  f"invalid css class `{css_class}', ignoring")
                 continue
 
             # all validation passed, enflair the user
@@ -4098,7 +4084,7 @@ class ApiController(RedditController):
                 mode = 'added'
             else:
                 mode = 'removed'
-            line_result.status = '%s flair for user %s' % (mode, user.name)
+            line_result.status = f'{mode} flair for user {user.name}'
             line_result.ok = True
 
         return BoringPage(_("API"), content = results).render()
@@ -4238,7 +4224,7 @@ class ApiController(RedditController):
                 .render(style='html'))
             form.set_text('.status', _('saved'))
         else:
-            jquery('#%s' % flair_template._id).html(
+            jquery(f'#{flair_template._id}').html(
                 FlairTemplateEditor(flair_template, flair_type)
                 .render(style='html'))
             form.set_text('.status', _('saved'))
@@ -4262,7 +4248,7 @@ class ApiController(RedditController):
             details_text="flair_delete_template", target=c.site)
         idx = FlairTemplateBySubredditIndex.by_sr(c.site._id)
         if idx.delete_by_id(flair_template._id):
-            jquery('#%s' % flair_template._id).parent().remove()
+            jquery(f'#{flair_template._id}').parent().remove()
             ModAction.create(c.site, c.user, action='editflair',
                              details='flair_delete_template')
 
@@ -4385,14 +4371,14 @@ class ApiController(RedditController):
             # XXX: gross UI code
             # Push some client-side updates back to the browser.
 
-            jquery('.id-%s' % link._fullname).removeLinkFlairClass()
-            jquery('.id-%s .entry .linkflairlabel' % link._fullname).remove()
-            title_path = '.id-%s .entry > .title > .title' % link._fullname
+            jquery(f'.id-{link._fullname}').removeLinkFlairClass()
+            jquery(f'.id-{link._fullname} .entry .linkflairlabel').remove()
+            title_path = f'.id-{link._fullname} .entry > .title > .title'
 
             # TODO: move this to a template
             if flair_template:
                 classes = ' '.join('linkflair-' + c for c in css_class.split())
-                jquery('.id-%s' % link._fullname).addClass('linkflair').addClass(classes)
+                jquery(f'.id-{link._fullname}').addClass('linkflair').addClass(classes)
                 flair = format_html('<span class="linkflairlabel">%s</span>', text)
 
                 if subreddit.link_flair_position == 'left':
@@ -4413,11 +4399,10 @@ class ApiController(RedditController):
                             flair_text_editable=text_editable,
                             include_flair_selector=True)
             flair = u.render(style='html')
-            jquery('.tagline .flairselectable.id-%s'
-                % user._fullname).parent().html(flair)
-            jquery('#flairrow_%s input[name="text"]' % user._id36).data(
+            jquery(f'.tagline .flairselectable.id-{user._fullname}').parent().html(flair)
+            jquery(f'#flairrow_{user._id36} input[name="text"]').data(
                 'saved', text).val(text)
-            jquery('#flairrow_%s input[name="css_class"]' % user._id36).data(
+            jquery(f'#flairrow_{user._id36} input[name="css_class"]').data(
                 'saved', css_class).val(css_class)
 
     @validatedForm(
@@ -4539,7 +4524,7 @@ class ApiController(RedditController):
                 ui_elem=VOneOf('id', ('organic',)))
     async def POST_disable_ui(self, ui_elem):
         if ui_elem:
-            pref = "pref_%s" % ui_elem
+            pref = f"pref_{ui_elem}"
             if getattr(c.user, pref):
                 setattr(c.user, "pref_" + ui_elem, False)
                 await c.user._commit()
@@ -4838,7 +4823,7 @@ class ApiController(RedditController):
             await client._commit()
             form.set_text('.status', _('application updated'))
             apps = PrefApps([], [client])
-            jquery('#developed-app-%s' % client._id).replaceWith(
+            jquery(f'#developed-app-{client._id}').replaceWith(
                 apps.render_developed_app(client, collapsed=False))
         else:
             # client_id was omitted or empty, creating new OAuth2Client
@@ -4886,7 +4871,7 @@ class ApiController(RedditController):
 
         form.set_text('.status', _('developer added'))
         apps = PrefApps([], [client])
-        (jquery('#app-developer-%s input[name="name"]' % client._id).val('')
+        (jquery(f'#app-developer-{client._id} input[name="name"]').val('')
             .closest('.prefright').find('ul').append(
                 apps.render_editable_developer(client, account)))
 
@@ -4902,9 +4887,9 @@ class ApiController(RedditController):
         if client and account and not form.has_errors('name'):
             client.remove_developer(account)
             if account._id == c.user._id:
-                jquery('#developed-app-%s' % client._id).fadeOut()
+                jquery(f'#developed-app-{client._id}').fadeOut()
             else:
-                jquery('li#app-dev-%s-%s' % (client._id, account._id)).fadeOut()
+                jquery(f'li#app-dev-{client._id}-{account._id}').fadeOut()
 
     @noresponse(VUser(),
                 VModhash(),
@@ -4934,12 +4919,12 @@ class ApiController(RedditController):
             else:
                 await client._commit()
                 form.set_text('.status', 'uploaded')
-                jquery('#developed-app-%s .app-icon img'
-                       % client._id).attr('src', make_url_protocol_relative(client.icon_url))
-                jquery('#developed-app-%s .ajax-upload-form'
-                       % client._id).hide()
-                jquery('#developed-app-%s .edit-app-icon-button'
-                       % client._id).toggleClass('collapsed')
+                jquery(f'#developed-app-{client._id} .app-icon img'
+                       ).attr('src', make_url_protocol_relative(client.icon_url))
+                jquery(f'#developed-app-{client._id} .ajax-upload-form'
+                       ).hide()
+                jquery(f'#developed-app-{client._id} .edit-app-icon-button'
+                       ).toggleClass('collapsed')
 
     @json_validate(
         VUser(),
