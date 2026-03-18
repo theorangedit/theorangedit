@@ -351,7 +351,7 @@ def apply_updates(user, timer):
 
 def ip_span(ip):
     ip = websafe(ip)
-    return '<!-- %s -->' % ip
+    return f'<!-- {ip} -->'
 
 
 def wiki_template(template_slug, sr=None):
@@ -363,7 +363,7 @@ def wiki_template(template_slug, sr=None):
             return None
 
     try:
-        wiki = WikiPage.get(sr, "templates/%s" % template_slug)
+        wiki = WikiPage.get(sr, f"templates/{template_slug}")
     except tdb_cassandra.NotFound:
         return None
 

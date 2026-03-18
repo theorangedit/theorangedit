@@ -193,7 +193,7 @@ class FlairTemplateBySubredditIndex(tdb_cassandra.Thing):
 
     @classmethod
     def _make_index_key(cls, position, flair_type):
-        return '%s%08d' % (cls._key_prefixes[flair_type], position)
+        return f'{cls._key_prefixes[flair_type]}{position:08d}'
 
     def iter_template_ids(self, flair_type):
         return (getattr(self, key)

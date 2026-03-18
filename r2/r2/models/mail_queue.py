@@ -424,13 +424,12 @@ class Email(object):
         def utf8(s, reject_newlines=True):
             if reject_newlines and '\n' in s:
                 raise HeaderParseError(
-                    'header value contains unexpected newline: {!r}'.format(s))
+                    f'header value contains unexpected newline: {s!r}')
             return s.encode('utf8') if isinstance(s, str) else s
 
-        fr = '"%s" <%s>' % (
-            self.from_name().replace('"', ''),
-            self.fr_addr.replace('>', ''),
-        )
+        _from_name = self.from_name().replace('"', '')
+        _fr_addr = self.fr_addr.replace('>', '')
+        fr = f'"{_from_name}" <{_fr_addr}>'
 
         # Addresses that start with a dash could confuse poorly-written
         # software's argument parsers, and thus are disallowed by default in

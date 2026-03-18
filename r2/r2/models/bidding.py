@@ -256,7 +256,7 @@ class PayID(Sessionized, Base):
                            autoincrement = False)
 
     def __repr__(self):
-        return "<%s(%d)>" % (self.__class__.__name__, self.authorize_id)
+        return f"<{self.__class__.__name__}({self.authorize_id:d})>"
 
     @classmethod
     def get_ids(cls, key):

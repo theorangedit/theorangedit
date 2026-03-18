@@ -403,7 +403,7 @@ class QueryBuilder(Builder):
         Builder.__init__(self, **kw)
 
     def __repr__(self):
-        return "<%s(%r)>" % (self.__class__.__name__, self.query)
+        return f"<{self.__class__.__name__}({self.query!r})>"
 
     def item_iter(self, a):
         """Iterates over the items returned by get_items"""
@@ -987,11 +987,7 @@ class CommentOrderer(CommentOrdererBase):
         return comment_tuples
 
     def cache_key(self):
-        key = "order:{link}_{operator}{column}".format(
-            link=self.link._id36,
-            operator=self.sort.__class__.__name__,
-            column=self.sort.col,
-        )
+        key = f"order:{self.link._id36}_{self.sort.__class__.__name__}{self.sort.col}"
         return key
 
     @classmethod
@@ -1081,11 +1077,11 @@ class CommentOrderer(CommentOrdererBase):
         else:
             bucket_start = num_comments / 5 * 5
             bucket_end = bucket_start + 5
-            bucket = "%s_%s" % (bucket_start, bucket_end)
+            bucket = f"{bucket_start}_{bucket_end}"
 
         # record the number of comments on this link so we can get an idea of
         # what value to use for 'precomputed_comment_sort_min_comments'
-        g.stats.simple_event("CommentOrderer.num_comments.%s" % bucket)
+        g.stats.simple_event(f"CommentOrderer.num_comments.{bucket}")
 
         if self.link.num_comments <= 0:
             return []

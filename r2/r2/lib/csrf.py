@@ -51,5 +51,5 @@ def check_controller_csrf_prevention(controller):
         if not getattr(func, 'handles_csrf', False):
             endpoint_name = ':'.join((controller.__name__, name))
             msg = ("Handlers that might mutate data must be "
-                   "explicit about CSRF prevention: %s" % endpoint_name)
+                   f"explicit about CSRF prevention: {endpoint_name}")
             raise CSRFPreventionException(msg)

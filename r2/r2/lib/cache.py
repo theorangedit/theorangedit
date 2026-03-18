@@ -126,7 +126,7 @@ class CMemcache(CacheUtils):
     def set(self, key, val, time=0):
         # pylibmc converts this number to an unsigned integer without warning
         if time < 0:
-            raise ValueError("Rejecting negative TTL for key %s" % key)
+            raise ValueError(f"Rejecting negative TTL for key {key}")
 
         with self.clients.reserve() as mc:
             return mc.set(str(key), val, time=time,
@@ -134,7 +134,7 @@ class CMemcache(CacheUtils):
 
     def set_multi(self, keys, prefix='', time=0):
         if time < 0:
-            raise ValueError("Rejecting negative TTL for key %s" % key)
+            raise ValueError(f"Rejecting negative TTL for key {key}")
 
         str_keys = {str(k): v for k, v in keys.items()}
         with self.clients.reserve() as mc:
@@ -144,7 +144,7 @@ class CMemcache(CacheUtils):
     def add_multi(self, keys, prefix='', time=0):
         # pylibmc converts this number to an unsigned integer without warning
         if time < 0:
-            raise ValueError("Rejecting negative TTL for key %s" % key)
+            raise ValueError(f"Rejecting negative TTL for key {key}")
 
         str_keys = {str(k): v for k, v in keys.items()}
         with self.clients.reserve() as mc:
@@ -158,7 +158,7 @@ class CMemcache(CacheUtils):
     def append(self, key, val, time=0):
         # pylibmc converts this number to an unsigned integer without warning
         if time < 0:
-            raise ValueError("Rejecting negative TTL for key %s" % key)
+            raise ValueError(f"Rejecting negative TTL for key {key}")
 
         with self.clients.reserve() as mc:
             return mc.append(str(key), val, time=time)
@@ -171,7 +171,7 @@ class CMemcache(CacheUtils):
     def add(self, key, val, time=0):
         # pylibmc converts this number to an unsigned integer without warning
         if time < 0:
-            raise ValueError("Rejecting negative TTL for key %s" % key)
+            raise ValueError(f"Rejecting negative TTL for key {key}")
 
         try:
             with self.clients.reserve() as mc:
@@ -189,8 +189,7 @@ class CMemcache(CacheUtils):
             return mc.delete_multi(str_keys, key_prefix=prefix)
 
     def __repr__(self):
-        return '<%s(%r)>' % (self.__class__.__name__,
-                             self.servers)
+        return f'<{self.__class__.__name__}({self.servers!r})>'
 
 
 class Mcrouter(CMemcache):
@@ -257,7 +256,7 @@ class HardCache(CacheUtils):
     def _split_key(self, key):
         tokens = key.split("-", 1)
         if len(tokens) != 2:
-            raise ValueError("key %s has no dash" % key)
+            raise ValueError(f"key {key} has no dash")
 
         category, ids = tokens
         return category, ids
@@ -320,7 +319,7 @@ class LocalCache(dict, CacheUtils):
         if isinstance(key, str):
             key = str(key) # try to convert it first
         if not isinstance(key, str):
-            raise TypeError('Key is not a string: %r' % (key,))
+            raise TypeError(f'Key is not a string: {key!r}')
 
     def get(self, key, default=None):
         r = dict.get(self, key)
@@ -387,7 +386,7 @@ class LocalCache(dict, CacheUtils):
         self.clear()
 
     def __repr__(self):
-        return "<LocalCache(%d)>" % (len(self),)
+        return f"<LocalCache({len(self)})>"
 
 
 class TransitionalCache(CacheUtils):
@@ -575,7 +574,7 @@ def cache_timer_decorator(fn_name):
             if use_timer and self.stats:
                 publish = random.random() < g.stats.CACHE_SAMPLE_RATE
                 cache_name = self.stats.cache_name
-                timer_name = "cache.%s.%s" % (cache_name, fn_name)
+                timer_name = f"cache.{cache_name}.{fn_name}"
                 timer = g.stats.get_timer(timer_name, publish)
                 timer.start()
             else:
@@ -728,13 +727,12 @@ class CacheChain(CacheUtils, local):
         return out
 
     def __repr__(self):
-        return '<%s %r>' % (self.__class__.__name__,
-                            self.caches)
+        return f'<{self.__class__.__name__} {self.caches!r}>'
 
     def debug(self, key):
-        print("Looking up [%r]" % key)
+        print(f"Looking up [{key!r}]")
         for i, c in enumerate(self.caches):
-            print("[%d] %10s has value [%r]" % (i, c.__class__.__name__, c.get(key)))
+            print(f"[{i}] {c.__class__.__name__:10s} has value [{c.get(key)!r}]")
 
     def reset(self):
         # the first item in a cache chain is a LocalCache
@@ -764,8 +762,7 @@ class HardcacheChain(CacheChain):
         try:
             auth_value = int(auth_value) + delta
         except ValueError:
-            raise ValueError("Can't accrue %s; it's a %s (%r)" %
-                             (key, auth_value.__class__.__name__, auth_value))
+            raise ValueError(f"Can't accrue {key}; it's a {auth_value.__class__.__name__} ({auth_value!r})")
 
         for c in self.caches:
             c.set(key, auth_value, time=time)
@@ -882,8 +879,7 @@ class StaleCacheChain(CacheChain):
             self.realcache.caches = (newcache,) + self.realcache.caches[1:]
 
     def __repr__(self):
-        return '<%s %r>' % (self.__class__.__name__,
-                            (self.localcache, self.stalecache, self.realcache))
+        return f'<{self.__class__.__name__} {(self.localcache, self.stalecache, self.realcache)!r}>'
 
 CL_ONE = ConsistencyLevel.ONE
 CL_QUORUM = ConsistencyLevel.QUORUM
@@ -935,7 +931,7 @@ class Permacache(object):
         ret = {}
         with self.cf.batch():
             for key, val in keys.items():
-                rowkey = "%s%s" % (prefix, key)
+                rowkey = f"{prefix}{key}"
                 column = {self.COLUMN_NAME: pickle.dumps(val, protocol=2)}
                 ret[key] = self.cf.insert(rowkey, column)
         return ret
@@ -992,7 +988,7 @@ class Permacache(object):
 
     def mutate(self, key, mutation_fn, default=None, willread=True):
         """Mutate a Cassandra key as atomically as possible"""
-        with self.make_lock("permacache_mutate", "mutate_%s" % key):
+        with self.make_lock("permacache_mutate", f"mutate_{key}"):
             # This has an edge-case where the cache chain was populated by a ONE
             # read rather than a QUORUM one just before running this. All reads
             # should use consistency level QUORUM.
@@ -1012,55 +1008,54 @@ class Permacache(object):
         return new_value
 
     def __repr__(self):
-        return '<%s %r %r>' % (self.__class__.__name__,
-                            self.cache_chain, self.cf.column_family)
+        return f'<{self.__class__.__name__} {self.cache_chain!r} {self.cf.column_family!r}>'
 
 
 def test_cache(cache, prefix=''):
     #basic set/get
-    cache.set('%s1' % prefix, 1)
-    assert cache.get('%s1' % prefix) == 1
+    cache.set(f'{prefix}1', 1)
+    assert cache.get(f'{prefix}1') == 1
 
     #python data
-    cache.set('%s2' % prefix, [1,2,3])
-    assert cache.get('%s2' % prefix) == [1,2,3]
+    cache.set(f'{prefix}2', [1,2,3])
+    assert cache.get(f'{prefix}2') == [1,2,3]
 
     #set multi, no prefix
-    cache.set_multi({'%s3' % prefix:3, '%s4' % prefix: 4})
-    assert cache.get_multi(('%s3' % prefix, '%s4' % prefix)) == {'%s3' % prefix: 3, 
-                                                                 '%s4' % prefix: 4}
+    cache.set_multi({f'{prefix}3':3, f'{prefix}4': 4})
+    assert cache.get_multi((f'{prefix}3', f'{prefix}4')) == {f'{prefix}3': 3,
+                                                             f'{prefix}4': 4}
 
     #set multi, prefix
-    cache.set_multi({'3':3, '4': 4}, prefix='%sp_' % prefix)
-    assert cache.get_multi(('3', 4), prefix='%sp_' % prefix) == {'3':3, 4: 4}
-    assert cache.get_multi(('%sp_3' % prefix, '%sp_4' % prefix)) == {'%sp_3'%prefix: 3,
-                                                                     '%sp_4'%prefix: 4}
+    cache.set_multi({'3':3, '4': 4}, prefix=f'{prefix}p_')
+    assert cache.get_multi(('3', 4), prefix=f'{prefix}p_') == {'3':3, 4: 4}
+    assert cache.get_multi((f'{prefix}p_3', f'{prefix}p_4')) == {f'{prefix}p_3': 3,
+                                                                 f'{prefix}p_4': 4}
 
     # delete
-    cache.set('%s1'%prefix, 1)
-    assert cache.get('%s1'%prefix) == 1
-    cache.delete('%s1'%prefix)
-    assert cache.get('%s1'%prefix) is None
+    cache.set(f'{prefix}1', 1)
+    assert cache.get(f'{prefix}1') == 1
+    cache.delete(f'{prefix}1')
+    assert cache.get(f'{prefix}1') is None
 
-    cache.set('%s1'%prefix, 1)
-    cache.set('%s2'%prefix, 2)
-    cache.set('%s3'%prefix, 3)
-    assert cache.get('%s1'%prefix) == 1 and cache.get('%s2'%prefix) == 2
-    cache.delete_multi(['%s1'%prefix, '%s2'%prefix])
-    assert (cache.get('%s1'%prefix) is None
-            and cache.get('%s2'%prefix) is None
-            and cache.get('%s3'%prefix) == 3)
+    cache.set(f'{prefix}1', 1)
+    cache.set(f'{prefix}2', 2)
+    cache.set(f'{prefix}3', 3)
+    assert cache.get(f'{prefix}1') == 1 and cache.get(f'{prefix}2') == 2
+    cache.delete_multi([f'{prefix}1', f'{prefix}2'])
+    assert (cache.get(f'{prefix}1') is None
+            and cache.get(f'{prefix}2') is None
+            and cache.get(f'{prefix}3') == 3)
 
     #incr
-    cache.set('%s5'%prefix, 1)
-    cache.set('%s6'%prefix, 1)
-    cache.incr('%s5'%prefix)
-    assert cache.get('%s5'%prefix) == 2
-    cache.incr('%s5'%prefix,2)
-    assert cache.get('%s5'%prefix) == 4
-    cache.incr_multi(('%s5'%prefix, '%s6'%prefix), 1)
-    assert cache.get('%s5'%prefix) == 5
-    assert cache.get('%s6'%prefix) == 2
+    cache.set(f'{prefix}5', 1)
+    cache.set(f'{prefix}6', 1)
+    cache.incr(f'{prefix}5')
+    assert cache.get(f'{prefix}5') == 2
+    cache.incr(f'{prefix}5',2)
+    assert cache.get(f'{prefix}5') == 4
+    cache.incr_multi((f'{prefix}5', f'{prefix}6'), 1)
+    assert cache.get(f'{prefix}5') == 5
+    assert cache.get(f'{prefix}6') == 2
 
 def test_multi(cache):
     from threading import Thread
@@ -1109,7 +1104,7 @@ def _make_hashable(s):
     elif isinstance(s, (tuple, list)):
         return ','.join(_make_hashable(x) for x in s)
     elif isinstance(s, dict):
-        return ','.join('%s:%s' % (_make_hashable(k), _make_hashable(v))
+        return ','.join(f'{_make_hashable(k)}:{_make_hashable(v)}'
                         for (k, v) in sorted(s.items()))
     else:
         return str(s)

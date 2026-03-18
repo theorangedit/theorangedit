@@ -127,7 +127,7 @@ class AccountSRFeedback(tdb_cassandra.DenormalizedRelation):
         srs = tup(srs)
         # update user feedback record, setting appropriate ttls
         fb_rowkey = account._id36
-        fb_colkeys = ['%s.%s' % (action, sr._id36) for sr in srs]
+        fb_colkeys = [f'{action}.{sr._id36}' for sr in srs]
         col_data = {col: '' for col in fb_colkeys}
         ttl = FEEDBACK_TTL.get(action, 0)
         if ttl > 0:

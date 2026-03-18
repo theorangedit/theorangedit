@@ -34,7 +34,7 @@ _TTL = 7 * 24 * 3600  # 7 days in seconds
 
 
 def _key(fullname, name):
-    return 'lastmod:%s:%s' % (fullname, name)
+    return f'lastmod:{fullname}:{name}'
 
 
 class LastModified:

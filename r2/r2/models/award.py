@@ -68,7 +68,7 @@ class Award(Thing):
         if award:
             return cls._byID(award[0]._id, True)
         else:
-            raise NotFound('Award %s' % codename)
+            raise NotFound(f'Award {codename}')
 
     @classmethod
     def give_if_needed(cls, codename, user,
@@ -197,7 +197,7 @@ class Trophy(Relation(Account, Award)):
 
     @classmethod
     def claim(cls, user, uid, award, description, url):
-        with g.make_lock("claim_award", str("%s_%s" % (user.name, uid))):
+        with g.make_lock("claim_award", f"{user.name}_{uid}"):
             existing_trophy_id = user.get_trophy_id(uid)
             if existing_trophy_id:
                 trophy = cls._byID(existing_trophy_id)

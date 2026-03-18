@@ -96,7 +96,7 @@ def verify_email(user, dest=None):
     base = g.https_endpoint or g.origin
     emaillink = base + '/verification/' + token._id
     if dest:
-        emaillink += '?dest=%s' % dest
+        emaillink += f'?dest={dest}'
     g.log.debug("Generated email verification link: " + emaillink)
 
     _system_email(user.email,
@@ -111,7 +111,7 @@ def password_email(user):
     from r2.lib.pages import PasswordReset
 
     user_reset_ratelimit = SimpleRateLimit(
-        name="email_reset_count_%s" % user._id36,
+        name=f"email_reset_count_{user._id36}",
         seconds=int(datetime.timedelta(hours=12).total_seconds()),
         limit=3,
     )
@@ -168,7 +168,7 @@ def message_notification_email(data):
                 datum['to'], user_email=user.email,
                 user_password_hash=user.password)
         base = g.https_endpoint or g.origin
-        unsubscribe_link = base + '/mail/unsubscribe/%s/%s' % (datum['to'], mac)
+        unsubscribe_link = base + f"/mail/unsubscribe/{datum['to']}/{mac}"
 
         templateData = {
             'sender_username': datum.get('from', ''),

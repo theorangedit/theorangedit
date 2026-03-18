@@ -122,7 +122,7 @@ def make_solution():
 
 
 def get_image(iden):
-    key = "captcha:%s" % iden
+    key = f"captcha:{iden}"
     solution = g.gencache.get(key)
     if not solution:
         solution = make_solution()
@@ -131,7 +131,7 @@ def get_image(iden):
 
 
 def valid_solution(iden, solution):
-    key = "captcha:%s" % iden
+    key = f"captcha:{iden}"
 
     if (not iden or
             not solution or
