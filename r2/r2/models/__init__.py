@@ -69,5 +69,15 @@ from r2.models.token import (  # noqa: F401
 
 from r2.models.vote import Vote  # noqa: F401
 
+from r2.models.flair import (  # noqa: F401
+    Flair,
+    FlairTemplate,
+    FlairTemplateBySubredditIndex,
+    NotFound as FlairNotFound,
+    USER_FLAIR,
+    LINK_FLAIR,
+    MAX_FLAIR_TEMPLATES,
+)
+
 # Auth helpers that controllers expect on r2.models
 from r2.lib.auth import valid_feed, valid_admin_cookie, valid_otp_cookie  # noqa: F401

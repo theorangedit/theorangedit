@@ -28,6 +28,7 @@ from r2.models.orm.relations import (
 from r2.models.orm.tokens import Token, OAuthClient, OAuthClientDeveloper
 from r2.models.orm.modaction import ModAction
 from r2.models.orm.wiki import WikiPage, WikiRevision
+from r2.models.orm.flair import FlairTemplate
 from r2.models.orm.promo import PromoCampaign
 from r2.models.orm.misc import (
     VoteDetail,
@@ -50,7 +51,7 @@ __all__ = [
     'CommentInbox', 'MessageInbox', 'BlockedSubreddit', 'SubscriptionByDay',
     'Token', 'OAuthClient', 'OAuthClientDeveloper',
     'ModAction',
-    'WikiPage', 'WikiRevision',
+    'WikiPage', 'WikiRevision', 'FlairTemplate',
     'PromoCampaign',
     'VoteDetail', 'IpTracking', 'SubredditRule', 'LiveConfig',
 ]

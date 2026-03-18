@@ -19,21 +19,47 @@
 # All portions of the code written by reddit are Copyright (c) 2006-2015 reddit
 # Inc. All Rights Reserved.
 ###############################################################################
+"""
+Flair model shim — replaces the Cassandra-backed FlairTemplate and
+FlairTemplateBySubredditIndex classes.
 
-import uuid
+All flair-template data now lives in the ``flair_templates`` PostgreSQL table
+via the ORM model at r2.models.orm.flair.  The public API of each class is
+preserved so existing call-sites require only minimal changes (adding await).
+"""
 
-from r2.lib.app_globals import g
+from __future__ import annotations
 
-from r2.lib.db import tdb_cassandra
+from typing import List, Optional
+
+from r2.lib.context import c
 from r2.lib.db.thing import Relation
 from r2.lib.db.userrel import UserRel
-from r2.lib.utils import to36
+from r2.lib.app_globals import g
 from r2.models import Account, Subreddit
+from r2.models.orm.flair import FlairTemplate as _ORMFlairTemplate
+import r2.services.flair_templates as _svc
 
+
+# ---------------------------------------------------------------------------
+# Constants
+# ---------------------------------------------------------------------------
 
 USER_FLAIR = 'USER_FLAIR'
 LINK_FLAIR = 'LINK_FLAIR'
 
+MAX_FLAIR_TEMPLATES = _svc.MAX_FLAIR_TEMPLATES
+
+# ---------------------------------------------------------------------------
+# Exceptions
+# ---------------------------------------------------------------------------
+
+NotFound = type('NotFound', (Exception,), {})
+
+
+# ---------------------------------------------------------------------------
+# Flair relation (PostgreSQL — unchanged)
+# ---------------------------------------------------------------------------
 
 class Flair(Relation(Subreddit, Account)):
     _cache = g.thingcache
@@ -53,45 +79,73 @@ Subreddit.__bases__ += (
 )
 
 
-class FlairTemplate(tdb_cassandra.Thing):
-    """A template for some flair."""
-    _defaults = dict(text='',
-                     css_class='',
-                     text_editable=False,
-                    )
+# ---------------------------------------------------------------------------
+# FlairTemplate wrapper
+# ---------------------------------------------------------------------------
 
-    _bool_props = ('text_editable',)
+class FlairTemplate:
+    """Thin wrapper around the ORM FlairTemplate row."""
 
-    _use_db = True
-    _connection_pool = 'main'
+    def __init__(self, orm_obj: Optional[_ORMFlairTemplate] = None) -> None:
+        self._orm = orm_obj
+
+    # -- ORM field pass-throughs ------------------------------------------
+
+    @property
+    def _id(self) -> Optional[str]:
+        return self._orm.id if self._orm is not None else None
+
+    @property
+    def text(self) -> str:
+        return self._orm.text if self._orm is not None else ''
+
+    @text.setter
+    def text(self, value: str) -> None:
+        if self._orm is not None:
+            self._orm.text = value or ''
+
+    @property
+    def css_class(self) -> str:
+        return self._orm.css_class if self._orm is not None else ''
+
+    @css_class.setter
+    def css_class(self, value: str) -> None:
+        if self._orm is not None:
+            self._orm.css_class = value or ''
+
+    @property
+    def text_editable(self) -> bool:
+        return self._orm.text_editable if self._orm is not None else False
+
+    @text_editable.setter
+    def text_editable(self, value: bool) -> None:
+        if self._orm is not None:
+            self._orm.text_editable = bool(value)
+
+    # -- Persistence --------------------------------------------------------
+
+    async def _commit(self) -> None:
+        """Flush pending ORM changes to the database."""
+        await c.db.flush()
 
     @classmethod
-    def _new(cls, text='', css_class='', text_editable=False):
-        if text is None:
-            text = ''
-        if css_class is None:
-            css_class = ''
-        ft = cls(text=text, css_class=css_class, text_editable=text_editable)
-        ft._commit()
-        return ft
+    async def _byID(cls, ft_id: str) -> 'FlairTemplate':
+        """Fetch a FlairTemplate by its UUID primary key.
 
-    def _commit(self, *a, **kw):
-        # Make sure an _id is always assigned before committing.
-        if not self._id:
-            self._id = str(uuid.uuid1())
-        return tdb_cassandra.Thing._commit(self, *a, **kw)
+        Raises NotFound if the row does not exist.
+        """
+        orm = await _svc.get_by_id(c.db, ft_id)
+        # get_by_id raises _svc.NotFound; re-raise as our NotFound
+        return cls(orm)
 
-    def covers(self, other_template):
-        """Returns true if other_template is a subset of this one.
+    # -- Business logic -----------------------------------------------------
 
-        The value for other_template may be another FlairTemplate, or a tuple
-        of (text, css_class). The latter case is treated like a FlairTemplate
-        that doesn't permit editable text.
+    def covers(self, other_template) -> bool:
+        """Return True if *other_template* is a subset of this template.
 
-        For example, if self permits editable text, then this method will return
-        True as long as just the css_classes match. On the other hand, if self
-        doesn't permit editable text but other_template does, this method will
-        return False.
+        *other_template* may be another FlairTemplate or a ``(text,
+        css_class)`` tuple.  The tuple form is treated as a template that
+        does not permit editable text.
         """
         if isinstance(other_template, FlairTemplate):
             text_editable = other_template.text_editable
@@ -104,138 +158,166 @@ class FlairTemplate(tdb_cassandra.Thing):
             return False
         return self.text_editable or (not text_editable and self.text == text)
 
-
-class FlairTemplateBySubredditIndex(tdb_cassandra.Thing):
-    """Lists of FlairTemplate IDs for a subreddit.
-
-    The FlairTemplate references are stored as an arbitrary number of attrs.
-    The lexicographical ordering of these attr names gives the ordering for
-    flair templates within the subreddit.
-    """
-
-    MAX_FLAIR_TEMPLATES = 350
-
-    _int_props = ('sr_id',)
-    _use_db = True
-    _connection_pool = 'main'
-
-    _key_prefixes = {
-        USER_FLAIR: 'ft_',
-        LINK_FLAIR: 'link_ft_',
-    }
+    # -- Factory ------------------------------------------------------------
 
     @classmethod
-    def _new(cls, sr_id, flair_type=USER_FLAIR):
-        idx = cls(_id=to36(sr_id), sr_id=sr_id)
-        idx._commit()
-        return idx
+    async def _new(
+        cls,
+        text: str,
+        css_class: str,
+        text_editable: bool,
+        sr_id: int,
+        flair_type: str,
+    ) -> 'FlairTemplate':
+        """Create and persist a new FlairTemplate row."""
+        orm = await _svc.create(
+            c.db,
+            sr_id=sr_id,
+            text=text or '',
+            css_class=css_class or '',
+            text_editable=bool(text_editable),
+            flair_type=flair_type,
+        )
+        return cls(orm)
+
+    def __repr__(self) -> str:
+        return f'<FlairTemplate id={self._id!r}>'
+
+
+# ---------------------------------------------------------------------------
+# FlairTemplateBySubredditIndex
+# ---------------------------------------------------------------------------
+
+class FlairTemplateBySubredditIndex:
+    """Service-layer proxy for flair-template index operations."""
 
     @classmethod
-    def by_sr(cls, sr_id, create=False):
-        try:
-            return cls._byID(to36(sr_id))
-        except tdb_cassandra.NotFound:
-            if create:
-                return cls._new(sr_id)
-            raise
+    async def create_template(
+        cls,
+        sr_id: int,
+        text: str = '',
+        css_class: str = '',
+        text_editable: bool = False,
+        flair_type: str = USER_FLAIR,
+    ) -> FlairTemplate:
+        """Create a new flair template for *sr_id*.
+
+        Raises OverflowError if MAX_FLAIR_TEMPLATES would be exceeded.
+        """
+        return await FlairTemplate._new(
+            text=text,
+            css_class=css_class,
+            text_editable=text_editable,
+            sr_id=sr_id,
+            flair_type=flair_type,
+        )
 
     @classmethod
-    def create_template(cls, sr_id, text='', css_class='', text_editable=False,
-                        flair_type=USER_FLAIR):
-        idx = cls.by_sr(sr_id, create=True)
-
-        if len(idx._index_keys(flair_type)) >= cls.MAX_FLAIR_TEMPLATES:
-            raise OverflowError
-
-        ft = FlairTemplate._new(text=text, css_class=css_class,
-                                text_editable=text_editable)
-        idx.insert(ft._id, flair_type=flair_type)
-        return ft
+    async def get_template_ids(
+        cls,
+        sr_id: int,
+        flair_type: str = USER_FLAIR,
+    ) -> List[str]:
+        """Return ordered list of template IDs for *sr_id* / *flair_type*."""
+        rows = await _svc.get_by_sr(c.db, sr_id=sr_id, flair_type=flair_type)
+        return [r.id for r in rows]
 
     @classmethod
-    def get_template_ids(cls, sr_id, flair_type=USER_FLAIR):
-        try:
-            return list(cls.by_sr(sr_id).iter_template_ids(flair_type))
-        except tdb_cassandra.NotFound:
-            return []
+    async def get_template(
+        cls,
+        sr_id: int,
+        ft_id: str,
+        flair_type: Optional[str] = None,
+    ) -> Optional[FlairTemplate]:
+        """Fetch a template by ID, validating it belongs to *sr_id*.
 
-    @classmethod
-    def get_template(cls, sr_id, ft_id, flair_type=None):
+        If *flair_type* is given only that type is searched.  Returns None
+        when no matching template is found.
+        """
         if flair_type:
             flair_types = [flair_type]
         else:
             flair_types = [USER_FLAIR, LINK_FLAIR]
-        for flair_type in flair_types:
-            if ft_id in cls.get_template_ids(sr_id, flair_type=flair_type):
-                return FlairTemplate._byID(ft_id)
+
+        for ft in flair_types:
+            ids = await cls.get_template_ids(sr_id, flair_type=ft)
+            if ft_id in ids:
+                try:
+                    orm = await _svc.get_by_id(c.db, ft_id)
+                    return FlairTemplate(orm)
+                except _svc.NotFound:
+                    return None
         return None
 
     @classmethod
-    def clear(cls, sr_id, flair_type=USER_FLAIR):
-        try:
-            idx = cls.by_sr(sr_id)
-        except tdb_cassandra.NotFound:
-            # Everything went better than expected.
-            return
-
-        for k in idx._index_keys(flair_type):
-            del idx[k]
-            # TODO: delete the orphaned FlairTemplate row
-
-        idx._commit()
-
-    def _index_keys(self, flair_type):
-        keys = set(self._dirties.keys())
-        keys |= frozenset(self._orig.keys())
-        keys -= self._deletes
-        key_prefix = self._key_prefixes[flair_type]
-        return [k for k in keys if k.startswith(key_prefix)]
+    async def clear(
+        cls,
+        sr_id: int,
+        flair_type: str = USER_FLAIR,
+    ) -> None:
+        """Delete all flair templates for *sr_id* / *flair_type*."""
+        await _svc.clear(c.db, sr_id=sr_id, flair_type=flair_type)
 
     @classmethod
-    def _make_index_key(cls, position, flair_type):
-        return f'{cls._key_prefixes[flair_type]}{position:08d}'
+    async def delete_by_id(
+        cls,
+        sr_id: int,
+        ft_id: str,
+        flair_type: Optional[str] = None,
+    ) -> bool:
+        """Delete a single template by ID.
 
-    def iter_template_ids(self, flair_type):
-        return (getattr(self, key)
-                for key in sorted(self._index_keys(flair_type)))
-
-    def insert(self, ft_id, position=None, flair_type=USER_FLAIR):
-        """Insert template reference into index at position.
-
-        A position value of None means to simply append.
+        Returns True if a row was deleted.
         """
-        ft_ids = list(self.iter_template_ids(flair_type))
-        if position is None:
-            position = len(ft_ids)
-        if position < 0 or position > len(ft_ids):
-            raise IndexError(position)
-        ft_ids.insert(position, ft_id)
-
-        # Rewrite ALL the things.
-        for k in self._index_keys(flair_type):
-            del self[k]
-        for i, ft_id in enumerate(ft_ids):
-            setattr(self, self._make_index_key(i, flair_type), ft_id)
-        self._commit()
-
-    def delete_by_id(self, ft_id, flair_type=None):
         if flair_type:
             flair_types = [flair_type]
         else:
             flair_types = [USER_FLAIR, LINK_FLAIR]
-        for flair_type in flair_types:
-            if self._delete_by_id(ft_id, flair_type):
+
+        for ft in flair_types:
+            ids = await cls.get_template_ids(sr_id, flair_type=ft)
+            if ft_id in ids:
+                await _svc.delete(c.db, ft_id=ft_id)
                 return True
+
         g.log.debug("couldn't find %s to delete", ft_id)
         return False
 
-    def _delete_by_id(self, ft_id, flair_type):
-        for key in self._index_keys(flair_type):
-            ft = getattr(self, key)
-            if ft == ft_id:
-                # TODO: delete the orphaned FlairTemplate row
-                g.log.debug('deleting ft %s (%s)', ft, key)
-                del self[key]
-                self._commit()
-                return True
-        return False
+    @classmethod
+    async def insert(
+        cls,
+        sr_id: int,
+        ft_id: str,
+        flair_type: str = USER_FLAIR,
+        position: Optional[int] = None,
+    ) -> None:
+        """Move/insert *ft_id* to *position* within *sr_id* / *flair_type*.
+
+        A *position* of None appends at the end.
+        """
+        await _svc.reorder(
+            c.db,
+            sr_id=sr_id,
+            flair_type=flair_type,
+            ft_ids=await cls._ids_after_insert(sr_id, ft_id, flair_type, position),
+        )
+
+    @classmethod
+    async def _ids_after_insert(
+        cls,
+        sr_id: int,
+        ft_id: str,
+        flair_type: str,
+        position: Optional[int],
+    ) -> List[str]:
+        """Return the full ordered ID list after inserting *ft_id* at *position*."""
+        ids = await cls.get_template_ids(sr_id, flair_type=flair_type)
+        # Remove if already present (move semantics)
+        if ft_id in ids:
+            ids.remove(ft_id)
+        if position is None:
+            position = len(ids)
+        if position < 0 or position > len(ids):
+            raise IndexError(position)
+        ids.insert(position, ft_id)
+        return ids

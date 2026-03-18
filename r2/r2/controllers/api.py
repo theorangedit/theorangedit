@@ -4197,7 +4197,7 @@ class ApiController(RedditController):
             new = False
         else:
             try:
-                flair_template = FlairTemplateBySubredditIndex.create_template(
+                flair_template = await FlairTemplateBySubredditIndex.create_template(
                     c.site._id, text=text, css_class=css_class,
                     text_editable=text_editable,
                     flair_type=flair_type)
@@ -4240,14 +4240,13 @@ class ApiController(RedditController):
         flair_template=VFlairTemplateByID('flair_template_id'),
     )
     @api_doc(api_section.flair, uses_site=True)
-    def POST_deleteflairtemplate(self, form, jquery, flair_template):
+    async def POST_deleteflairtemplate(self, form, jquery, flair_template):
         if not flair_template:
             return self.abort404()
 
         VNotInTimeout().run(action_name="editflair",
             details_text="flair_delete_template", target=c.site)
-        idx = FlairTemplateBySubredditIndex.by_sr(c.site._id)
-        if idx.delete_by_id(flair_template._id):
+        if await FlairTemplateBySubredditIndex.delete_by_id(c.site._id, flair_template._id):
             jquery(f'#{flair_template._id}').parent().remove()
             ModAction.create(c.site, c.user, action='editflair',
                              details='flair_delete_template')
@@ -4261,8 +4260,8 @@ class ApiController(RedditController):
             default=USER_FLAIR),
     )
     @api_doc(api_section.flair, uses_site=True)
-    def POST_clearflairtemplates(self, form, jquery, flair_type):
-        FlairTemplateBySubredditIndex.clear(c.site._id, flair_type=flair_type)
+    async def POST_clearflairtemplates(self, form, jquery, flair_type):
+        await FlairTemplateBySubredditIndex.clear(c.site._id, flair_type=flair_type)
         jquery.refresh()
         ModAction.create(c.site, c.user, action='editflair',
                          details='flair_clear_template')
@@ -4338,9 +4337,9 @@ class ApiController(RedditController):
 
         if flair_template_id:
             try:
-                flair_template = FlairTemplateBySubredditIndex.get_template(
+                flair_template = await FlairTemplateBySubredditIndex.get_template(
                     subreddit._id, flair_template_id, flair_type=flair_type)
-            except NotFound:
+            except FlairNotFound:
                 # TODO: serve error to client
                 g.log.debug('invalid flair template for subreddit %s', subreddit._id)
                 return

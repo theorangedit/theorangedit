@@ -2860,12 +2860,9 @@ class VFlairTemplateByID(VRequired):
     def __init__(self, param, **kw):
         VRequired.__init__(self, param, None, **kw)
 
-    def run(self, flair_template_id):
-        try:
-            return FlairTemplateBySubredditIndex.get_template(
-                c.site._id, flair_template_id)
-        except tdb_cassandra.NotFound:
-            return None
+    async def run(self, flair_template_id):
+        return await FlairTemplateBySubredditIndex.get_template(
+            c.site._id, flair_template_id)
 
 class VOneTimePassword(Validator):
     allowed_skew = [-1, 0, 1]  # allow a period of skew on either side of now
