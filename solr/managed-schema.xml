@@ -1,0 +1,128 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!--
+  Solr 9 schema for theorangedit.
+  Migrated from schema4.xml (Solr 4.10.4).
+
+  Key changes from schema4.xml:
+  - Trie numeric types (TrieIntField, TrieLongField, etc.) replaced with
+    Point-based types (IntPointField, LongPointField, etc.) — trie types
+    were removed in Solr 8.
+  - solrconfig.xml and schema.xml now live in the same conf/ directory.
+  - All Reddit-specific fields are preserved with identical names.
+-->
+
+<schema name="reddit" version="1.6">
+
+  <!-- ==================== Field Types ==================== -->
+  <types>
+
+    <fieldType name="string"  class="solr.StrField"  sortMissingLast="true"/>
+    <fieldType name="boolean" class="solr.BoolField" sortMissingLast="true"/>
+
+    <!-- Point-based numeric types (Solr 7+, required in Solr 9) -->
+    <fieldType name="int"    class="solr.IntPointField"    docValues="true"/>
+    <fieldType name="long"   class="solr.LongPointField"   docValues="true"/>
+    <fieldType name="float"  class="solr.FloatPointField"  docValues="true"/>
+    <fieldType name="double" class="solr.DoublePointField" docValues="true"/>
+    <fieldType name="date"   class="solr.DatePointField"   docValues="true"/>
+
+    <!-- General text field — standard tokenizer + lower-case + stop words -->
+    <fieldType name="text_general" class="solr.TextField" positionIncrementGap="100" multiValued="true">
+      <analyzer type="index">
+        <tokenizer class="solr.StandardTokenizerFactory"/>
+        <filter class="solr.StopFilterFactory" ignoreCase="true" words="stopwords.txt"/>
+        <filter class="solr.LowerCaseFilterFactory"/>
+      </analyzer>
+      <analyzer type="query">
+        <tokenizer class="solr.StandardTokenizerFactory"/>
+        <filter class="solr.StopFilterFactory" ignoreCase="true" words="stopwords.txt"/>
+        <filter class="solr.SynonymGraphFilterFactory" synonyms="synonyms.txt" ignoreCase="true" expand="true"/>
+        <filter class="solr.LowerCaseFilterFactory"/>
+      </analyzer>
+    </fieldType>
+
+    <!-- Reversed text for leading-wildcard queries -->
+    <fieldType name="text_general_rev" class="solr.TextField" positionIncrementGap="100">
+      <analyzer type="index">
+        <tokenizer class="solr.StandardTokenizerFactory"/>
+        <filter class="solr.StopFilterFactory" ignoreCase="true" words="stopwords.txt"/>
+        <filter class="solr.LowerCaseFilterFactory"/>
+        <filter class="solr.ReversedWildcardFilterFactory" withOriginal="true"
+           maxPosAsterisk="3" maxPosQuestion="2" maxFractionAsterisk="0.33"/>
+      </analyzer>
+      <analyzer type="query">
+        <tokenizer class="solr.StandardTokenizerFactory"/>
+        <filter class="solr.SynonymGraphFilterFactory" synonyms="synonyms.txt" ignoreCase="true" expand="true"/>
+        <filter class="solr.StopFilterFactory" ignoreCase="true" words="stopwords.txt"/>
+        <filter class="solr.LowerCaseFilterFactory"/>
+      </analyzer>
+    </fieldType>
+
+  </types>
+
+  <!-- ==================== Fields ==================== -->
+  <fields>
+
+    <!-- Solr internal fields -->
+    <field name="_version_" type="long"   indexed="true" stored="true"/>
+    <field name="_root_"    type="string" indexed="true" stored="false" docValues="false"/>
+
+    <!-- Required unique key -->
+    <field name="id" type="string" indexed="true" stored="true" required="true" multiValued="false"/>
+
+    <!-- Link / post fields -->
+    <field name="version"         type="int"          indexed="true" stored="true"/>
+    <field name="ups"             type="int"          indexed="true" stored="true"/>
+    <field name="downs"           type="int"          indexed="true" stored="true"/>
+    <field name="num_comments"    type="int"          indexed="true" stored="true"/>
+    <field name="fullname"        type="text_general" indexed="true" stored="true"/>
+    <field name="subreddit"       type="text_general" indexed="true" stored="true"/>
+    <field name="reddit"          type="text_general" indexed="true" stored="true"/>
+    <field name="title"           type="text_general" indexed="true" stored="true"/>
+    <field name="sr_id"           type="int"          indexed="true" stored="true"/>
+    <field name="timestamp"       type="int"          indexed="true" stored="true"/>
+    <field name="over18"          type="boolean"      indexed="true" stored="true"/>
+    <field name="nsfw"            type="boolean"      indexed="true" stored="true"/>
+    <field name="self"            type="boolean"      indexed="true" stored="true"/>
+    <field name="selftext"        type="text_general" indexed="true" stored="true"/>
+    <field name="is_self"         type="boolean"      indexed="true" stored="true"/>
+    <field name="author_fullname" type="text_general" indexed="true" stored="true"/>
+    <field name="author"          type="text_general" indexed="true" stored="true"/>
+    <field name="type_id"         type="int"          indexed="true" stored="true"/>
+    <field name="flair"           type="text_general" indexed="true" stored="true"/>
+    <field name="flair_css_class" type="text_general" indexed="true" stored="true"/>
+    <field name="flair_text"      type="text_general" indexed="true" stored="true"/>
+    <field name="url"             type="text_general" indexed="true" stored="true"/>
+    <field name="link_type"       type="text_general" indexed="true" stored="true"/>
+    <field name="site"            type="text_general" indexed="true" stored="true"/>
+
+    <!-- Subreddit fields -->
+    <field name="name"         type="text_general" indexed="true" stored="true"/>
+    <field name="type"         type="text_general" indexed="true" stored="true"/>
+    <field name="language"     type="text_general" indexed="true" stored="true"/>
+    <field name="header_title" type="text_general" indexed="true" stored="true"/>
+    <field name="description"  type="text_general" indexed="true" stored="true"/>
+    <field name="sidebar"      type="text_general" indexed="true" stored="true"/>
+    <field name="activity"     type="int"          indexed="true" stored="true"/>
+    <field name="subscribers"  type="int"          indexed="true" stored="true"/>
+
+    <!-- Catch-all full-text search field (populated via copyField) -->
+    <field name="text"     type="text_general"     indexed="true" stored="false" multiValued="true"/>
+    <field name="text_rev" type="text_general_rev" indexed="true" stored="false" multiValued="true"/>
+
+  </fields>
+
+  <!-- ==================== Copy fields ==================== -->
+  <!-- Populate the catch-all "text" field -->
+  <copyField source="title"    dest="text"/>
+  <copyField source="selftext" dest="text"/>
+  <copyField source="author"   dest="text"/>
+  <copyField source="subreddit" dest="text"/>
+  <copyField source="name"     dest="text"/>
+  <copyField source="description" dest="text"/>
+  <copyField source="sidebar"  dest="text"/>
+
+  <!-- ==================== Unique key ==================== -->
+  <uniqueKey>id</uniqueKey>
+
+</schema>

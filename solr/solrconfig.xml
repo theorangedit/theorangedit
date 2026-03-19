@@ -1,0 +1,92 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!--
+  Minimal Solr 9 solrconfig.xml for theorangedit.
+  Replaces the Solr 4 config which referenced many removed/deprecated handlers.
+-->
+
+<config>
+
+  <luceneMatchVersion>9.0</luceneMatchVersion>
+
+  <!-- Data directory relative to the instance directory -->
+  <dataDir>${solr.data.dir:}</dataDir>
+
+  <!-- Index configuration -->
+  <indexConfig>
+    <ramBufferSizeMB>100</ramBufferSizeMB>
+    <maxBufferedDocs>1000</maxBufferedDocs>
+  </indexConfig>
+
+  <!-- Update handler -->
+  <updateHandler class="solr.DirectUpdateHandler2">
+    <updateLog>
+      <str name="dir">${solr.ulog.dir:}</str>
+    </updateLog>
+    <autoCommit>
+      <maxTime>${solr.autoCommit.maxTime:15000}</maxTime>
+      <openSearcher>false</openSearcher>
+    </autoCommit>
+    <autoSoftCommit>
+      <maxTime>${solr.autoSoftCommit.maxTime:-1}</maxTime>
+    </autoSoftCommit>
+  </updateHandler>
+
+  <!-- Query settings -->
+  <query>
+    <maxBooleanClauses>${solr.max.booleanClauses:1024}</maxBooleanClauses>
+    <filterCache size="512" initialSize="512" autowarmCount="0"/>
+    <queryResultCache size="512" initialSize="512" autowarmCount="0"/>
+    <documentCache size="512" initialSize="512" autowarmCount="0"/>
+    <queryResultWindowSize>20</queryResultWindowSize>
+    <queryResultMaxDocsCached>200</queryResultMaxDocsCached>
+    <useColdSearcher>false</useColdSearcher>
+    <maxWarmingSearchers>2</maxWarmingSearchers>
+  </query>
+
+  <!-- Request dispatcher -->
+  <requestDispatcher>
+    <requestParsers enableRemoteStreaming="true"
+                    multipartUploadLimitInKB="-1"
+                    formdataUploadLimitInKB="-1"
+                    addHttpRequestToContext="false"/>
+    <httpCaching never304="true"/>
+  </requestDispatcher>
+
+  <!-- Standard search handler -->
+  <requestHandler name="/select" class="solr.SearchHandler">
+    <lst name="defaults">
+      <str  name="echoParams">explicit</str>
+      <int  name="rows">10</int>
+      <str  name="wt">json</str>
+      <str  name="df">text</str>
+    </lst>
+  </requestHandler>
+
+  <!-- Update handler (accepts XML and JSON) -->
+  <requestHandler name="/update" class="solr.UpdateRequestHandler"/>
+
+  <!-- Realtime get (used by Solr admin UI) -->
+  <requestHandler name="/get" class="solr.RealTimeGetHandler">
+    <lst name="defaults">
+      <str name="omitHeader">true</str>
+      <str name="wt">json</str>
+      <str name="indent">true</str>
+    </lst>
+  </requestHandler>
+
+  <!-- Admin ping for health checks -->
+  <requestHandler name="/admin/ping" class="solr.PingRequestHandler">
+    <lst name="invariants">
+      <str name="q">solrpingquery</str>
+    </lst>
+    <lst name="defaults">
+      <str name="echoParams">all</str>
+    </lst>
+  </requestHandler>
+
+  <!-- Default response format -->
+  <queryResponseWriter name="json" class="solr.JSONResponseWriter">
+    <str name="content-type">application/json; charset=UTF-8</str>
+  </queryResponseWriter>
+
+</config>
