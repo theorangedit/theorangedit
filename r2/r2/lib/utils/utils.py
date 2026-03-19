@@ -957,7 +957,7 @@ def decompose_fullname(fullname):
         decompose_fullname("t3_e4fa") ->
             (Thing, 3, 658918)
     """
-    from r2.lib.db.thing import Thing,Relation
+    from r2.lib.db.legacy import Thing, Relation
     if fullname[0] == 't':
         type_class = Thing
     elif fullname[0] == 'r':

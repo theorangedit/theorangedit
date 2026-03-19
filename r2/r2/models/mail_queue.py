@@ -30,7 +30,7 @@ from email.errors import HeaderParseError
 import sqlalchemy as sa
 from sqlalchemy.dialects.postgresql.base import PGInet
 
-from r2.lib.db.tdb_sql import make_metadata, index_str, create_table
+from r2.lib.db.legacy import make_metadata, index_str, create_table
 from r2.lib.utils import Enum, tup
 from r2.lib.memoize import memoize
 from r2.lib.context import request

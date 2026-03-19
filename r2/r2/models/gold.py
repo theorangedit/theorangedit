@@ -20,7 +20,7 @@
 # Inc. All Rights Reserved.
 ###############################################################################
 
-from r2.lib.db.tdb_sql import make_metadata, index_str, create_table
+from r2.lib.db.legacy import make_metadata, index_str, create_table
 
 import json
 import pytz

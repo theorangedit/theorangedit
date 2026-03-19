@@ -25,7 +25,7 @@ from sqlalchemy.orm.exc import MultipleResultsFound
 from r2.lib.context import request
 from r2.lib.app_globals import g
 
-from r2.lib.db.thing import NotFound
+from r2.lib.db.legacy import NotFound
 from r2.lib.utils import Storage
 from r2.lib.export import export
 from r2.models.bidding import Bid, CustomerID, PayID

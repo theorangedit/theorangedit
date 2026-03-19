@@ -37,14 +37,14 @@ from r2.lib.app_globals import Globals
 def get_operational_exceptions():
     import _pylibmc
     import sqlalchemy.exc
-    import r2.lib.db.thing
+    import r2.lib.db.legacy
     import r2.lib.lock
     import r2.lib.cache
 
     return (
         SystemExit,  # gunicorn is shutting us down
         _pylibmc.MemcachedError,
-        r2.lib.db.thing.NotFound,
+        r2.lib.db.legacy.NotFound,
         r2.lib.lock.TimeoutExpired,
         sqlalchemy.exc.OperationalError,
         sqlalchemy.exc.IntegrityError,

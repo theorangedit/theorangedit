@@ -31,7 +31,7 @@ from webob.exc import HTTPException
 # expects a sane pylons env
 from r2.tests import RedditTestCase
 
-from r2.lib.db.thing import NotFound
+from r2.lib.db.legacy import NotFound
 from r2.lib.errors import errors, ErrorSet, UserRequiredException
 from r2.lib.validator import VVerifyPassword
 from r2.models import Account, AccountExists, bcrypt_password

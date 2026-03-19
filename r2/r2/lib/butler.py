@@ -24,7 +24,7 @@ from r2.lib.context import c
 from r2.lib.app_globals import g
 
 from r2.lib.db import queries
-from r2.lib.db.tdb_sql import CreationError
+from r2.lib.db.legacy import CreationError
 from r2.lib import amqp
 from r2.lib.utils import extract_user_mentions
 from r2.models import query_cache, Thing, Comment, Account, Inbox, NotFound

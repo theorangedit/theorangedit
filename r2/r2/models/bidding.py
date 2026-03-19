@@ -42,7 +42,7 @@ from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.orm.exc import NoResultFound
 
-from r2.lib.db.thing import Thing, NotFound
+from r2.lib.db.legacy import Thing, NotFound
 from r2.lib.memoize import memoize
 from r2.lib.utils import Enum, to_date, tup
 from r2.models.account import Account
@@ -179,9 +179,8 @@ class Sessionized(object):
             if not res:
                 raise NoResultFound
         except NoResultFound: 
-            raise NotFound("%s with %s" % \)
-                (cls.__name__,
-                 ",".join("%s=%s" % x for x in args))
+            raise NotFound("%s with %s" % (cls.__name__,
+                 ",".join("%s=%s" % x for x in args)))
         return res
 
     @classmethod

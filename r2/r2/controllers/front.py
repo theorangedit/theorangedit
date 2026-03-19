@@ -49,7 +49,7 @@ from r2.lib.db import queries
 from r2.lib.strings import strings
 from r2.lib.validator import *
 from r2.lib import jsontemplates
-import r2.lib.db.thing as thing
+import r2.lib.db.legacy as thing
 from r2.lib.errors import errors, ForbiddenError
 from listingcontroller import ListingController
 from oauth2 import require_oauth2_scope

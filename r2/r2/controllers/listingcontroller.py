@@ -38,7 +38,7 @@ from r2.lib.menus import ControversyTimeMenu, ProfileOverviewTimeMenu, menu, Que
 from r2.lib.rising import get_rising, normalized_rising
 from r2.lib.wrapped import Wrapped
 from r2.lib.normalized_hot import normalized_hot
-from r2.lib.db.thing import Query, Merge, Relations
+from r2.lib.db.legacy import Query, Merge, Relations
 from r2.lib.db import queries
 from r2.lib.strings import Score
 from r2.lib.template_helpers import add_sr

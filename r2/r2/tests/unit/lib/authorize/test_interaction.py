@@ -38,7 +38,7 @@ from r2.lib.authorize.interaction import (get_or_create_customer_profile,
                                           charge_transaction,
                                           void_transaction,
                                           refund_transaction,)
-from r2.lib.db.thing import NotFound
+from r2.lib.db.legacy import NotFound
 from r2.models import Account, Link
 from r2.tests import RedditTestCase
 

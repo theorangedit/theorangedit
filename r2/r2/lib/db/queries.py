@@ -41,7 +41,7 @@ from r2.lib.comment_tree import add_comments
 from r2.lib.db.operators import and_, or_
 from r2.lib.db.operators import asc, desc, timeago
 from r2.lib.db.sorts import epoch_seconds
-from r2.lib.db.thing import Thing, Merge
+from r2.lib.db.legacy import Thing, Merge
 from r2.lib import utils
 from r2.lib.utils import in_chunks, is_subdomain, SimpleSillyStub
 from r2.lib.utils import fetch_things2, tup, UniqueIterator
