@@ -3,8 +3,7 @@ FROM ubuntu:22.04
 ENV DEBIAN_FRONTEND noninteractive
 ENV PYTHONUNBUFFERED 1
 
-# for reddit installer
-# WARNING: some of this is hardcoded in 'cron' and 'supervisord.conf' and 'docker-compose.yml'
+# WARNING: some of these are hardcoded in 'cron', 'supervisord.conf', and 'docker-compose.yml'
 ENV REDDIT_USER reddit
 ENV REDDIT_GROUP nogroup
 ENV REDDIT_HOME /home/reddit
@@ -14,8 +13,6 @@ ENV INSTALL_PROFILE docker
 ENV PGUSER reddit
 ENV PGHOST postgres
 # for container init
-ENV CASSANDRA_HOST cassandra
-ENV CASSANDRA_PORT 9042
 ENV POSTGRES_HOST postgres
 ENV POSTGRES_PORT 5432
 ENV RABBITMQ_HOST rabbitmq
