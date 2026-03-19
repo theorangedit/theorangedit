@@ -1024,6 +1024,9 @@ class UserController(ListingController):
 
         self.vuser = vuser
 
+        from r2.models.subreddit import LabeledMulti as _LabeledMulti
+        c.profile_user_multis = await _LabeledMulti.by_owner(vuser, load_subreddits=False)
+
         c.profilepage = True
         self.suppress_reply_buttons = True
 

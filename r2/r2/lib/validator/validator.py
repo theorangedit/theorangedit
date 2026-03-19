@@ -3190,36 +3190,17 @@ class VMultiPath(Validator):
 
 
 class VMultiByPath(Validator):
-    """Validates a multireddit path.  Returns a LabeledMulti.
+    """Retired — LabeledMulti lookup is now async (done inline in controllers).
+
+    Kept as an import shim only. run() always returns None.
+    Controllers now use VMultiPath for format validation and call
+    await LabeledMulti._byID() directly.
     """
     def __init__(self, param, require_view=True, require_edit=False, kinds=None):
         Validator.__init__(self, param)
-        self.require_view = require_view
-        self.require_edit = require_edit
-        self.kinds = tup(kinds or ('f', 'm'))
 
     def run(self, path):
-        path = VMultiPath.normalize(path)
-        if not path.startswith('/user/'):
-            return self.set_error('MULTI_NOT_FOUND', code=404)
-
-        name = path.split('/')[-1]
-        if not multi_name_rx.match(name):
-            return self.set_error('MULTI_NOT_FOUND', code=404)
-
-        try:
-            multi = LabeledMulti._byID(path)
-        except Exception:  # was tdb_cassandra.NotFound
-            return self.set_error('MULTI_NOT_FOUND', code=404)
-
-        if not multi or multi.kind not in self.kinds:
-            return self.set_error('MULTI_NOT_FOUND', code=404)
-        if not multi or (self.require_view and not multi.can_view(c.user)):
-            return self.set_error('MULTI_NOT_FOUND', code=404)
-        if self.require_edit and not multi.can_edit(c.user):
-            return self.set_error('MULTI_CANNOT_EDIT', code=403)
-
-        return multi
+        return None
 
     def param_docs(self):
         return {

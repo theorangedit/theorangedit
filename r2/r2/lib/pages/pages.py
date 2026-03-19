@@ -2369,7 +2369,7 @@ class ProfilePage(Reddit):
 
         rb.push(scb)
 
-        multis = LabeledMulti.by_owner(self.user, load_subreddits=False)
+        multis = getattr(c, 'profile_user_multis', [])
 
         public_multis = [m for m in multis if m.is_public()]
         if public_multis:
@@ -5550,8 +5550,8 @@ class ListingChooser(Templated):
 
         self.show_samples = False
         if c.user_is_loggedin:
-            multis = LabeledMulti.by_owner(c.user, load_subreddits=False)
-            multis.sort(key=lambda multi: multi.name.lower())
+            multis = getattr(c, 'user_multis', [])
+            multis = sorted(multis, key=lambda multi: multi.name.lower())
             for multi in multis:
                 if not multi.is_hidden():
                     self.add_item("multi", multi.name, site=multi)
@@ -5714,7 +5714,7 @@ class ListingSuggestions(Templated):
                 return
 
             if c.user_is_loggedin:
-                multis = LabeledMulti.by_owner(c.user, load_subreddits=False)
+                multis = getattr(c, 'user_multis', [])
             else:
                 multis = []
 

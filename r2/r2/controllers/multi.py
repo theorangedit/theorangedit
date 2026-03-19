@@ -32,8 +32,9 @@ from r2.controllers.oauth2 import require_oauth2_scope
 from r2.models.account import Account
 from r2.models.subreddit import (
     FakeSubreddit,
-    Subreddit,
     LabeledMulti,
+    LabeledMultiNotFound,
+    Subreddit,
     TooManySubredditsError,
 )
 from r2.lib.validator import (
@@ -45,7 +46,6 @@ from r2.lib.validator import (
     VMarkdownLength,
     VModhash,
     VMultiPath,
-    VMultiByPath,
     VOneOf,
     VSubredditName,
     VSRByName,
@@ -100,23 +100,38 @@ class MultiApiController(RedditController):
                 if multi.can_view(viewer)]
         return self.api_wrapper(resp)
 
+    async def _fetch_multi(self, path_info, require_edit=False, kinds=None):
+        """Look up a LabeledMulti by path and enforce view/edit permissions."""
+        try:
+            multi = await LabeledMulti._byID(path_info['path'])
+        except LabeledMultiNotFound:
+            raise RedditError('MULTI_NOT_FOUND', code=404)
+
+        if kinds and multi.kind not in kinds:
+            raise RedditError('MULTI_NOT_FOUND', code=404)
+        if not multi.can_view(c.user):
+            raise RedditError('MULTI_NOT_FOUND', code=404)
+        if require_edit and not multi.can_edit(c.user):
+            raise RedditError('MULTI_CANNOT_EDIT', code=403)
+        return multi
+
     @require_oauth2_scope("read")
     @validate(
         user=VAccountByName("username"),
         expand_srs=VBoolean("expand_srs"),
     )
     @api_doc(api_section.multis, uri="/api/multi/user/{username}")
-    def GET_list_multis(self, user, expand_srs):
+    async def GET_list_multis(self, user, expand_srs):
         """Fetch a list of public multis belonging to `username`"""
-        multis = LabeledMulti.by_owner(user)
+        multis = await LabeledMulti.by_owner(user)
         return self._format_multi_list(multis, c.user, expand_srs)
 
     @require_oauth2_scope("read")
     @validate(VUser(), expand_srs=VBoolean("expand_srs"))
     @api_doc(api_section.multis, uri="/api/multi/mine")
-    def GET_my_multis(self, expand_srs):
+    async def GET_my_multis(self, expand_srs):
         """Fetch a list of multis belonging to the current user."""
-        multis = LabeledMulti.by_owner(c.user)
+        multis = await LabeledMulti.by_owner(c.user)
         return self._format_multi_list(multis, c.user, expand_srs)
 
     def _format_multi(self, multi, expand_sr_info=False):
@@ -125,7 +140,7 @@ class MultiApiController(RedditController):
 
     @require_oauth2_scope("read")
     @validate(
-        multi=VMultiByPath("multipath", require_view=True),
+        path_info=VMultiPath("multipath"),
         expand_srs=VBoolean("expand_srs"),
     )
     @api_doc(
@@ -133,8 +148,9 @@ class MultiApiController(RedditController):
         uri="/api/multi/{multipath}",
         uri_variants=['/api/filter/{filterpath}'],
     )
-    def GET_multi(self, multi, expand_srs):
+    async def GET_multi(self, path_info, expand_srs):
         """Fetch a multi's data and subreddit list by name."""
+        multi = await self._fetch_multi(path_info)
         return self._format_multi(multi, expand_srs)
 
     def _check_new_multi_path(self, path_info):
@@ -220,7 +236,7 @@ class MultiApiController(RedditController):
 
         try:
             await LabeledMulti._byID(path_info['path'])
-        except Exception:  # was tdb_cassandra.NotFound
+        except LabeledMultiNotFound:
             multi = LabeledMulti.create(path_info['path'], owner)
             response.status = 201
         else:
@@ -244,7 +260,7 @@ class MultiApiController(RedditController):
 
         try:
             multi = await LabeledMulti._byID(path_info['path'])
-        except Exception:  # was tdb_cassandra.NotFound
+        except LabeledMultiNotFound:
             multi = LabeledMulti.create(path_info['path'], owner)
             response.status = 201
 
@@ -255,12 +271,13 @@ class MultiApiController(RedditController):
     @validate(
         VUser(),
         VModhash(),
-        multi=VMultiByPath("multipath", require_edit=True),
+        path_info=VMultiPath("multipath"),
     )
     @api_doc(api_section.multis, extends=GET_multi)
-    def DELETE_multi(self, multi):
+    async def DELETE_multi(self, path_info):
         """Delete a multi."""
-        multi.delete()
+        multi = await self._fetch_multi(path_info, require_edit=True)
+        await multi._commit_delete()
 
     async def _copy_multi(self, from_multi, to_path_info, rename=False):
         """Copy a multi to a user account."""
@@ -273,7 +290,7 @@ class MultiApiController(RedditController):
 
         try:
             await LabeledMulti._byID(to_path_info['path'])
-        except Exception:  # was tdb_cassandra.NotFound
+        except LabeledMultiNotFound:
             to_multi = LabeledMulti.copy(to_path_info['path'], from_multi,
                                          owner=to_owner)
         else:
@@ -285,7 +302,7 @@ class MultiApiController(RedditController):
     @validate(
         VUser(),
         VModhash(),
-        from_multi=VMultiByPath("from", require_view=True, kinds='m'),
+        from_path_info=VMultiPath("from", kinds='m'),
         to_path_info=VMultiPath("to", required=False,
             docs={"to": "destination multireddit url path"},
         ),
@@ -296,7 +313,7 @@ class MultiApiController(RedditController):
         api_section.multis,
         uri="/api/multi/copy",
     )
-    async def POST_multi_copy(self, from_multi, to_path_info, display_name):
+    async def POST_multi_copy(self, from_path_info, to_path_info, display_name):
         """Copy a multi.
 
         Responds with 409 Conflict if the target already exists.
@@ -305,6 +322,8 @@ class MultiApiController(RedditController):
         description.
 
         """
+        from_multi = await self._fetch_multi(from_path_info, kinds=('m',))
+
         if not to_path_info:
             if display_name:
                 # if path not provided, copy multi to same owner
@@ -334,7 +353,7 @@ class MultiApiController(RedditController):
     @validate(
         VUser(),
         VModhash(),
-        from_multi=VMultiByPath("from", require_edit=True, kinds='m'),
+        from_path_info=VMultiPath("from", kinds='m'),
         to_path_info=VMultiPath("to", required=False,
             docs={"to": "destination multireddit url path"},
         ),
@@ -345,8 +364,10 @@ class MultiApiController(RedditController):
         api_section.multis,
         uri="/api/multi/rename",
     )
-    async def POST_multi_rename(self, from_multi, to_path_info, display_name):
+    async def POST_multi_rename(self, from_path_info, to_path_info, display_name):
         """Rename a multi."""
+        from_multi = await self._fetch_multi(from_path_info, require_edit=True, kinds=('m',))
+
         if not to_path_info:
             if display_name:
                 path = LabeledMulti.slugify(from_multi.owner, display_name)
@@ -359,7 +380,7 @@ class MultiApiController(RedditController):
         if display_name:
             to_multi.display_name = display_name
             await to_multi._commit()
-        from_multi.delete()
+        await from_multi._commit_delete()
 
         return self._format_multi(to_multi)
 
@@ -370,7 +391,7 @@ class MultiApiController(RedditController):
     @require_oauth2_scope("read")
     @validate(
         VUser(),
-        multi=VMultiByPath("multipath", require_view=True),
+        path_info=VMultiPath("multipath"),
         sr=VSRByName('srname'),
     )
     @api_doc(
@@ -378,27 +399,29 @@ class MultiApiController(RedditController):
         uri="/api/multi/{multipath}/r/{srname}",
         uri_variants=['/api/filter/{filterpath}/r/{srname}'],
     )
-    def GET_multi_subreddit(self, multi, sr):
+    async def GET_multi_subreddit(self, path_info, sr):
         """Get data about a subreddit in a multi."""
+        multi = await self._fetch_multi(path_info)
         return self._get_multi_subreddit(multi, sr)
 
     @require_oauth2_scope("subscribe")
     @validate(
         VUser(),
         VModhash(),
-        multi=VMultiByPath("multipath", require_edit=True),
+        path_info=VMultiPath("multipath"),
         sr_name=VSubredditName('srname', allow_language_srs=True),
         data=VValidatedJSON("model", multi_sr_data_json_spec),
     )
     @api_doc(api_section.multis, extends=GET_multi_subreddit)
-    async def PUT_multi_subreddit(self, multi, sr_name, data):
+    async def PUT_multi_subreddit(self, path_info, sr_name, data):
         """Add a subreddit to a multi."""
+        multi = await self._fetch_multi(path_info, require_edit=True)
 
         new = not any(sr.name.lower() == sr_name.lower() for sr in multi.srs)
 
         data['name'] = sr_name
         sr_props = await self._add_multi_srs(multi, [data])
-        sr = sr_props.items()[0][0]
+        sr = list(sr_props.items())[0][0]
         await multi._commit()
 
         if new:
@@ -410,12 +433,13 @@ class MultiApiController(RedditController):
     @validate(
         VUser(),
         VModhash(),
-        multi=VMultiByPath("multipath", require_edit=True),
+        path_info=VMultiPath("multipath"),
         sr=VSRByName('srname'),
     )
     @api_doc(api_section.multis, extends=GET_multi_subreddit)
-    async def DELETE_multi_subreddit(self, multi, sr):
+    async def DELETE_multi_subreddit(self, path_info, sr):
         """Remove a subreddit from a multi."""
+        multi = await self._fetch_multi(path_info, require_edit=True)
         multi.del_srs(sr)
         await multi._commit()
 
@@ -426,26 +450,28 @@ class MultiApiController(RedditController):
     @require_oauth2_scope("read")
     @validate(
         VUser(),
-        multi=VMultiByPath("multipath", require_view=True, kinds='m'),
+        path_info=VMultiPath("multipath", kinds='m'),
     )
     @api_doc(
         api_section.multis,
         uri="/api/multi/{multipath}/description",
     )
-    def GET_multi_description(self, multi):
+    async def GET_multi_description(self, path_info):
         """Get a multi's description."""
+        multi = await self._fetch_multi(path_info, kinds=('m',))
         return self._format_multi_description(multi)
 
     @require_oauth2_scope("read")
     @validate(
         VUser(),
         VModhash(),
-        multi=VMultiByPath("multipath", require_edit=True, kinds='m'),
+        path_info=VMultiPath("multipath", kinds='m'),
         data=VValidatedJSON('model', multi_description_json_spec),
     )
     @api_doc(api_section.multis, extends=GET_multi_description)
-    async def PUT_multi_description(self, multi, data):
+    async def PUT_multi_description(self, path_info, data):
         """Change a multi's markdown description."""
+        multi = await self._fetch_multi(path_info, require_edit=True, kinds=('m',))
         multi.description_md = data['body_md']
         await multi._commit()
         return self._format_multi_description(multi)

@@ -196,11 +196,11 @@ class FrontController(RedditController):
         return page.render()
 
     @validate(VUser())
-    def GET_explore(self):
+    async def GET_explore(self):
         settings = ExploreSettings.for_user(c.user)
-        recs = recommender.get_recommended_content_for_user(c.user,
-                                                            settings,
-                                                            record_views=True)
+        recs = await recommender.get_recommended_content_for_user(c.user,
+                                                                   settings,
+                                                                   record_views=True)
         content = ExploreItemListing(recs, settings)
         return BoringPage(_("explore"),
                           show_sidebar=True,

@@ -7,6 +7,7 @@ from sqlalchemy import (
     BigInteger, Boolean, Date, DateTime, Integer, SmallInteger,
     String, Text, ForeignKey, UniqueConstraint, func,
 )
+from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column
 
 from r2.models.orm.base import Base
@@ -247,3 +248,32 @@ class UserFlair(Base):
     flair_text: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     flair_css_class: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     date: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
+class MultiRedditORM(Base):
+    __tablename__ = 'multireddits'
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+    path: Mapped[str] = mapped_column(Text, unique=True, nullable=False, index=True)
+    owner_id: Mapped[int] = mapped_column(BigInteger, ForeignKey('accounts.id', ondelete='CASCADE'), nullable=False, index=True)
+    name: Mapped[str] = mapped_column(Text, nullable=False)
+    display_name: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    description_md: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    visibility: Mapped[str] = mapped_column(String(10), nullable=False, default='private')
+    key_color: Mapped[Optional[str]] = mapped_column(String(7), nullable=True)
+    icon_id: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    icon_url: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    weighting_scheme: Mapped[str] = mapped_column(String(10), nullable=False, default='classic')
+    kind: Mapped[str] = mapped_column(String(1), nullable=False, default='m')
+    copied_from: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
+class MultiRedditSubreddit(Base):
+    __tablename__ = 'multireddit_subreddits'
+    __table_args__ = (UniqueConstraint('multi_id', 'sr_id', name='uq_multi_sr'),)
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+    multi_id: Mapped[int] = mapped_column(BigInteger, ForeignKey('multireddits.id', ondelete='CASCADE'), nullable=False, index=True)
+    sr_id: Mapped[int] = mapped_column(BigInteger, ForeignKey('subreddits.id', ondelete='CASCADE'), nullable=False)
+    sr_props: Mapped[dict] = mapped_column(JSONB, nullable=False, server_default='{}')

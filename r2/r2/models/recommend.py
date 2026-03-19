@@ -61,10 +61,10 @@ class AccountSRPrefs(object):
         self.recent_views = set()
 
     @classmethod
-    def for_user(cls, account):
+    async def for_user(cls, account):
         """Return a new AccountSRPrefs obj populated with user's data."""
         prefs = cls()
-        multis = LabeledMulti.by_owner(account)
+        multis = await LabeledMulti.by_owner(account)
         multi_srs = set(chain.from_iterable(multi.srs for multi in multis))
         feedback = AccountSRFeedback.for_user(account)
         # subscriptions and srs in the user's multis become likes

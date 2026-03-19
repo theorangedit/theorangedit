@@ -94,10 +94,10 @@ def get_recommendations(srs,
     return filtered[:count]
 
 
-def get_recommended_content_for_user(account,
-                                     settings,
-                                     record_views=False,
-                                     src=SRC_EXPLORE):
+async def get_recommended_content_for_user(account,
+                                           settings,
+                                           record_views=False,
+                                           src=SRC_EXPLORE):
     """Wrapper around get_recommended_content() that fills in user info.
 
     If record_views == True, the srs will be noted in the user's preferences
@@ -109,7 +109,7 @@ def get_recommended_content_for_user(account,
     Returns a list of ExploreItems.
 
     """
-    prefs = AccountSRPrefs.for_user(account)
+    prefs = await AccountSRPrefs.for_user(account)
     recs = get_recommended_content(prefs, src, settings)
     if record_views:
         # mark as seen so they won't be shown again too soon

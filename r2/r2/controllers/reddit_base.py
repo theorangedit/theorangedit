@@ -1320,6 +1320,10 @@ class RedditController(OAuth2ResourceController):  # noqa: E302
             c.user_is_admin = maybe_admin and c.user.name in g.admins
             c.user_is_sponsor = c.user_is_admin or c.user.name in g.sponsors
             c.otp_cached = is_otpcookie_valid
+            from r2.models.subreddit import LabeledMulti as _LabeledMulti
+            c.user_multis = await _LabeledMulti.by_owner(c.user, load_subreddits=False)
+        else:
+            c.user_multis = []
 
         enforce_https()
 

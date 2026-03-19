@@ -27,12 +27,15 @@ from r2.lib.context import c
 from r2.lib.utils import to36
 from r2.models.orm.subreddit import Subreddit as _ORMSubreddit
 from r2.models.orm.relations import (
+    MultiRedditORM,
+    MultiRedditSubreddit,
     SubredditBanned,
     SubredditContributor,
     SubredditModerator,
     SubredditSubscriber,
 )
 import r2.services.subreddits as subreddits_svc
+import r2.services.multis as multis_svc
 
 
 # ── Public exception ──────────────────────────────────────────────────────────
@@ -349,38 +352,283 @@ class MultiReddit(FakeSubreddit):
         self.title = 'Multi'
 
 
-# ── LabeledMulti stub ─────────────────────────────────────────────────────────
-# LabeledMulti (user multireddits) needs a real PostgreSQL implementation.
-# TODO: implement LabeledMulti with a proper ORM table and service layer.
+# ── LabeledMulti exceptions ───────────────────────────────────────────────────
+
+class LabeledMultiNotFound(Exception):
+    pass
+
+
+class TooManySubredditsError(Exception):
+    pass
+
+
+# ── LabeledMulti ──────────────────────────────────────────────────────────────
 
 class LabeledMulti:
-    """Stub for user multireddits — Cassandra backend removed, PostgreSQL implementation pending."""
+    """User multireddit — PostgreSQL-backed via multireddits + multireddit_subreddits tables."""
 
     MAX_SR_COUNT = 100
 
-    def __init__(self, *args, **kwargs):
-        raise NotImplementedError(
-            'LabeledMulti: Cassandra removed — re-implement with PostgreSQL'
+    def __init__(self, orm_row, srs=None, owner_account=None):
+        self._orm = orm_row
+        self._srs = list(srs or [])
+        self._sr_props = {}
+        self._owner = owner_account
+        self._saved_srs = list(srs or [])
+
+    # -- Properties -----------------------------------------------------------
+
+    @property
+    def path(self):
+        return self._orm.path
+
+    @path.setter
+    def path(self, value):
+        self._orm.path = value
+
+    @property
+    def name(self):
+        return self._orm.name
+
+    @name.setter
+    def name(self, value):
+        self._orm.name = value
+
+    @property
+    def display_name(self):
+        return self._orm.display_name
+
+    @display_name.setter
+    def display_name(self, value):
+        self._orm.display_name = value
+
+    @property
+    def description_md(self):
+        return self._orm.description_md
+
+    @description_md.setter
+    def description_md(self, value):
+        self._orm.description_md = value
+
+    @property
+    def visibility(self):
+        return self._orm.visibility
+
+    @visibility.setter
+    def visibility(self, value):
+        self._orm.visibility = value
+
+    @property
+    def key_color(self):
+        return self._orm.key_color
+
+    @key_color.setter
+    def key_color(self, value):
+        self._orm.key_color = value
+
+    @property
+    def icon_id(self):
+        return self._orm.icon_id
+
+    @icon_id.setter
+    def icon_id(self, value):
+        self._orm.icon_id = value
+
+    @property
+    def icon_url(self):
+        return self._orm.icon_url
+
+    @icon_url.setter
+    def icon_url(self, value):
+        self._orm.icon_url = value
+
+    @property
+    def weighting_scheme(self):
+        return self._orm.weighting_scheme
+
+    @weighting_scheme.setter
+    def weighting_scheme(self, value):
+        self._orm.weighting_scheme = value
+
+    @property
+    def kind(self):
+        return self._orm.kind
+
+    @kind.setter
+    def kind(self, value):
+        self._orm.kind = value
+
+    @property
+    def copied_from(self):
+        return self._orm.copied_from
+
+    @copied_from.setter
+    def copied_from(self, value):
+        self._orm.copied_from = value
+
+    @property
+    def srs(self):
+        return self._srs
+
+    @property
+    def sr_ids(self):
+        return [sr._id for sr in self._srs]
+
+    @property
+    def sr_props(self):
+        return self._sr_props
+
+    @property
+    def owner(self):
+        return self._owner
+
+    # Compat: _id36 used in templates
+    @property
+    def _id36(self):
+        return to36(self._orm.id) if self._orm.id else None
+
+    # -- Classmethods ---------------------------------------------------------
+
+    @classmethod
+    async def _byID(cls, path: str, return_dict: bool = False):
+        """Fetch a multireddit by its path string (e.g. '/user/alice/m/programming').
+
+        Raises LabeledMultiNotFound if missing.
+        """
+        orm = await multis_svc.get_by_path(c.db, path)
+        if orm is None:
+            raise LabeledMultiNotFound(path)
+        sr_rows = await multis_svc.get_sr_rows(c.db, orm.id)
+        sr_id_list = [r.sr_id for r in sr_rows]
+        props_map = {r.sr_id: r.sr_props for r in sr_rows}
+        srs = []
+        if sr_id_list:
+            sr_dict = await Subreddit._byID(sr_id_list, return_dict=True)
+            srs = list(sr_dict.values())
+        from r2.models.account import Account
+        owner = await Account._byID(orm.owner_id)
+        multi = cls(orm, srs=srs, owner_account=owner)
+        multi._sr_props = {sr._id: props_map.get(sr._id, {}) for sr in srs}
+        if return_dict:
+            return {path: multi}
+        return multi
+
+    @classmethod
+    async def by_owner(cls, account, load_subreddits: bool = True):
+        """Return list of LabeledMulti owned by account."""
+        orm_rows = await multis_svc.get_by_owner(c.db, account._id)
+        result = []
+        for orm in orm_rows:
+            sr_rows = await multis_svc.get_sr_rows(c.db, orm.id) if load_subreddits else []
+            sr_id_list = [r.sr_id for r in sr_rows]
+            props_map = {r.sr_id: r.sr_props for r in sr_rows}
+            srs = []
+            if sr_id_list:
+                sr_dict = await Subreddit._byID(sr_id_list, return_dict=True)
+                srs = list(sr_dict.values())
+            multi = cls(orm, srs=srs, owner_account=account)
+            multi._sr_props = {sr._id: props_map.get(sr._id, {}) for sr in srs}
+            result.append(multi)
+        return result
+
+    @classmethod
+    def create(cls, path: str, owner):
+        """Sync factory — returns an unsaved LabeledMulti. Call await multi._commit() to persist."""
+        name = path.rstrip('/').rsplit('/', 1)[-1]
+        orm = MultiRedditORM(path=path, owner_id=owner._id, name=name)
+        return cls(orm, owner_account=owner)
+
+    @classmethod
+    def copy(cls, path: str, source_multi, owner=None):
+        """Sync factory — returns an unsaved copy of source_multi at the new path."""
+        name = path.rstrip('/').rsplit('/', 1)[-1]
+        src = source_multi._orm
+        orm = MultiRedditORM(
+            path=path,
+            owner_id=(owner._id if owner else src.owner_id),
+            name=name,
+            display_name=src.display_name,
+            description_md=src.description_md,
+            visibility=src.visibility,
+            key_color=src.key_color,
+            icon_id=src.icon_id,
+            icon_url=src.icon_url,
+            weighting_scheme=src.weighting_scheme,
+            kind=src.kind,
+            copied_from=src.path,
         )
+        effective_owner = owner or source_multi._owner
+        multi = cls(orm, srs=list(source_multi._srs), owner_account=effective_owner)
+        multi._sr_props = dict(source_multi._sr_props)
+        return multi
 
     @classmethod
-    async def _byID(cls, *args, **kwargs):
-        raise NotImplementedError('LabeledMulti: Cassandra removed — re-implement with PostgreSQL')
-
-    @classmethod
-    def by_owner(cls, *args, **kwargs):
-        return []
-
-    @classmethod
-    def create(cls, *args, **kwargs):
-        raise NotImplementedError('LabeledMulti: Cassandra removed — re-implement with PostgreSQL')
-
-    @classmethod
-    def copy(cls, *args, **kwargs):
-        raise NotImplementedError('LabeledMulti: Cassandra removed — re-implement with PostgreSQL')
-
-    @classmethod
-    def slugify(cls, owner, display_name):
+    def slugify(cls, owner, display_name: str) -> str:
         import re
         slug = re.sub(r'[^\w]+', '_', display_name).strip('_').lower()
         return f'/user/{owner.name}/m/{slug}'
+
+    # -- Instance methods -----------------------------------------------------
+
+    async def _commit(self):
+        c.db.add(self._orm)
+        await c.db.flush()
+        await multis_svc.upsert_sr_rows(
+            c.db,
+            self._orm.id,
+            {sr._id: self._sr_props.get(sr._id, {}) for sr in self._srs},
+        )
+        await c.db.flush()
+        self._saved_srs = list(self._srs)
+
+    def _revert(self):
+        self._srs = list(self._saved_srs)
+
+    async def _commit_delete(self):
+        await multis_svc.delete_multi(c.db, self._orm.id)
+
+    def add_srs(self, sr_props_dict):
+        """Add subreddits. sr_props_dict: {sr_object: props_dict}."""
+        existing_ids = {sr._id for sr in self._srs}
+        new_srs = [sr for sr in sr_props_dict if sr._id not in existing_ids]
+        if len(self._srs) + len(new_srs) > self.MAX_SR_COUNT:
+            raise TooManySubredditsError(
+                f'A multireddit can have at most {self.MAX_SR_COUNT} subreddits'
+            )
+        for sr, props in sr_props_dict.items():
+            if sr._id not in existing_ids:
+                self._srs.append(sr)
+            self._sr_props[sr._id] = props or {}
+
+    def clear_srs(self):
+        self._srs = []
+        self._sr_props = {}
+
+    def del_srs(self, sr):
+        self._srs = [s for s in self._srs if s._id != sr._id]
+        self._sr_props.pop(sr._id, None)
+
+    def set_icon_by_name(self, icon_name):
+        self._orm.icon_id = icon_name
+
+    # -- Visibility / permissions ---------------------------------------------
+
+    def is_public(self):
+        return self._orm.visibility == 'public'
+
+    def is_hidden(self):
+        return self._orm.visibility == 'hidden'
+
+    def can_view(self, user):
+        if self._orm.owner_id == getattr(user, '_id', None):
+            return True
+        return self.is_public()
+
+    def can_edit(self, user):
+        return self._orm.owner_id == getattr(user, '_id', None)
+
+    def is_allowed_to_view(self, user):
+        return self.can_view(user)
+
+    def __repr__(self):
+        return f'<LabeledMulti path={self._orm.path!r}>'
