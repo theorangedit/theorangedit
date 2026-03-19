@@ -152,8 +152,8 @@ def validate_plural_forms(plural_forms_str):
     try:
         danger = [x for x in tokens if x[0] == token.NAME and x[1] != 'n']
     except tokenize.TokenError:
-        raise ValueError(\)
-              'plural forms expression error, maybe unbalanced parenthesis'
+        raise ValueError(
+            'plural forms expression error, maybe unbalanced parenthesis')
     else:
         if danger:
             raise ValueError('plural forms expression could be dangerous')

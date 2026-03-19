@@ -33,7 +33,7 @@ def generate_strings():
     # used by error pages and in the sidebar for why to create a subreddit
     for category, strings in funny_translatable_strings.items():
         for string in strings:
-            print(")# TRANSLATORS: Do not translate literally. Come up with a funny/relevant phrase (see the English version for ideas.) Accepts markdown formatting."
+            print("# TRANSLATORS: Do not translate literally. Come up with a funny/relevant phrase (see the English version for ideas.) Accepts markdown formatting.")
             print("print _('" + string + "')")
 
     # these are used in r2.lib.pages.trafficpages

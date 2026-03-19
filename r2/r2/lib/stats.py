@@ -168,7 +168,7 @@ class StatsdConnection:
             if len(prefix) > 3:
                 prefix_len = len(prefix)
                 compressed_lines.append(
-                    f'^{prefix_len:02x}{line[prefix_len:]}'))
+                    f'^{prefix_len:02x}{line[prefix_len:]}')
             else:
                 compressed_lines.append(line)
             previous = line
