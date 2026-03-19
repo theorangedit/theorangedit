@@ -66,9 +66,7 @@ class HealthController(MinimalController):
                     # libmemcached doesn't support UDP get/fetch operations
                     continue
                 mc = pylibmc.Client([server], behaviors=behaviors)
-                # it's ok that not all caches are mcrouter, we'll just ignore
-                # the miss either way
-                mc.get("__mcrouter__.version")
+                mc.get("healthcheck")
                 results[server] = "OK"
             except pylibmc.Error as e:
                 g.log.warning("Health check for %s FAILED: %s", server, e)

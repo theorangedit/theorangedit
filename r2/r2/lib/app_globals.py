@@ -56,7 +56,6 @@ from r2.lib.cache import (
     HardCache,
     HardcacheChain,
     LocalCache,
-    Mcrouter,
     MemcacheChain,
     Permacache,
     SelfEmptyingCache,
@@ -279,7 +278,7 @@ class Globals(object):
             'media_preview_domain_whitelist',
             'multi_icons',
             'hide_subscribers_srs',
-            'mcrouter_addr',
+            'memcaches',
         ],
 
         ConfigValue.tuple_of(ConfigValue.int): [
@@ -724,10 +723,10 @@ class Globals(object):
 
         self.startup_timer.intermediate("memcache")
 
-        ################# MCROUTER
-        self.mcrouter = Mcrouter(
-            "mcrouter",
-            self.mcrouter_addr,
+        ################# MEMCACHE
+        self.mcrouter = CMemcache(
+            "memcache",
+            self.memcaches.split(','),
             min_compress_len=1400,
             num_clients=num_mc_clients,
         )
