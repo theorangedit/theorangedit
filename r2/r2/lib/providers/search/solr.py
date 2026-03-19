@@ -402,7 +402,7 @@ def _encode_query(query, faceting, size, start, rank, return_fields):
     if return_fields:
         params["qf"] = ",".join(return_fields)
     encoded_query = urllib.parse.urlencode(params)
-    if getattr(g, 'solr_version', '1').startswith('4'):
+    if not getattr(g, 'solr_version', '1').startswith('1'):
         path = f"/solr/{getattr(g, 'solr_core', 'collection1')}/select?{encoded_query}"
     else:
         path = f'/solr/select?{encoded_query}'
@@ -570,7 +570,7 @@ class SolrSearchUploader(object):
         try:
             for data in chunker:
                 # HTTPLib calculates Content-Length header automatically
-                if getattr(g, 'solr_version', '1').startswith('4'):
+                if not getattr(g, 'solr_version', '1').startswith('1'):
                     connection.request('POST', f"/solr/{core}/update/",
                                        data, headers)
                 else:     
