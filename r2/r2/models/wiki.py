@@ -295,22 +295,53 @@ class WikiRevision:
 # ---------------------------------------------------------------------------
 
 class ImagesByWikiPage:
-    def __init__(self, *a, **kw):
-        raise NotImplementedError("Cassandra removed — use service layer")
+    """Per-subreddit, per-page image registry backed by g.permacache.
+
+    Stores a JSON dict of {image_name: url} per (sr_id, page_key) pair.
+    Replaces the old Cassandra-backed implementation.
+    """
 
     @classmethod
-    def add_image(cls, *a, **kw):
-        raise NotImplementedError("Cassandra removed — use service layer")
+    def _key(cls, sr, page_name):
+        from r2.lib.app_globals import g
+        return f'wiki_images_{sr._id}_{page_name}'
 
     @classmethod
-    def get_images(cls, *a, **kw):
-        raise NotImplementedError("Cassandra removed — use service layer")
+    def _load(cls, sr, page_name):
+        import json
+        from r2.lib.app_globals import g
+        raw = g.permacache.get(cls._key(sr, page_name))
+        if not raw:
+            return {}
+        try:
+            return json.loads(raw)
+        except (ValueError, TypeError):
+            return {}
 
     @classmethod
-    def get_image_count(cls, *a, **kw):
-        raise NotImplementedError("Cassandra removed — use service layer")
+    def _save(cls, sr, page_name, images):
+        import json
+        from r2.lib.app_globals import g
+        g.permacache.set(cls._key(sr, page_name), json.dumps(images))
 
     @classmethod
-    def delete_image(cls, *a, **kw):
-        raise NotImplementedError("Cassandra removed — use service layer")
+    def get_images(cls, sr, page_name):
+        """Return {name: url} dict for all images on this page."""
+        return cls._load(sr, page_name)
+
+    @classmethod
+    def get_image_count(cls, sr, page_name):
+        return len(cls._load(sr, page_name))
+
+    @classmethod
+    def add_image(cls, sr, page_name, name, url, content_type=None):
+        images = cls._load(sr, page_name)
+        images[name] = url
+        cls._save(sr, page_name, images)
+
+    @classmethod
+    def delete_image(cls, sr, page_name, name):
+        images = cls._load(sr, page_name)
+        images.pop(name, None)
+        cls._save(sr, page_name, images)
 

@@ -52,7 +52,7 @@ from r2.models import (
     Comment,
     Inbox,
     Link,
-    LinksByAccount,
+
     Message,
     ModContribSR,
     ModeratorInbox,
@@ -1870,9 +1870,10 @@ async def consume_deleted_accounts():
             cancel_stripe_subscription(account.gold_subscr_id)
 
         # Mark their link submissions for updating on search
-        query = LinksByAccount._cf.xget(account._id36)
-        for link_id36, unused in query:
-            fullname = Link._fullname_from_id36(link_id36)
+        from r2.services import links as link_svc
+        user_links = await link_svc.get_user_links(c.db, account._id, limit=10000)
+        for link in user_links:
+            fullname = link._fullname
             payload = pickle.dumps({"fullname": fullname})
             await amqp.add_item("search_changes", payload, message_id=fullname,
                 delivery_mode=amqp.DELIVERY_TRANSIENT)

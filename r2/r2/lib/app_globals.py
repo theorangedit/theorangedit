@@ -74,7 +74,6 @@ from r2.lib.stats import (
     CacheStats,
     StaleCacheStats,
     Stats,
-    StatsCollectingConnectionPool,
 )
 from r2.lib.translation import get_active_langs, I18N_PATH
 from r2.lib.utils import config_gold_price, thread_dump

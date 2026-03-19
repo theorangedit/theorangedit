@@ -24,20 +24,28 @@ import json
 
 NoDefault = object()
 
-_MSG = 'KeyValueStore: Cassandra removed — re-implement with PostgreSQL/Redis'
+_PREFIX = 'named_globals_'
+_TTL = 0  # permacache entries live forever (until evicted)
 
 
-class KeyValueStore:
-    """Generic key/value store — stub only, Cassandra backend removed."""
+class NamedGlobals:
+    """Persistent key/value store backed by g.permacache (Redis/Memcache).
+
+    Replaces the old Cassandra-backed implementation. Values are JSON-encoded
+    so they survive serialisation round-trips identically to the original.
+    """
 
     @classmethod
     def get(cls, key, default=NoDefault):
-        raise NotImplementedError(_MSG)
+        from r2.lib.app_globals import g
+        raw = g.permacache.get(_PREFIX + key)
+        if raw is None:
+            if default is NoDefault:
+                raise KeyError(key)
+            return default
+        return json.loads(raw)
 
     @classmethod
     def set(cls, key, data):
-        raise NotImplementedError(_MSG)
-
-
-class NamedGlobals(KeyValueStore):
-    pass
+        from r2.lib.app_globals import g
+        g.permacache.set(_PREFIX + key, json.dumps(data))

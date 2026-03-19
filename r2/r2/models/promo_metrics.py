@@ -20,28 +20,69 @@
 # Inc. All Rights Reserved.
 ###############################################################################
 
-_MSG = 'PromoMetrics: Cassandra removed — re-implement with PostgreSQL'
+import json
+
+_PM_PREFIX = 'promo_metrics_'
+_LPM_PREFIX = 'location_promo_metrics_'
 
 
 class PromoMetrics:
-    """Promotion inventory metrics — stub only, Cassandra backend removed."""
+    """Promotion inventory metrics backed by g.permacache.
+
+    Values are dicts mapping sr_name → int (pageview count).
+
+    Replaces the old Cassandra-backed implementation.
+    """
 
     @classmethod
     def get(cls, metric_name, sr_names=None):
-        raise NotImplementedError(_MSG)
+        from r2.lib.app_globals import g
+        raw = g.permacache.get(_PM_PREFIX + metric_name)
+        if raw is None:
+            return {}
+        data = json.loads(raw)
+        if sr_names is not None:
+            data = {k: v for k, v in data.items() if k in sr_names}
+        return data
 
     @classmethod
     def set(cls, metric_name, values_by_sr):
-        raise NotImplementedError(_MSG)
+        from r2.lib.app_globals import g
+        g.permacache.set(_PM_PREFIX + metric_name, json.dumps(values_by_sr))
 
 
 class LocationPromoMetrics:
-    """Location-level promotion inventory metrics — stub only, Cassandra backend removed."""
+    """Location-level promotion inventory metrics backed by g.permacache.
+
+    Keyed by (sr_name, location_str). The ``get`` classmethod accepts a single
+    SR and a list of Location objects and returns a dict keyed by
+    ``(sr, location)`` tuples — matching the calling convention in inventory.py.
+
+    Replaces the old Cassandra-backed implementation.
+    """
+
+    @classmethod
+    def _cache_key(cls, sr_name, location_str):
+        return f'{_LPM_PREFIX}{sr_name}_{location_str}'
 
     @classmethod
     def get(cls, srs, locations):
-        raise NotImplementedError(_MSG)
+        from r2.lib.app_globals import g
+        from r2.lib.utils import tup
+        srs_list = tup(srs)
+        result = {}
+        for sr in srs_list:
+            for loc in locations:
+                loc_str = str(loc) if loc is not None else ''
+                raw = g.permacache.get(cls._cache_key(sr.name, loc_str))
+                value = json.loads(raw) if raw is not None else 0
+                result[(sr, loc)] = value
+        return result
 
     @classmethod
     def set(cls, metrics):
-        raise NotImplementedError(_MSG)
+        """Store a mapping of {(sr, location): value}."""
+        from r2.lib.app_globals import g
+        for (sr, loc), value in metrics.items():
+            loc_str = str(loc) if loc is not None else ''
+            g.permacache.set(cls._cache_key(sr.name, loc_str), json.dumps(value))

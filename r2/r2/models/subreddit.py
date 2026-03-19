@@ -349,44 +349,38 @@ class MultiReddit(FakeSubreddit):
         self.title = 'Multi'
 
 
-# ── Stub Cassandra classes ────────────────────────────────────────────────────
-# These existed in the legacy Cassandra Thing ORM.  They are kept as stubs so
-# that any lingering import references do not cause ImportError at startup.
-# Raise NotImplementedError on any attempt to actually use them.
+# ── LabeledMulti stub ─────────────────────────────────────────────────────────
+# LabeledMulti (user multireddits) needs a real PostgreSQL implementation.
+# TODO: implement LabeledMulti with a proper ORM table and service layer.
 
-class _CassandraStub:
-    """Base for removed Cassandra-backed relation classes."""
+class LabeledMulti:
+    """Stub for user multireddits — Cassandra backend removed, PostgreSQL implementation pending."""
+
+    MAX_SR_COUNT = 100
 
     def __init__(self, *args, **kwargs):
         raise NotImplementedError(
-            f'{self.__class__.__name__} is a removed Cassandra class and '
-            f'cannot be instantiated.'
+            'LabeledMulti: Cassandra removed — re-implement with PostgreSQL'
         )
 
     @classmethod
-    def _byID(cls, *args, **kwargs):
-        raise NotImplementedError(cls.__name__)
+    async def _byID(cls, *args, **kwargs):
+        raise NotImplementedError('LabeledMulti: Cassandra removed — re-implement with PostgreSQL')
 
     @classmethod
-    def _by_name(cls, *args, **kwargs):
-        raise NotImplementedError(cls.__name__)
+    def by_owner(cls, *args, **kwargs):
+        return []
 
+    @classmethod
+    def create(cls, *args, **kwargs):
+        raise NotImplementedError('LabeledMulti: Cassandra removed — re-implement with PostgreSQL')
 
-class SubscribedSubredditsByAccount(_CassandraStub):
-    """Removed — was a Cassandra column-family index of subscriptions."""
+    @classmethod
+    def copy(cls, *args, **kwargs):
+        raise NotImplementedError('LabeledMulti: Cassandra removed — re-implement with PostgreSQL')
 
-
-class SubscriptionsByDay(_CassandraStub):
-    """Removed — was a Cassandra counter for daily subscription deltas."""
-
-
-class SubredditsActiveForFrontPage(_CassandraStub):
-    """Removed — was a Cassandra set of front-page-eligible subreddits."""
-
-
-class LabeledMulti(_CassandraStub):
-    """Removed — was a Cassandra-backed user multi-reddit."""
-
-
-class LabeledMultiByOwner(_CassandraStub):
-    """Removed — was a Cassandra index of multis by owner account."""
+    @classmethod
+    def slugify(cls, owner, display_name):
+        import re
+        slug = re.sub(r'[^\w]+', '_', display_name).strip('_').lower()
+        return f'/user/{owner.name}/m/{slug}'

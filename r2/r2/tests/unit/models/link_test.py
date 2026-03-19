@@ -222,21 +222,9 @@ class SubredditMock(ThingMock):
 
 class TestSubmit(unittest.TestCase):
     def setUp(self):
-        from r2.models import (
-            LinksByAccount,
-            LinksByUrlAndSubreddit,
-            SubredditParticipationByAccount,
-            SubredditsActiveForFrontPage,
-        )
+        from r2.models import SubredditParticipationByAccount
 
-        LinksByAccount.add_link = MagicMock()
         SubredditParticipationByAccount.mark_participated = MagicMock()
-        SubredditsActiveForFrontPage.mark_new_post = MagicMock()
-
-        self.links_by_url_add_link = MagicMock()
-        LinksByUrlAndSubreddit.add_link = self.links_by_url_add_link
-        self.links_by_url_remove_link = MagicMock()
-        LinksByUrlAndSubreddit.remove_link = self.links_by_url_remove_link
 
     def test_new_self_post_has_url(self):
         l = LinkMock._submit(

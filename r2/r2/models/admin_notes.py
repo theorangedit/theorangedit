@@ -20,19 +20,51 @@
 # Inc. All Rights Reserved.
 ###############################################################################
 
-_MSG = 'AdminNotesBySystem: Cassandra removed — re-implement with PostgreSQL'
+import json
+import time
+
+_PREFIX = 'admin_notes_'
 
 
 class AdminNotesBySystem:
-    """Admin moderation notes — stub only, Cassandra backend removed."""
+    """Admin moderation notes backed by g.permacache.
+
+    Notes are stored as a JSON list under ``admin_notes_{system}:{subject}``.
+    Data persists as long as the cache backend is running.
+
+    Replaces the old Cassandra-backed implementation.
+    """
+
+    @classmethod
+    def _key(cls, system_name, subject):
+        return f'{_PREFIX}{system_name}:{subject}'
 
     @classmethod
     def add(cls, system_name, subject, note, author, when=None):
-        raise NotImplementedError(_MSG)
+        from r2.lib.app_globals import g
+        key = cls._key(system_name, subject)
+        notes = cls.in_display_order(system_name, subject)
+        entry = {
+            'note': note,
+            'author': author if isinstance(author, str) else getattr(author, 'name', str(author)),
+            'when': when if when is not None else time.time(),
+        }
+        notes.append(entry)
+        g.permacache.set(key, json.dumps(notes))
 
     @classmethod
     def in_display_order(cls, system_name, subject):
-        raise NotImplementedError(_MSG)
+        from r2.lib.app_globals import g
+        key = cls._key(system_name, subject)
+        raw = g.permacache.get(key)
+        if not raw:
+            return []
+        try:
+            notes = json.loads(raw)
+        except (ValueError, TypeError):
+            return []
+        # newest first
+        return list(reversed(notes))
 
     @classmethod
     def _rowkey(cls, system_name, subject):

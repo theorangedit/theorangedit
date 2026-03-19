@@ -29,20 +29,6 @@ import time
 import threading
 import random
 
-# pycassa removed (Cassandra removed in Phase 10) — raise on use so callers surface immediately
-class _RemovedCassandraPool:
-    def __init__(self, *a, **kw):
-        raise NotImplementedError("pycassa.pool removed — Cassandra is gone")
-    def _get_new_wrapper(self, *a, **kw):
-        raise NotImplementedError("pycassa.pool removed — Cassandra is gone")
-class _RemovedCassandraColumnFamily:
-    class ColumnParent:
-        pass
-    class ColumnPath:
-        pass
-    ConnectionPool = _RemovedCassandraPool
-columnfamily = _RemovedCassandraColumnFamily()
-pool = type('pool', (), {'ConnectionPool': _RemovedCassandraPool})()
 
 from r2.lib import baseplate_integration
 from r2.lib import cache
@@ -302,7 +288,6 @@ class Stats:
     # sample_rate.
     CACHE_SAMPLE_RATE = 0.01
 
-    CASSANDRA_KEY_SUFFIXES = ['error', 'ok']
 
     def __init__(self, addr, sample_rate):
         self.client = StatsdClient(addr, sample_rate)
@@ -391,23 +376,6 @@ class Stats:
     def end_logging_timings(self):
         return self.client.timing_stats.end_logging()
 
-    def cf_key_iter(self, operation, column_families, suffix):
-        if not self.client:
-            return
-        if not isinstance(column_families, list):
-            column_families = [column_families]
-        for cf in column_families:
-            yield '.'.join(['cassandra', cf, operation, suffix])
-
-    def cassandra_timing(self, operation, column_families, success,
-                         start, end):
-        suffix = self.CASSANDRA_KEY_SUFFIXES[success]
-        for key in self.cf_key_iter(operation, column_families, suffix):
-            self.client.timing_stats.record(key, start, end)
-
-    def cassandra_counter(self, operation, column_families, suffix, delta):
-        for key in self.cf_key_iter(operation, column_families, suffix):
-            self.client.counting_stats.record(key, delta)
 
     def pg_before_cursor_execute(self, conn, cursor, statement, parameters,
                                context, executemany):
@@ -523,106 +491,3 @@ class StaleCacheStats(CacheStats):
                 })
             self.parent.cache_count_multi(data)
 
-
-class StatsCollectingConnectionPool(pool.ConnectionPool):
-    def __init__(self, keyspace, stats=None, *args, **kwargs):
-        pool.ConnectionPool.__init__(self, keyspace, *args, **kwargs)
-        self.stats = stats
-
-    def _get_new_wrapper(self, server):
-        host, sep, port = server.partition(':')
-        self.stats.event_count('cassandra.connections', host)
-
-        cf_types = (columnfamily.ColumnParent, columnfamily.ColumnPath)
-
-        def get_cf_name_from_args(args, kwargs):
-            for v in args:
-                if isinstance(v, cf_types):
-                    return v.column_family
-            for v in kwargs.values():
-                if isinstance(v, cf_types):
-                    return v.column_family
-            return None
-
-        def get_cf_name_from_batch_mutation(args, kwargs):
-            cf_names = set()
-            mutation_map = args[0]
-            for key_mutations in mutation_map.values():
-                cf_names.update(key_mutations)
-            return list(cf_names)
-
-        instrumented_methods = dict(
-            get=get_cf_name_from_args,
-            get_slice=get_cf_name_from_args,
-            multiget_slice=get_cf_name_from_args,
-            get_count=get_cf_name_from_args,
-            multiget_count=get_cf_name_from_args,
-            get_range_slices=get_cf_name_from_args,
-            get_indexed_slices=get_cf_name_from_args,
-            insert=get_cf_name_from_args,
-            batch_mutate=get_cf_name_from_batch_mutation,
-            add=get_cf_name_from_args,
-            remove=get_cf_name_from_args,
-            remove_counter=get_cf_name_from_args,
-            truncate=lambda args, kwargs: args[0],
-        )
-
-        def record_error(method_name, cf_name, start, end):
-            if cf_name and self.stats:
-                self.stats.cassandra_timing(method_name, cf_name, False,
-                                           start, end)
-
-        def record_success(method_name, cf_name, start, end):
-            if cf_name and self.stats:
-                self.stats.cassandra_timing(method_name, cf_name, True,
-                                           start, end)
-
-        def record_size(method_name, cf_name, result, key="size"):
-            if cf_name and self.stats:
-                # if we don't have easy access to the wire-size, we can
-                # proxy because thrift objects have descriptive reprs
-                size = len(repr(result))
-                self.stats.cassandra_counter(method_name, cf_name, key, size)
-
-        # size_sample determines how often we measure and track the size
-        # of the response from cassandra.
-        def instrument(f, get_cf_name, size_sample=0.01):
-            def call_with_instrumentation(*args, **kwargs):
-                from r2.lib.context import c
-
-                cf_name = get_cf_name(args, kwargs)
-                method_name = f.__name__
-
-                try:
-                    c.trace
-                except TypeError:
-                    # the tmpl_context global isn't available out of request
-                    cassandra_child_trace = utils.SimpleSillyStub()
-                else:
-                    if c.trace:
-                        cassandra_child_trace = c.trace.make_child("cassandra")
-                        cassandra_child_trace.set_tag("column_family", cf_name)
-                        cassandra_child_trace.set_tag("method", method_name)
-                    else:
-                        cassandra_child_trace = utils.SimpleSillyStub()
-
-                start = time.time()
-                try:
-                    with cassandra_child_trace:
-                        result = f(*args, **kwargs)
-                except:
-                    record_error(method_name, cf_name, start, time.time())
-                    raise
-                else:
-                    if random.random() < size_sample:
-                        record_size(method_name, cf_name, result)
-
-                    record_success(method_name, cf_name, start, time.time())
-                    return result
-            return call_with_instrumentation
-
-        wrapper = pool.ConnectionPool._get_new_wrapper(self, server)
-        for method_name, get_cf_name in instrumented_methods.items():
-            f = getattr(wrapper, method_name)
-            setattr(wrapper, method_name, instrument(f, get_cf_name))
-        return wrapper

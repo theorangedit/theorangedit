@@ -464,60 +464,41 @@ Message = _MessageORM
 
 
 # ===========================================================================
-# Dead-code stubs for removed Cassandra-backed classes
+# CommentScoresByLink
 # ===========================================================================
 
-class LinksByUrlAndSubreddit:
-    """Legacy Cassandra index — removed.  Raises NotImplementedError on use."""
+class CommentScoresByLink:
+    """Precomputed per-sort comment scores backed by g.permacache.
 
-    def __init__(self, *args, **kwargs):
-        raise NotImplementedError(
-            'LinksByUrlAndSubreddit (Cassandra) has been removed. '
-            'Use link_svc.get_by_url() instead.'
-        )
+    Scores are stored as a JSON dict of {id36: float} keyed by link_id + sort.
+    This is a hot path (called on every comment page load).
+
+    Replaces the old Cassandra-backed implementation.
+    """
 
     @classmethod
-    def get_links(cls, url, sr=None):
-        raise NotImplementedError
+    def _key(cls, link, sort):
+        return f'comment_scores_{link._id}_{sort}'
 
+    @classmethod
+    def get_scores(cls, link, sort):
+        """Return {id36: score} dict for the given link and sort."""
+        import json
+        from r2.lib.app_globals import g
+        raw = g.permacache.get(cls._key(link, sort))
+        if not raw:
+            return {}
+        try:
+            return json.loads(raw)
+        except (ValueError, TypeError):
+            return {}
 
-class CommentScoresByLink:
-    """Legacy Cassandra index — removed."""
-
-    def __init__(self, *args, **kwargs):
-        raise NotImplementedError(
-            'CommentScoresByLink (Cassandra) has been removed.'
-        )
-
-
-class LinksByAccount:
-    """Legacy Cassandra index — removed."""
-
-    def __init__(self, *args, **kwargs):
-        raise NotImplementedError(
-            'LinksByAccount (Cassandra) has been removed. '
-            'Use link_svc.get_user_links() instead.'
-        )
-
-
-class CommentsByAccount:
-    """Legacy Cassandra index — removed."""
-
-    def __init__(self, *args, **kwargs):
-        raise NotImplementedError(
-            'CommentsByAccount (Cassandra) has been removed. '
-            'Use comment_svc.get_user_comments() instead.'
-        )
-
-
-class MessagesByAccount:
-    """Legacy Cassandra index — removed."""
-
-    def __init__(self, *args, **kwargs):
-        raise NotImplementedError(
-            'MessagesByAccount (Cassandra) has been removed. '
-            'Use message_svc.get_inbox() / message_svc.get_sent() instead.'
-        )
+    @classmethod
+    def set_scores(cls, link, sort, scores):
+        """Store {id36: score} dict for the given link and sort."""
+        import json
+        from r2.lib.app_globals import g
+        g.permacache.set(cls._key(link, sort), json.dumps(scores))
 
 
 # ---------------------------------------------------------------------------
@@ -527,11 +508,7 @@ class MessagesByAccount:
 __all__ = [
     'Comment',
     'CommentScoresByLink',
-    'CommentsByAccount',
     'Link',
-    'LinksByAccount',
-    'LinksByUrlAndSubreddit',
     'Message',
-    'MessagesByAccount',
     'NotFound',
 ]

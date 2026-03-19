@@ -185,25 +185,6 @@ def pushup_permacache(verbosity=1000):
         populate(keys)
 
 
-def port_cassaurls(after_id=None, estimate=15231317):
-    from r2.models import Link, LinksByUrlAndSubreddit
-    from r2.lib.db.operators import desc
-    from r2.lib.utils import fetch_things2, in_chunks, progress
-
-    q = Link._query(Link.c._spam == (True, False),
-                    sort=desc('_date'), data=True)
-    if after_id:
-        q._after(Link._byID(after_id,data=True))
-    q = fetch_things2(q, chunk_size=500)
-    q = progress(q, estimate=estimate)
-    q = (l for l in q
-         if getattr(l, 'url', 'self') != 'self'
-         and not getattr(l, 'is_self', False))
-    chunks = in_chunks(q, 500)
-
-    for chunk in chunks:
-        for l in chunk:
-            LinksByUrlAndSubreddit.add_link(l)
 
 def port_deleted_links(after_id=None):
     from r2.models import Link

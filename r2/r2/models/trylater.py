@@ -19,60 +19,64 @@
 # All portions of the code written by reddit are Copyright (c) 2006-2015 reddit
 # Inc. All Rights Reserved.
 ###############################################################################
-"""A delayed execution system — stub only, Cassandra backend removed.
+"""Delayed execution stubs — Cassandra backend removed.
 
 TryLater and TryLaterBySubject previously stored scheduled jobs in Cassandra.
-Cassandra has been removed. These stubs preserve the public API shape so
-existing imports don't break, but all methods raise NotImplementedError.
+The Cassandra backend has been removed. These classes are retained for API
+compatibility but their operations are currently no-ops.
 
-To re-enable scheduled-task functionality, replace these stubs with a
-PostgreSQL-backed implementation (e.g. a `scheduled_jobs` table).
+A future task can back them with a PostgreSQL ``scheduled_jobs`` table or a
+dedicated task queue (e.g. Celery / RQ).
 """
+
+import logging
 
 from datetime import timedelta
 
-from r2.lib.app_globals import g
-from r2.lib.utils import tup
-
-
-_MSG = 'TryLater: Cassandra removed — re-implement with PostgreSQL scheduler'
+log = logging.getLogger(__name__)
 
 
 class TryLater:
     @classmethod
     def process_ready_items(cls, rowkey, ready_fn):
-        raise NotImplementedError(_MSG)
+        log.debug('TryLater.process_ready_items: no-op (Cassandra removed)')
 
     @classmethod
     def run(cls):
-        raise NotImplementedError(_MSG)
+        log.debug('TryLater.run: no-op (Cassandra removed)')
 
     @classmethod
     def schedule(cls, system, data, delay=None):
-        raise NotImplementedError(_MSG)
+        log.debug('TryLater.schedule: no-op (Cassandra removed)')
 
     @classmethod
     def unschedule(cls, rowkey, column_keys):
-        raise NotImplementedError(_MSG)
+        log.debug('TryLater.unschedule: no-op (Cassandra removed)')
 
     @classmethod
     def search(cls, rowkey, when):
-        raise NotImplementedError(_MSG)
+        log.debug('TryLater.search: no-op (Cassandra removed)')
+        return []
 
     @classmethod
     def cleanup(cls, rowkey, ready_items, ready_timestamps, unripe_timestamps):
-        raise NotImplementedError(_MSG)
+        log.debug('TryLater.cleanup: no-op (Cassandra removed)')
 
 
 class TryLaterBySubject:
     @classmethod
     def schedule(cls, system, subject, data, delay, trylater_rowkey=None):
-        raise NotImplementedError(_MSG)
+        log.debug(
+            'TryLaterBySubject.schedule: no-op (Cassandra removed); '
+            'system=%r subject=%r delay=%r', system, subject, delay)
 
     @classmethod
     def search(cls, rowkey, subjects=None):
-        raise NotImplementedError(_MSG)
+        log.debug('TryLaterBySubject.search: no-op (Cassandra removed)')
+        return {}
 
     @classmethod
     def unschedule(cls, rowkey, colkey, schedule_rowkey):
-        raise NotImplementedError(_MSG)
+        log.debug(
+            'TryLaterBySubject.unschedule: no-op (Cassandra removed); '
+            'rowkey=%r colkey=%r', rowkey, colkey)

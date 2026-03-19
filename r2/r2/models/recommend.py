@@ -20,6 +20,7 @@
 # Inc. All Rights Reserved.
 ###############################################################################
 
+import json
 import time
 
 from collections import defaultdict
@@ -81,36 +82,111 @@ class AccountSRPrefs(object):
         return prefs
 
 
-_MSG = 'Cassandra removed — re-implement with PostgreSQL'
+_FB_PREFIX = 'sr_feedback_'
+_ES_PREFIX = 'explore_settings_'
 
 
 class AccountSRFeedback:
-    """Recommendation feedback — stub only, Cassandra backend removed."""
+    """Per-user SR recommendation feedback backed by g.permacache.
+
+    Stores lists of (sr_id36, timestamp) pairs per action type.
+    Expired entries are filtered on read according to FEEDBACK_TTL.
+
+    Replaces the old Cassandra-backed implementation.
+    """
+
+    @classmethod
+    def _key(cls, account, action):
+        return f'{_FB_PREFIX}{account._id}_{action}'
+
+    @classmethod
+    def _read_entries(cls, account, action):
+        """Return a list of (sr_id36, timestamp) for the given action, filtering expired."""
+        raw = g.permacache.get(cls._key(account, action))
+        if not raw:
+            return []
+        try:
+            entries = json.loads(raw)
+        except (ValueError, TypeError):
+            return []
+        ttl = FEEDBACK_TTL.get(action, 0)
+        if ttl:
+            cutoff = time.time() - ttl
+            entries = [e for e in entries if e[1] >= cutoff]
+        return entries
+
+    @classmethod
+    def _write_entries(cls, account, action, entries):
+        ttl = int(FEEDBACK_TTL.get(action, 0))
+        g.permacache.set(cls._key(account, action), json.dumps(entries),
+                         time=ttl or 0)
 
     @classmethod
     def for_user(cls, account):
-        raise NotImplementedError(_MSG)
+        """Return {action: set_of_sr_id36} for all FEEDBACK_ACTIONS."""
+        result = {action: set() for action in FEEDBACK_ACTIONS}
+        for action in FEEDBACK_ACTIONS:
+            entries = cls._read_entries(account, action)
+            result[action] = {e[0] for e in entries}
+        return result
 
     @classmethod
     def record_feedback(cls, account, srs, action):
-        raise NotImplementedError(_MSG)
+        """Record that the user took ``action`` on each sr in ``srs``."""
+        if action not in FEEDBACK_ACTIONS:
+            return
+        now = time.time()
+        existing = cls._read_entries(account, action)
+        existing_ids = {e[0] for e in existing}
+        for sr in srs:
+            sr_id36 = sr._id36
+            if sr_id36 not in existing_ids:
+                existing.append([sr_id36, now])
+        cls._write_entries(account, action, existing)
 
     @classmethod
-    def record_views(cls, account, srs):
-        raise NotImplementedError(_MSG)
+    def record_views(cls, account, sr_data):
+        """Record VIEW feedback for each sr in ``sr_data`` (a {sr: src} dict)."""
+        cls.record_feedback(account, sr_data.keys(), VIEW)
 
 
 class ExploreSettings:
-    """Explore page user settings — stub only, Cassandra backend removed."""
+    """Explore page user settings backed by g.permacache.
+
+    Replaces the old Cassandra-backed implementation.
+    """
+
+    @classmethod
+    def _key(cls, account):
+        return f'{_ES_PREFIX}{account._id}'
 
     @classmethod
     def for_user(cls, account):
-        return DefaultExploreSettings()
+        """Return an ExploreSettings-like object for the given user."""
+        raw = g.permacache.get(cls._key(account))
+        if not raw:
+            return DefaultExploreSettings()
+        try:
+            data = json.loads(raw)
+        except (ValueError, TypeError):
+            return DefaultExploreSettings()
+        settings = DefaultExploreSettings()
+        settings.personalized = data.get('personalized', True)
+        settings.discovery = data.get('discovery', True)
+        settings.rising = data.get('rising', True)
+        settings.nsfw = data.get('nsfw', False)
+        return settings
 
     @classmethod
     def record_settings(cls, user, personalized=False, discovery=False,
                         rising=False, nsfw=False):
-        raise NotImplementedError(_MSG)
+        data = {
+            'personalized': personalized,
+            'discovery': discovery,
+            'rising': rising,
+            'nsfw': nsfw,
+        }
+        g.permacache.set(cls._key(user), json.dumps(data))
 
 
 class DefaultExploreSettings(object):

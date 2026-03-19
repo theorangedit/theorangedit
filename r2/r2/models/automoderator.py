@@ -20,22 +20,47 @@
 # Inc. All Rights Reserved.
 ###############################################################################
 
+import json
 from datetime import timedelta
 
-_MSG = 'PerformedRulesByThing: Cassandra removed — re-implement with PostgreSQL'
+_PREFIX = 'automod_performed_'
+# Keep deduplication data for 90 days (automod rules rarely need longer)
+_TTL = int(timedelta(days=90).total_seconds())
 
 
 class PerformedRulesByThing:
-    """Tracks which automod rules have been applied to a thing — stub only."""
+    """Tracks which non-repeatable automod rules have been applied to a thing.
+
+    Backed by g.permacache. Data is ephemeral — if lost, a non-repeatable rule
+    may fire once more, which is an acceptable edge case.
+
+    Replaces the old Cassandra-backed implementation.
+    """
 
     @classmethod
     def _rowkey(cls, thing):
         return thing._fullname
 
     @classmethod
+    def _cache_key(cls, thing):
+        return _PREFIX + thing._fullname
+
+    @classmethod
     def mark_performed(cls, thing, rule):
-        raise NotImplementedError(_MSG)
+        from r2.lib.app_globals import g
+        key = cls._cache_key(thing)
+        already = cls.get_already_performed(thing)
+        already.add(rule.unique_id)
+        g.permacache.set(key, json.dumps(list(already)), time=_TTL)
 
     @classmethod
     def get_already_performed(cls, thing):
-        raise NotImplementedError(_MSG)
+        from r2.lib.app_globals import g
+        key = cls._cache_key(thing)
+        raw = g.permacache.get(key)
+        if not raw:
+            return set()
+        try:
+            return set(json.loads(raw))
+        except (ValueError, TypeError):
+            return set()
