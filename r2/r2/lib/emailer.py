@@ -43,7 +43,7 @@ from r2.models.token import EmailVerificationToken, PasswordResetToken
 
 trylater_hooks = hooks.HookRegistrar()
 
-def _system_email(email, plaintext_body, kind, reply_to="",
+async def _system_email(db, email, plaintext_body, kind, reply_to="",
         thing=None, from_address=g.feedback_email,
         html_body="", list_unsubscribe_header="", user=None,
         suppress_username=False):
@@ -56,34 +56,34 @@ def _system_email(email, plaintext_body, kind, reply_to="",
     elif user is None and c.user_is_loggedin:
         user = c.user
 
-    Email.handler.add_to_queue(user,
+    await Email.handler.add_to_queue(db, user,
         email, g.domain, from_address, kind,
         body=plaintext_body, reply_to=reply_to, thing=thing,
     )
 
 
-def _ads_email(body, from_name, kind):
+async def _ads_email(db, body, from_name, kind):
     """
     For sending email to ads
     """
-    Email.handler.add_to_queue(None, g.ads_email, from_name, g.ads_email,
-                               kind, body=body)
+    await Email.handler.add_to_queue(db, None, g.ads_email, from_name,
+                                     g.ads_email, kind, body=body)
 
-def _fraud_email(body, kind):
+async def _fraud_email(db, body, kind):
     """
     For sending email to the fraud mailbox
     """
-    Email.handler.add_to_queue(None, g.fraud_email, g.domain, g.fraud_email,
-                               kind, body=body)
+    await Email.handler.add_to_queue(db, None, g.fraud_email, g.domain,
+                                     g.fraud_email, kind, body=body)
 
-def _community_email(body, kind):
+async def _community_email(db, body, kind):
     """
     For sending email to the community mailbox
     """
-    Email.handler.add_to_queue(c.user, g.community_email, g.domain, g.community_email,
-                               kind, body=body)
+    await Email.handler.add_to_queue(db, c.user, g.community_email, g.domain,
+                                     g.community_email, kind, body=body)
 
-def verify_email(user, dest=None):
+async def verify_email(db, user, dest=None):
     """
     For verifying an email address
     """
@@ -99,12 +99,12 @@ def verify_email(user, dest=None):
         emaillink += f'?dest={dest}'
     g.log.debug("Generated email verification link: " + emaillink)
 
-    _system_email(user.email,
-                  VerifyEmail(user=user,
-                              emaillink = emaillink).render(style='email'),
-                  Email.Kind.VERIFY_EMAIL)
+    await _system_email(db, user.email,
+                        VerifyEmail(user=user,
+                                    emaillink=emaillink).render(style='email'),
+                        Email.Kind.VERIFY_EMAIL)
 
-def password_email(user):
+async def password_email(db, user):
     """
     For resetting a user's password.
     """
@@ -130,16 +130,16 @@ def password_email(user):
     base = g.https_endpoint or g.origin
     passlink = base + '/resetpassword/' + token._id
     g.log.info("Generated password reset link: " + passlink)
-    _system_email(user.email,
-                  PasswordReset(user=user,
-                                passlink=passlink).render(style='email'),
-                  Email.Kind.RESET_PASSWORD,
-                  user=user,
-                  )
+    await _system_email(db, user.email,
+                        PasswordReset(user=user,
+                                      passlink=passlink).render(style='email'),
+                        Email.Kind.RESET_PASSWORD,
+                        user=user,
+                        )
     return True
 
 @trylater_hooks.on('trylater.message_notification_email')
-def message_notification_email(data):
+async def message_notification_email(db, data):
     """Queues a system email for a new message notification."""
     from r2.lib.pages import MessageNotificationEmail
 
@@ -176,10 +176,10 @@ def message_notification_email(data):
             'permalink': datum['permalink'],
             'unsubscribe_link': unsubscribe_link,
         }
-        _system_email(user.email,
-                      MessageNotificationEmail(**templateData).render(style='email'),
-                      Email.Kind.MESSAGE_NOTIFICATION,
-                      from_address=g.notification_email)
+        await _system_email(db, user.email,
+                            MessageNotificationEmail(**templateData).render(style='email'),
+                            Email.Kind.MESSAGE_NOTIFICATION,
+                            from_address=g.notification_email)
 
         g.stats.simple_event('email.message_notification.queued')
         g.cache.incr(MESSAGE_THROTTLE_KEY)
@@ -209,43 +209,43 @@ def generate_notification_email_unsubscribe_token(user_id36, user_email=None,
         user_id36 + user_email + user_password_hash,
         hashlib.sha256).hexdigest()
 
-def password_change_email(user):
+async def password_change_email(db, user):
     """Queues a system email for a password change notification."""
     from r2.lib.pages import PasswordChangeEmail
 
-    return _system_email(user.email,
-                         PasswordChangeEmail(user=user).render(style='email'),
-                         Email.Kind.PASSWORD_CHANGE,
-                         user=user,
-                         )
+    return await _system_email(db, user.email,
+                               PasswordChangeEmail(user=user).render(style='email'),
+                               Email.Kind.PASSWORD_CHANGE,
+                               user=user,
+                               )
 
-def email_change_email(user):
+async def email_change_email(db, user):
     """Queues a system email for a email change notification."""
     from r2.lib.pages import EmailChangeEmail
 
-    return _system_email(user.email,
-                         EmailChangeEmail(user=user).render(style='email'),
-                         Email.Kind.EMAIL_CHANGE)
+    return await _system_email(db, user.email,
+                               EmailChangeEmail(user=user).render(style='email'),
+                               Email.Kind.EMAIL_CHANGE)
 
-def community_email(body, kind):
-    return _community_email(body, kind)
+async def community_email(db, body, kind):
+    return await _community_email(db, body, kind)
 
 
-def ads_email(body, from_name=g.domain):
+async def ads_email(db, body, from_name=g.domain):
     """Queues an email to the Sales team."""
-    return _ads_email(body, from_name, Email.Kind.ADS_ALERT)
+    return await _ads_email(db, body, from_name, Email.Kind.ADS_ALERT)
 
-def share(link, emails, from_name = "", reply_to = "", body = ""):
+async def share(db, link, emails, from_name="", reply_to="", body=""):
     """Queues a 'share link' email."""
     now = datetime.datetime.now(g.tz)
     ival = now - timeago(g.new_link_share_delay)
-    date = max(now,link._date + ival)
-    Email.handler.add_to_queue(c.user, emails, from_name, g.share_reply,
-                               Email.Kind.SHARE, date = date,
-                               body = body, reply_to = reply_to,
-                               thing = link)
+    date = max(now, link._date + ival)
+    await Email.handler.add_to_queue(db, c.user, emails, from_name, g.share_reply,
+                                     Email.Kind.SHARE, date=date,
+                                     body=body, reply_to=reply_to,
+                                     thing=link)
 
-def send_queued_mail(test = False):
+async def send_queued_mail(db, test=False):
     """sends mail from the mail queue to smtplib for delivery.  Also,
     on successes, empties the mail queue and adds all emails to the
     sent_mail list."""
@@ -257,7 +257,7 @@ def send_queued_mail(test = False):
     clear = False
     if not test:
         session = SMTP(g.smtp_server, 587)
-    def sendmail(email):
+    async def sendmail(email):
         try:
             mimetext = email.to_MIMEText()
             if mimetext is None:
@@ -270,7 +270,7 @@ def send_queued_mail(test = False):
                 session.login(email.fr_addr, g.smtp_password)
                 session.sendmail(email.fr_addr, email.to_addr,
                                  mimetext.as_string())
-                email.set_sent(rejected = False)
+                await email.set_sent(db, rejected=False)
                 session.quit()
         # exception happens only for local recipient that doesn't exist
         except:
@@ -278,126 +278,125 @@ def send_queued_mail(test = False):
                 #UnicodeDecodeError, AttributeError, HeaderParseError):
             # handle error and print, but don't stall the rest of the queue
             print("Handled error sending mail (traceback to follow)")
-            traceback.print_exc(file = sys.stdout)
-            email.set_sent(rejected = True)
-    
+            traceback.print_exc(file=sys.stdout)
+            await email.set_sent(db, rejected=True)
 
 
     try:
-        for email in Email.get_unsent(now):
+        async for email in Email.get_unsent(db, now):
             clear = True
 
             should_queue = email.should_queue()
             # check only on sharing that the mail is invalid
             if email.kind == Email.Kind.SHARE:
                 if should_queue:
-                    email.body = Share(username = email.from_name(),
-                                       msg_hash = email.msg_hash,
-                                       link = email.thing,
-                                       body =email.body).render(style = "email")
+                    email.body = Share(username=email.from_name(),
+                                       msg_hash=email.msg_hash,
+                                       link=email.thing,
+                                       body=email.body).render(style="email")
                 else:
-                    email.set_sent(rejected = True)
+                    await email.set_sent(db, rejected=True)
                     continue
             elif email.kind == Email.Kind.OPTOUT:
-                email.body = Mail_Opt(msg_hash = email.msg_hash,
-                                      leave = True).render(style = "email")
+                email.body = Mail_Opt(msg_hash=email.msg_hash,
+                                      leave=True).render(style="email")
             elif email.kind == Email.Kind.OPTIN:
-                email.body = Mail_Opt(msg_hash = email.msg_hash,
-                                      leave = False).render(style = "email")
+                email.body = Mail_Opt(msg_hash=email.msg_hash,
+                                      leave=False).render(style="email")
             # handle unknown types here
             elif not email.body:
                 print(f"Rejecting email with an empty body from {email.fr_addr!r} and to {email.to_addr!r}")
-                email.set_sent(rejected = True)
+                await email.set_sent(db, rejected=True)
                 continue
-            sendmail(email)
+            await sendmail(email)
 
-    except:
+    except Exception:
         print("Error sending queued mail")
 
     # clear is true if anything was found and processed above
     if clear:
-        Email.handler.clear_queue(now)
+        await Email.handler.clear_queue(db, now)
 
 
 
-def opt_out(msg_hash):
+async def opt_out(db, msg_hash):
     """Queues an opt-out email (i.e., a confirmation that the email
     address has been opted out of receiving any future mail)"""
-    email, added =  Email.handler.opt_out(msg_hash)
+    email, added = await Email.handler.opt_out(db, msg_hash)
     if email and added:
-        _system_email(email, "", Email.Kind.OPTOUT)
+        await _system_email(db, email, "", Email.Kind.OPTOUT)
     return email, added
 
-def opt_in(msg_hash):
+async def opt_in(db, msg_hash):
     """Queues an opt-in email (i.e., that the email has been removed
     from our opt out list)"""
-    email, removed =  Email.handler.opt_in(msg_hash)
+    email, removed = await Email.handler.opt_in(db, msg_hash)
     if email and removed:
-        _system_email(email, "", Email.Kind.OPTIN)
+        await _system_email(db, email, "", Email.Kind.OPTIN)
     return email, removed
 
 
-def _promo_email(thing, kind, body = "", **kw):
+async def _promo_email(db, thing, kind, body="", **kw):
     from r2.lib.pages import Promo_Email
     a = Account._byID(thing.author_id, True)
 
     if not a.email:
         return
 
-    body = Promo_Email(link = thing, kind = kind,
-                       body = body, **kw).render(style = "email")
-    return _system_email(a.email, body, kind, thing = thing,
-                         reply_to = g.selfserve_support_email,
-                         suppress_username=True)
+    body = Promo_Email(link=thing, kind=kind,
+                       body=body, **kw).render(style="email")
+    return await _system_email(db, a.email, body, kind, thing=thing,
+                               reply_to=g.selfserve_support_email,
+                               suppress_username=True)
 
 
-def new_promo(thing):
-    return _promo_email(thing, Email.Kind.NEW_PROMO)
+async def new_promo(db, thing):
+    return await _promo_email(db, thing, Email.Kind.NEW_PROMO)
 
-def promo_total_budget(thing, total_budget_dollars, start_date):
-    return _promo_email(thing, Email.Kind.BID_PROMO,
-        total_budget_dollars = total_budget_dollars, start_date = start_date)
+async def promo_total_budget(db, thing, total_budget_dollars, start_date):
+    return await _promo_email(db, thing, Email.Kind.BID_PROMO,
+        total_budget_dollars=total_budget_dollars, start_date=start_date)
 
-def accept_promo(thing):
-    return _promo_email(thing, Email.Kind.ACCEPT_PROMO)
+async def accept_promo(db, thing):
+    return await _promo_email(db, thing, Email.Kind.ACCEPT_PROMO)
 
-def reject_promo(thing, reason = ""):
-    return _promo_email(thing, Email.Kind.REJECT_PROMO, reason)
+async def reject_promo(db, thing, reason=""):
+    return await _promo_email(db, thing, Email.Kind.REJECT_PROMO, reason)
 
-def edited_live_promo(thing):
-    return _promo_email(thing, Email.Kind.EDITED_LIVE_PROMO)
+async def edited_live_promo(db, thing):
+    return await _promo_email(db, thing, Email.Kind.EDITED_LIVE_PROMO)
 
-def queue_promo(thing, total_budget_dollars, trans_id):
-    return _promo_email(thing, Email.Kind.QUEUED_PROMO,
-        total_budget_dollars=total_budget_dollars, trans_id = trans_id)
+async def queue_promo(db, thing, total_budget_dollars, trans_id):
+    return await _promo_email(db, thing, Email.Kind.QUEUED_PROMO,
+        total_budget_dollars=total_budget_dollars, trans_id=trans_id)
 
-def live_promo(thing):
-    return _promo_email(thing, Email.Kind.LIVE_PROMO)
+async def live_promo(db, thing):
+    return await _promo_email(db, thing, Email.Kind.LIVE_PROMO)
 
-def finished_promo(thing):
-    return _promo_email(thing, Email.Kind.FINISHED_PROMO)
-
-
-def refunded_promo(thing):
-    return _promo_email(thing, Email.Kind.REFUNDED_PROMO)
+async def finished_promo(db, thing):
+    return await _promo_email(db, thing, Email.Kind.FINISHED_PROMO)
 
 
-def void_payment(thing, campaign, total_budget_dollars, reason):
-    return _promo_email(thing, Email.Kind.VOID_PAYMENT, campaign=campaign,
-                        total_budget_dollars=total_budget_dollars,
-                        reason=reason)
+async def refunded_promo(db, thing):
+    return await _promo_email(db, thing, Email.Kind.REFUNDED_PROMO)
 
 
-def fraud_alert(body):
-    return _fraud_email(body, Email.Kind.FRAUD_ALERT)
+async def void_payment(db, thing, campaign, total_budget_dollars, reason):
+    return await _promo_email(db, thing, Email.Kind.VOID_PAYMENT, campaign=campaign,
+                              total_budget_dollars=total_budget_dollars,
+                              reason=reason)
 
-def suspicious_payment(user, link):
+
+async def fraud_alert(db, body):
+    return await _fraud_email(db, body, Email.Kind.FRAUD_ALERT)
+
+async def suspicious_payment(db, user, link):
     from r2.lib.pages import SuspiciousPaymentEmail
 
     body = SuspiciousPaymentEmail(user, link).render(style="email")
     kind = Email.Kind.SUSPICIOUS_PAYMENT
 
-    return _fraud_email(body, kind)
+    return await _fraud_email(db, body, kind)
 
 
 def send_html_email(to_addr, from_addr, subject, html,

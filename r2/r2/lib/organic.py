@@ -34,7 +34,7 @@ organic_max_length= 50
 def cached_organic_links(*sr_ids):
     sr_count = count.get_link_counts()
     #only use links from reddits that you're subscribed to
-    link_names = filter(lambda n: sr_count[n][1] in sr_ids, sr_count.keys())
+    link_names = [n for n in sr_count.keys() if sr_count[n][1] in sr_ids]
     link_names.sort(key = lambda n: sr_count[n][0])
 
     if not link_names and g.debug:

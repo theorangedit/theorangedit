@@ -249,8 +249,7 @@ class NavMenu(Styled):
         maybe_selected = [o for o in self.options if o.is_selected()]
         if maybe_selected:
             # pick the button with the most restrictive pathing
-            maybe_selected.sort(lambda x, y:
-                                len(y.bare_path) - len(x.bare_path))
+            maybe_selected.sort(key=lambda x: len(x.bare_path), reverse=True)
             return maybe_selected[0]
         elif self.default:
             #lookup the menu with the 'dest' that matches 'default'

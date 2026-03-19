@@ -22,9 +22,9 @@ from r2.tests import RedditTestCase, NonCache
 
 
 subscriptions_srnames = ["foo", "bar"]
-subscriptions = map(lambda srname: Subreddit(name=srname), subscriptions_srnames)
+subscriptions = [Subreddit(name=srname) for srname in subscriptions_srnames]
 multi_srnames = ["bing", "bat"]
-multi_subreddits = map(lambda srname: Subreddit(name=srname), multi_srnames)
+multi_subreddits = [Subreddit(name=srname) for srname in multi_srnames]
 nice_srname = "mylittlepony"
 nsfw_srname = "pr0n"
 questionably_nsfw = "sexstories"

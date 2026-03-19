@@ -34,32 +34,18 @@ the data pipeline.
 
 import datetime
 
-from r2.lib.app_globals import g
-from sqlalchemy.ext.declarative import declarative_base
-from sqlalchemy.orm import scoped_session, sessionmaker
-from sqlalchemy.orm.exc import NoResultFound
+from sqlalchemy import BigInteger, DateTime, Integer, String, select
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import Mapped, mapped_column
 from sqlalchemy.schema import Column
 from sqlalchemy.sql.expression import desc, distinct
 from sqlalchemy.sql.functions import sum as sa_sum
-from sqlalchemy.types import (
-    BigInteger,
-    DateTime,
-    Integer,
-    String,
-    TypeDecorator,
-)
+from sqlalchemy.types import TypeDecorator
 
 from r2.lib.memoize import memoize
 from r2.lib.utils import timedelta_by_name, tup
 from r2.models.link import Link
-
-# see g.databases
-# ENGINE_NAME = 'traffic'
-ENGINE_NAME = 'main'
-
-engine = g.dbm.get_engine(ENGINE_NAME)
-Session = scoped_session(sessionmaker(bind=engine, autocommit=True))
-Base = declarative_base(bind=engine)
+from r2.models.orm.base import Base
 
 
 def memoize_traffic(**memoize_kwargs):
@@ -238,23 +224,24 @@ def points_for_interval(interval):
     return range.total_seconds() / interval.total_seconds()
 
 
-def make_history_query(cls, interval):
+async def make_history_query(db: AsyncSession, cls, interval):
     """Build a generic query showing the history of a given aggregate."""
 
     time_points = get_time_points(interval)
-    q = (Session.query(cls)
-                .filter(cls.date.in_(time_points)))
+    stmt = (select(cls)
+            .where(cls.date.in_(time_points)))
 
     # subscription stats doesn't have an interval (it's only daily)
     if hasattr(cls, "interval"):
-        q = q.filter(cls.interval == interval)
+        stmt = stmt.where(cls.interval == interval)
 
-    q = q.order_by(desc(cls.date))
+    stmt = stmt.order_by(desc(cls.date))
 
-    return time_points, q
+    rows = (await db.execute(stmt)).scalars().all()
+    return time_points, rows
 
 
-def top_last_month(cls, key, ids=None, num=None):
+async def top_last_month(db: AsyncSession, cls, key, ids=None, num=None):
     """Aggregate a listing of the top items (by pageviews) last month.
 
     We use the last month because it's guaranteed to be fully computed and
@@ -265,19 +252,20 @@ def top_last_month(cls, key, ids=None, num=None):
     cur_month = datetime.date.today().replace(day=1)
     last_month = decrement_month(cur_month)
 
-    q = (Session.query(cls)
-                .filter(cls.date == last_month)
-                .filter(cls.interval == "month")
-                .order_by(desc(cls.date), desc(cls.pageview_count)))
+    stmt = (select(cls)
+            .where(cls.date == last_month)
+            .where(cls.interval == "month")
+            .order_by(desc(cls.date), desc(cls.pageview_count)))
 
     if ids:
-        q = q.filter(getattr(cls, key).in_(ids))
+        stmt = stmt.where(getattr(cls, key).in_(ids))
     else:
         num = num or 55
-        q = q.limit(num)
+        stmt = stmt.limit(num)
 
+    rows = (await db.execute(stmt)).scalars().all()
     return [(getattr(r, key), (r.unique_count, r.pageview_count))
-            for r in q.all()]
+            for r in rows]
 
 
 class CoerceToLong(TypeDecorator):
@@ -306,7 +294,7 @@ def sum(column):
         return sa_sum(column)
 
 
-def totals(cls, interval):
+async def totals(db: AsyncSession, cls, interval):
     """Aggregate sitewide totals for self-serve promotion traffic.
 
     We only aggregate codenames that start with a link type prefix which
@@ -316,27 +304,28 @@ def totals(cls, interval):
 
     time_points = get_time_points(interval)
 
-    q = (Session.query(cls.date, sum(cls.pageview_count).label("sum"))
-                .filter(cls.interval == interval)
-                .filter(cls.date.in_(time_points))
-                .filter(cls.codename.startswith(Link._type_prefix))
-                .group_by(cls.date)
-                .order_by(desc(cls.date)))
-    return fill_gaps(time_points, q, "sum")
+    stmt = (select(cls.date, sum(cls.pageview_count).label("sum"))
+            .where(cls.interval == interval)
+            .where(cls.date.in_(time_points))
+            .where(cls.codename.startswith(Link._type_prefix))
+            .group_by(cls.date)
+            .order_by(desc(cls.date)))
+    rows = (await db.execute(stmt)).all()
+    return fill_gaps(time_points, rows, "sum")
 
 
-def total_by_codename(cls, codenames):
+async def total_by_codename(db: AsyncSession, cls, codenames):
     """Return total lifetime pageviews (or clicks) for given codename(s)."""
     codenames = tup(codenames)
     # uses hour totals to get the most up-to-date count
-    q = (Session.query(cls.codename, sum(cls.pageview_count))
-                       .filter(cls.interval == "hour")
-                       .filter(cls.codename.in_(codenames))
-                       .group_by(cls.codename))
-    return list(q)
+    stmt = (select(cls.codename, sum(cls.pageview_count))
+            .where(cls.interval == "hour")
+            .where(cls.codename.in_(codenames))
+            .group_by(cls.codename))
+    return list((await db.execute(stmt)).all())
 
 
-def promotion_history(cls, count_column, codename, start, stop):
+async def promotion_history(db: AsyncSession, cls, count_column, codename, start, stop):
     """Get hourly traffic for a self-serve promotion.
 
     Traffic stats are summed over all targets for classes that include a target.
@@ -349,50 +338,50 @@ def promotion_history(cls, count_column, codename, start, stop):
     """
 
     time_points = get_time_points('hour', start, stop)
-    q = (Session.query(cls.date, sum(count_column))
-                .filter(cls.interval == "hour")
-                .filter(cls.codename == codename)
-                .filter(cls.date.in_(time_points))
-                .group_by(cls.date)
-                .order_by(cls.date))
-    return [(r[0], (r[1],)) for r in q.all()]
+    stmt = (select(cls.date, sum(count_column))
+            .where(cls.interval == "hour")
+            .where(cls.codename == codename)
+            .where(cls.date.in_(time_points))
+            .group_by(cls.date)
+            .order_by(cls.date))
+    rows = (await db.execute(stmt)).all()
+    return [(r[0], (r[1],)) for r in rows]
 
 
-def campaign_history(cls, codenames, start, stop):
+async def campaign_history(db: AsyncSession, cls, codenames, start, stop):
     """Get hourly traffic for given campaigns."""
     time_points = get_time_points('hour', start, stop)
-    q = (Session.query(cls)
-                .filter(cls.interval == "hour")
-                .filter(cls.codename.in_(codenames))
-                .filter(cls.date.in_(time_points))
-                .order_by(cls.date))
+    stmt = (select(cls)
+            .where(cls.interval == "hour")
+            .where(cls.codename.in_(codenames))
+            .where(cls.date.in_(time_points))
+            .order_by(cls.date))
+    rows = (await db.execute(stmt)).scalars().all()
     return [(r.date, r.codename, r.subreddit, (r.unique_count,
                                                r.pageview_count))
-            for r in q.all()]
+            for r in rows]
 
 
 @memoize("traffic_last_modified", time=60 * 10)
-def get_traffic_last_modified():
+async def get_traffic_last_modified(db: AsyncSession):
     """Guess how far behind the traffic processing system is."""
-    try:
-        return (Session.query(SitewidePageviews.date)
-                   .order_by(desc(SitewidePageviews.date))
-                   .limit(1)
-                   .one()).date
-    except NoResultFound:
-        return datetime.datetime.min
+    stmt = (select(SitewidePageviews.date)
+            .order_by(desc(SitewidePageviews.date))
+            .limit(1))
+    row = (await db.execute(stmt)).scalar_one_or_none()
+    return row if row is not None else datetime.datetime.min
 
 
 @memoize("missing_traffic", time=60 * 10)
-def get_missing_traffic(start, end):
+async def get_missing_traffic(db: AsyncSession, start, end):
     """Check for missing hourly traffic between start and end."""
 
     # NOTE: start, end must be UTC time without tzinfo
     time_points = get_time_points('hour', start, end)
-    q = (Session.query(SitewidePageviews.date)
-                .filter(SitewidePageviews.interval == "hour")
-                .filter(SitewidePageviews.date.in_(time_points)))
-    found = [t for (t,) in q]
+    stmt = (select(SitewidePageviews.date)
+            .where(SitewidePageviews.interval == "hour")
+            .where(SitewidePageviews.date.in_(time_points)))
+    found = [t for (t,) in (await db.execute(stmt)).all()]
     return [t for t in time_points if t not in found]
 
 
@@ -408,9 +397,9 @@ class SitewidePageviews(Base):
 
     @classmethod
     @memoize_traffic(time=3600)
-    def history(cls, interval):
-        time_points, q = make_history_query(cls, interval)
-        return fill_gaps(time_points, q, "unique_count", "pageview_count")
+    async def history(cls, db: AsyncSession, interval):
+        time_points, rows = await make_history_query(db, cls, interval)
+        return fill_gaps(time_points, rows, "unique_count", "pageview_count")
 
 
 class PageviewsBySubreddit(Base):
@@ -426,21 +415,21 @@ class PageviewsBySubreddit(Base):
 
     @classmethod
     @memoize_traffic(time=3600)
-    def history(cls, interval, subreddit):
-        time_points, q = make_history_query(cls, interval)
-        q = q.filter(cls.subreddit == subreddit)
-        return fill_gaps(time_points, q, "unique_count", "pageview_count")
+    async def history(cls, db: AsyncSession, interval, subreddit):
+        time_points, rows = await make_history_query(db, cls, interval)
+        rows = [r for r in rows if r.subreddit == subreddit]
+        return fill_gaps(time_points, rows, "unique_count", "pageview_count")
 
     @classmethod
     @memoize_traffic(time=3600 * 6)
-    def top_last_month(cls, num=None):
-        return top_last_month(cls, "subreddit", num=num)
+    async def top_last_month(cls, db: AsyncSession, num=None):
+        return await top_last_month(db, cls, "subreddit", num=num)
 
     @classmethod
     @memoize_traffic(time=3600 * 6)
-    def last_month(cls, srs):
+    async def last_month(cls, db: AsyncSession, srs):
         ids = [sr.name for sr in srs]
-        return top_last_month(cls, "subreddit", ids=ids)
+        return await top_last_month(db, cls, "subreddit", ids=ids)
 
 
 class PageviewsBySubredditAndPath(Base):
@@ -475,15 +464,15 @@ class PageviewsByLanguage(Base):
 
     @classmethod
     @memoize_traffic(time=3600)
-    def history(cls, interval, lang):
-        time_points, q = make_history_query(cls, interval)
-        q = q.filter(cls.lang == lang)
-        return fill_gaps(time_points, q, "unique_count", "pageview_count")
+    async def history(cls, db: AsyncSession, interval, lang):
+        time_points, rows = await make_history_query(db, cls, interval)
+        rows = [r for r in rows if r.lang == lang]
+        return fill_gaps(time_points, rows, "unique_count", "pageview_count")
 
     @classmethod
     @memoize_traffic(time=3600 * 6)
-    def top_last_month(cls):
-        return top_last_month(cls, "lang")
+    async def top_last_month(cls, db: AsyncSession):
+        return await top_last_month(db, cls, "lang")
 
 
 class ClickthroughsByCodename(Base):
@@ -499,25 +488,25 @@ class ClickthroughsByCodename(Base):
 
     @classmethod
     @memoize_traffic(time=3600)
-    def history(cls, interval, codename):
-        time_points, q = make_history_query(cls, interval)
-        q = q.filter(cls.codename == codename)
-        return fill_gaps(time_points, q, "unique_count", "pageview_count")
+    async def history(cls, db: AsyncSession, interval, codename):
+        time_points, rows = await make_history_query(db, cls, interval)
+        rows = [r for r in rows if r.codename == codename]
+        return fill_gaps(time_points, rows, "unique_count", "pageview_count")
 
     @classmethod
     @memoize_traffic(time=3600)
-    def promotion_history(cls, codename, start, stop):
-        return promotion_history(cls, cls.unique_count, codename, start, stop)
+    async def promotion_history(cls, db: AsyncSession, codename, start, stop):
+        return await promotion_history(db, cls, cls.unique_count, codename, start, stop)
 
     @classmethod
     @memoize_traffic(time=3600)
-    def historical_totals(cls, interval):
-        return totals(cls, interval)
+    async def historical_totals(cls, db: AsyncSession, interval):
+        return await totals(db, cls, interval)
 
     @classmethod
     @memoize_traffic(time=3600)
-    def total_by_codename(cls, codenames):
-        return total_by_codename(cls, codenames)
+    async def total_by_codename(cls, db: AsyncSession, codenames):
+        return await total_by_codename(db, cls, codenames)
 
 
 class TargetedClickthroughsByCodename(Base):
@@ -534,17 +523,17 @@ class TargetedClickthroughsByCodename(Base):
 
     @classmethod
     @memoize_traffic(time=3600)
-    def promotion_history(cls, codename, start, stop):
-        return promotion_history(cls, cls.unique_count, codename, start, stop)
+    async def promotion_history(cls, db: AsyncSession, codename, start, stop):
+        return await promotion_history(db, cls, cls.unique_count, codename, start, stop)
 
     @classmethod
     @memoize_traffic(time=3600)
-    def total_by_codename(cls, codenames):
-        return total_by_codename(cls, codenames)
+    async def total_by_codename(cls, db: AsyncSession, codenames):
+        return await total_by_codename(db, cls, codenames)
 
     @classmethod
-    def campaign_history(cls, codenames, start, stop):
-        return campaign_history(cls, codenames, start, stop)
+    async def campaign_history(cls, db: AsyncSession, codenames, start, stop):
+        return await campaign_history(db, cls, codenames, start, stop)
 
 
 class AdImpressionsByCodename(Base):
@@ -560,29 +549,29 @@ class AdImpressionsByCodename(Base):
 
     @classmethod
     @memoize_traffic(time=3600)
-    def history(cls, interval, codename):
-        time_points, q = make_history_query(cls, interval)
-        q = q.filter(cls.codename == codename)
-        return fill_gaps(time_points, q, "unique_count", "pageview_count")
+    async def history(cls, db: AsyncSession, interval, codename):
+        time_points, rows = await make_history_query(db, cls, interval)
+        rows = [r for r in rows if r.codename == codename]
+        return fill_gaps(time_points, rows, "unique_count", "pageview_count")
 
     @classmethod
     @memoize_traffic(time=3600)
-    def promotion_history(cls, codename, start, stop):
-        return promotion_history(cls, cls.pageview_count, codename, start, stop)
+    async def promotion_history(cls, db: AsyncSession, codename, start, stop):
+        return await promotion_history(db, cls, cls.pageview_count, codename, start, stop)
 
     @classmethod
     @memoize_traffic(time=3600)
-    def historical_totals(cls, interval):
-        return totals(cls, interval)
+    async def historical_totals(cls, db: AsyncSession, interval):
+        return await totals(db, cls, interval)
 
     @classmethod
     @memoize_traffic(time=3600)
-    def top_last_month(cls):
-        return top_last_month(cls, "codename")
+    async def top_last_month(cls, db: AsyncSession):
+        return await top_last_month(db, cls, "codename")
 
     @classmethod
     @memoize_traffic(time=3600)
-    def recent_codenames(cls, fullname):
+    async def recent_codenames(cls, db: AsyncSession, fullname):
         """Get a list of recent codenames used for 300x100 ads.
 
         The 300x100 ads get a codename that looks like "fullname_campaign".
@@ -590,15 +579,16 @@ class AdImpressionsByCodename(Base):
 
         """
         time_points = get_time_points('day')
-        query = (Session.query(distinct(cls.codename).label("codename"))
-                        .filter(cls.date.in_(time_points))
-                        .filter(cls.codename.startswith(fullname)))
-        return [row.codename for row in query]
+        stmt = (select(distinct(cls.codename).label("codename"))
+                .where(cls.date.in_(time_points))
+                .where(cls.codename.startswith(fullname)))
+        rows = (await db.execute(stmt)).all()
+        return [row.codename for row in rows]
 
     @classmethod
     @memoize_traffic(time=3600)
-    def total_by_codename(cls, codename):
-        return total_by_codename(cls, codename)
+    async def total_by_codename(cls, db: AsyncSession, codename):
+        return await total_by_codename(db, cls, codename)
 
 
 class TargetedImpressionsByCodename(Base):
@@ -615,17 +605,17 @@ class TargetedImpressionsByCodename(Base):
 
     @classmethod
     @memoize_traffic(time=3600)
-    def promotion_history(cls, codename, start, stop):
-        return promotion_history(cls, cls.pageview_count, codename, start, stop)
+    async def promotion_history(cls, db: AsyncSession, codename, start, stop):
+        return await promotion_history(db, cls, cls.pageview_count, codename, start, stop)
 
     @classmethod
     @memoize_traffic(time=3600)
-    def total_by_codename(cls, codenames):
-        return total_by_codename(cls, codenames)
+    async def total_by_codename(cls, db: AsyncSession, codenames):
+        return await total_by_codename(db, cls, codenames)
 
     @classmethod
-    def campaign_history(cls, codenames, start, stop):
-        return campaign_history(cls, codenames, start, stop)
+    async def campaign_history(cls, db: AsyncSession, codenames, start, stop):
+        return await campaign_history(db, cls, codenames, start, stop)
 
 
 class SubscriptionsBySubreddit(Base):
@@ -646,12 +636,7 @@ class SubscriptionsBySubreddit(Base):
 
     @classmethod
     @memoize_traffic(time=3600)
-    def history(cls, interval, subreddit):
-        time_points, q = make_history_query(cls, interval)
-        q = q.filter(cls.subreddit == subreddit)
-        return fill_gaps(time_points, q, "subscriber_count")
-
-
-# create the tables if they don't exist
-if g.db_create_tables:
-    Base.metadata.create_all()
+    async def history(cls, db: AsyncSession, interval, subreddit):
+        time_points, rows = await make_history_query(db, cls, interval)
+        rows = [r for r in rows if r.subreddit == subreddit]
+        return fill_gaps(time_points, rows, "subscriber_count")

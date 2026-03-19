@@ -20,7 +20,7 @@
 # Inc. All Rights Reserved.
 ###############################################################################
 
-from webob.exc import HTTPBadRequest, HTTPForbidden, status_map
+from starlette.exceptions import HTTPException as _HTTPException
 from r2.lib.utils import Storage, tup
 from r2.lib.context import request
 from r2.lib.app_globals import g
@@ -292,28 +292,32 @@ class ErrorSet(object):
             del self.errors[pair]
 
 
-class ForbiddenError(HTTPForbidden):
+class ForbiddenError(_HTTPException):
     def __init__(self, error_name):
-        HTTPForbidden.__init__(self)
-        self.explanation = error_list[error_name]
+        explanation = error_list.get(error_name, error_name)
+        super().__init__(status_code=403, detail=explanation)
+        self.explanation = explanation
 
 
-class BadRequestError(HTTPBadRequest):
+class BadRequestError(_HTTPException):
     def __init__(self, error_name):
-        HTTPBadRequest.__init__(self)
+        explanation = error_list.get(error_name, error_name)
+        super().__init__(status_code=400, detail=explanation)
         self.error_data = {
             'reason': error_name,
-            'explanation': error_list[error_name],
+            'explanation': explanation,
         }
-        self.explanation = error_list[error_name]
+        self.explanation = explanation
 
 
 def reddit_http_error(code=400, error_name='UNKNOWN_ERROR', **data):
-    exc = status_map[code]()
+    exc = _HTTPException(status_code=code)
 
-    data['reason'] = exc.explanation = error_name
-    if 'explanation' not in data and error_name in error_list:
-        data['explanation'] = exc.explanation = error_list[error_name]
+    explanation = error_list.get(error_name, error_name)
+    data['reason'] = error_name
+    if 'explanation' not in data:
+        data['explanation'] = explanation
+    exc.detail = explanation
 
     # omit 'fields' json attribute if it is empty
     if 'fields' in data and not data['fields']:

@@ -430,8 +430,8 @@ class SponsorController(PromoteController):
         id_user=VByName('name', thing_cls=Account),
         email=ValidEmail("email"),
     )
-    def GET_lookup_user(self, id_user, email):
-        email_users = AccountsByCanonicalEmail.get_accounts(email)
+    async def GET_lookup_user(self, id_user, email):
+        email_users = await AccountsByCanonicalEmail.get_accounts(email)
         content = SponsorLookupUser(
             id_user=id_user, email=email, email_users=email_users)
         return PromotePage(title="look up user", content=content).render()

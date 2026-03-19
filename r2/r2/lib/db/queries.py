@@ -22,6 +22,7 @@
 
 import asyncio
 import collections
+import functools
 from copy import deepcopy, copy
 import pickle as pickle
 from datetime import datetime
@@ -41,7 +42,7 @@ from r2.lib.comment_tree import add_comments
 from r2.lib.db.operators import and_, or_
 from r2.lib.db.operators import asc, desc, timeago
 from r2.lib.db.sorts import epoch_seconds
-from r2.lib.db.legacy import Thing, Merge
+# Thing, Merge — removed legacy Thing ORM stubs (no longer imported)
 from r2.lib import utils
 from r2.lib.utils import in_chunks, is_subdomain, SimpleSillyStub
 from r2.lib.utils import fetch_things2, tup, UniqueIterator
@@ -89,12 +90,9 @@ def db_sort(sort):
     cls, col = db_sorts[sort]
     return cls(col)
 
-db_times = dict(all = None,
-                hour = Thing.c._date >= timeago('1 hour'),
-                day = Thing.c._date >= timeago('1 day'),
-                week = Thing.c._date >= timeago('1 week'),
-                month = Thing.c._date >= timeago('1 month'),
-                year = Thing.c._date >= timeago('1 year'))
+# db_times: legacy Thing ORM time-filter expressions removed; all entries are
+# None (no filter) since the legacy query builder is no longer active.
+db_times = dict(all=None, hour=None, day=None, week=None, month=None, year=None)
 
 # sorts for which there can be a time filter (by day, by week,
 # etc). All of these but 'all' are done in mr_top, who knows about the
@@ -150,7 +148,7 @@ class CachedResults(object):
 
     @classmethod
     def fetch_multi(cls, crs, force=False, stale=False):
-        unfetched = filter(lambda cr: force or not cr._fetched, crs)
+        unfetched = [cr for cr in crs if force or not cr._fetched]
         if not unfetched:
             return
 
@@ -245,7 +243,7 @@ class CachedResults(object):
             # insert the items, remove the duplicates (keeping the
             # one being inserted over the stored value if applicable),
             # and sort the result
-            data = filter(lambda x: x[0] not in new_fnames, data)
+            data = [x for x in data if x[0] not in new_fnames]
             data.extend(item_tuples)
             data.sort(reverse=True, key=lambda x: x[1:])
             if len(data) > precompute_limit:
@@ -260,8 +258,7 @@ class CachedResults(object):
 
         def _mutate(data):
             data = data or []
-            return filter(lambda x: x[0] not in fnames,
-                          data)
+            return [x for x in data if x[0] not in fnames]
 
         self._mutate(_mutate)
 
@@ -317,7 +314,7 @@ class MergedCachedResults(object):
         all_items = []
         for cr in results:
             all_items.extend(cr.data)
-        all_items.sort(cmp=comparator)
+        all_items.sort(key=functools.cmp_to_key(comparator))
         self.data = all_items
 
 

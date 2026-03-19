@@ -957,11 +957,13 @@ def decompose_fullname(fullname):
         decompose_fullname("t3_e4fa") ->
             (Thing, 3, 658918)
     """
-    from r2.lib.db.legacy import Thing, Relation
+    # Thing/Relation ORM classes removed; type_class is not used for
+    # meaningful dispatch in the async stack — return None as placeholder.
+    type_class = None
     if fullname[0] == 't':
-        type_class = Thing
+        pass  # was: type_class = Thing
     elif fullname[0] == 'r':
-        type_class = Relation
+        pass  # was: type_class = Relation
 
     type_id36, thing_id36 = fullname[1:].split('_')
 
@@ -978,7 +980,7 @@ def cols(lst, ncols):
     lst = lst + [None for i in range(len(lst), nrows*ncols)]
     cols = [lst[i:i+nrows] for i in range(0, nrows*ncols, nrows)]
     rows = zip(*cols)
-    rows = [filter(lambda x: x is not None, r) for r in rows]
+    rows = [[x for x in r if x is not None] for r in rows]
     return rows
 
 def fetch_things(t_class,since,until,batch_fn=None,

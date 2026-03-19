@@ -57,7 +57,6 @@ from r2.lib.cache import (
     HardcacheChain,
     LocalCache,
     MemcacheChain,
-    Permacache,
     SelfEmptyingCache,
     StaleCacheChain,
     TransitionalCache,
@@ -633,7 +632,7 @@ class Globals(object):
             tokens = arg.split("=")
             if len(tokens) == 2:
                 k, v = tokens
-                self.log.debug("Overriding g.%s to %s" % (k, v))
+                self.log.debug(f"Overriding g.{k} to {v}")
                 setattr(self, k, v)
 
         self.reddit_host = socket.gethostname()
@@ -889,20 +888,14 @@ class Globals(object):
         """Get the currently checked out git revision for a given repository,
         record it in g.versions, and return the short version of the hash."""
         try:
-            subprocess.check_output
-        except AttributeError:
-            # python 2.6 compat
-            pass
+            revision = subprocess.check_output(["git",
+                                                "--git-dir", git_dir,
+                                                "rev-parse", "HEAD"])
+        except subprocess.CalledProcessError as e:
+            self.log.warning("Unable to fetch git revision: %r", e)
         else:
-            try:
-                revision = subprocess.check_output(["git",
-                                                    "--git-dir", git_dir,
-                                                    "rev-parse", "HEAD"])
-            except subprocess.CalledProcessError as e:
-                self.log.warning("Unable to fetch git revision: %r", e)
-            else:
-                self.versions[repo_name] = revision.rstrip()
-                return revision[:7]
+            self.versions[repo_name] = revision.rstrip()
+            return revision[:7]
 
         return "(unknown)"
 

@@ -321,7 +321,7 @@ def new_promotion(is_self, title, content, author, ip):
     return l
 
 
-def get_transactions(link, campaigns):
+async def get_transactions(db, link, campaigns):
     """Return Bids for specified campaigns on the link.
 
     A PromoCampaign can have several bids associated with it, but the most
@@ -335,23 +335,23 @@ def get_transactions(link, campaigns):
     if not campaigns:
         return {}
 
-    bids = Bid.lookup(thing_id=link._id)
+    bids = await Bid.lookup(db, thing_id=link._id)
     bid_dict = {(b.campaign, b.transaction): b for b in bids}
     bids_by_campaign = {c._id: bid_dict[(c._id, c.trans_id)] for c in campaigns}
     return bids_by_campaign
 
-def new_campaign(link, dates, target, frequency_cap,
-                 priority, location, platform,
-                 mobile_os, ios_devices, ios_version_range, android_devices,
-                 android_version_range, total_budget_pennies, cost_basis,
-                 bid_pennies):
+async def new_campaign(db, link, dates, target, frequency_cap,
+                       priority, location, platform,
+                       mobile_os, ios_devices, ios_version_range, android_devices,
+                       android_version_range, total_budget_pennies, cost_basis,
+                       bid_pennies):
     campaign = PromoCampaign.create(link, target, dates[0], dates[1],
                                     frequency_cap, priority,
                                     location, platform, mobile_os, ios_devices,
                                     ios_version_range, android_devices,
                                     android_version_range, total_budget_pennies,
                                     cost_basis, bid_pennies)
-    PromotionWeights.add(link, campaign)
+    await PromotionWeights.add(db, link, campaign)
     PromotionLog.add(link, f'campaign {campaign._id} created')
 
     if not campaign.is_house:
@@ -367,12 +367,12 @@ def free_campaign(link, campaign, user):
     auth_campaign(link, campaign, user, freebie=True)
 
 
-def edit_campaign(link, campaign, dates, target, frequency_cap,
-                  priority, location,
-                  total_budget_pennies, cost_basis, bid_pennies,
-                  platform='desktop', mobile_os=None, ios_devices=None,
-                  ios_version_range=None, android_devices=None,
-                  android_version_range=None):
+async def edit_campaign(db, link, campaign, dates, target, frequency_cap,
+                        priority, location,
+                        total_budget_pennies, cost_basis, bid_pennies,
+                        platform='desktop', mobile_os=None, ios_devices=None,
+                        ios_version_range=None, android_devices=None,
+                        android_version_range=None):
     changed = {}
     if dates[0] != campaign.start_date or dates[1] != campaign.end_date:
         original = f'{campaign.start_date} to {campaign.end_date}'
@@ -423,13 +423,12 @@ def edit_campaign(link, campaign, dates, target, frequency_cap,
                                         bid_pennies)
         campaign.bid_pennies = bid_pennies
 
-    change_strs = map(lambda t: f'{t[0]}: {t[1][0]} -> {t[1][1]}',
-                      changed.items())
+    change_strs = [f'{t[0]}: {t[1][0]} -> {t[1][1]}' for t in changed.items()]
     change_text = ', '.join(change_strs)
     campaign._commit()
 
     # update the index
-    PromotionWeights.reschedule(link, campaign)
+    await PromotionWeights.reschedule(db, link, campaign)
 
     if not campaign.is_house:
         # make it a freebie, if applicable
@@ -477,8 +476,8 @@ def terminate_campaign(link, campaign):
     PromotionLog.add(link, msg)
 
 
-def delete_campaign(link, campaign):
-    PromotionWeights.delete(link, campaign)
+async def delete_campaign(db, link, campaign):
+    await PromotionWeights.delete(db, link, campaign)
     void_campaign(link, campaign, reason='deleted_campaign')
     campaign.delete()
     PromotionLog.add(link, f'deleted campaign {campaign._id}')
@@ -770,7 +769,7 @@ def is_complete_promo(link, campaign):
 
 def _is_geotargeted_promo(link):
     campaigns = live_campaigns_by_link(link)
-    geotargeted = filter(lambda camp: camp.location, campaigns)
+    geotargeted = [camp for camp in campaigns if camp.location]
     city_target = any(camp.location.metro for camp in geotargeted)
     return bool(geotargeted), city_target
 
@@ -786,9 +785,9 @@ def is_geotargeted_promo(link):
         return from_cache
 
 
-def get_promos(date, sr_names=None, link=None):
-    campaign_ids = PromotionWeights.get_campaign_ids(
-        date, sr_names=sr_names, link=link)
+async def get_promos(db, date, sr_names=None, link=None):
+    campaign_ids = await PromotionWeights.get_campaign_ids(
+        db, date, sr_names=sr_names, link=link)
     campaigns = PromoCampaign._byID(campaign_ids, data=True, return_dict=False)
     link_ids = {camp.link_id for camp in campaigns}
     links = Link._byID(link_ids, data=True)
@@ -796,23 +795,23 @@ def get_promos(date, sr_names=None, link=None):
         yield camp, links[camp.link_id]
 
 
-def get_accepted_promos(offset=0):
+async def get_accepted_promos(db, offset=0):
     date = promo_datetime_now(offset=offset)
-    for camp, link in get_promos(date):
+    async for camp, link in get_promos(db, date):
         if is_accepted_promo(date, link, camp):
             yield camp, link
 
 
-def get_scheduled_promos(offset=0):
+async def get_scheduled_promos(db, offset=0):
     date = promo_datetime_now(offset=offset)
-    for camp, link in get_promos(date):
+    async for camp, link in get_promos(db, date):
         if is_scheduled_promo(date, link, camp):
             yield camp, link
 
 
-def get_served_promos(offset=0):
+async def get_served_promos(db, offset=0):
     date = promo_datetime_now(offset=offset)
-    for camp, link in get_promos(date):
+    async for camp, link in get_promos(db, date):
         if is_served_promo(date, link, camp):
             yield camp, link
 
@@ -912,7 +911,7 @@ def finalize_completed_campaigns(daysago=1):
                              PromoCampaign.c.trans_id != NO_TRANSACTION,
                              data=True)
     # filter out freebies
-    campaigns = filter(lambda camp: camp.trans_id > NO_TRANSACTION, q)
+    campaigns = [camp for camp in q if camp.trans_id > NO_TRANSACTION]
 
     if not campaigns:
         return

@@ -93,7 +93,6 @@ from r2.models.promo import (
 from r2.models.token import OAuth2Client, OAuth2AccessToken
 from r2.models import traffic
 from r2.models import ModAction
-from r2.models import Thing
 from r2.models.wiki import WikiPage, ImagesByWikiPage
 from r2.lib.db import queries
 from r2.config.extensions import is_api
@@ -3039,17 +3038,17 @@ class SubredditStylesheet(SubredditStylesheetBase):
         )
 
     @staticmethod
-    def find_preview_comments(sr):
+    async def find_preview_comments(sr):
         comments = queries.get_sr_comments(sr)
         comments = list(comments)
         if not comments:
             comments = queries.get_all_comments()
             comments = list(comments)
 
-        return Thing._by_fullname(comments[:25], data=True, return_dict=False)
+        return await Comment._by_fullname(comments[:25], data=True, return_dict=False)
 
     @staticmethod
-    def find_preview_links(sr):
+    async def find_preview_links(sr):
         # try to find a link to use, otherwise give up and return
         links = normalized_hot([sr._id])
         if not links:
@@ -3057,7 +3056,7 @@ class SubredditStylesheet(SubredditStylesheetBase):
 
         if links:
             links = links[:25]
-            links = Link._by_fullname(links, data=True, return_dict=False)
+            links = await Link._by_fullname(links, data=True, return_dict=False)
 
         return links
 

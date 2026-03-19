@@ -27,6 +27,7 @@ import re
 
 from itertools import chain
 from sqlalchemy import func
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from r2.lib.inventory_optimization import get_maximized_pageviews
 from r2.lib.memoize import memoize
@@ -59,9 +60,9 @@ DEFAULT_INVENTORY_FACTOR = 5.00
 PERCENT_MOBILE = 0
 
 
-def update_prediction_data():
+async def update_prediction_data(db: AsyncSession):
     """Fetch prediction data and write it to cassandra."""
-    min_daily_by_sr = _min_daily_pageviews_by_sr(NDAYS_TO_QUERY)
+    min_daily_by_sr = await _min_daily_pageviews_by_sr(db, NDAYS_TO_QUERY)
 
     # combine front page values (sometimes frontpage gets '' for its name)
     if '' in min_daily_by_sr:
@@ -74,24 +75,26 @@ def update_prediction_data():
     PromoMetrics.set(MIN_DAILY_CASS_KEY, filtered)
 
 
-def _min_daily_pageviews_by_sr(ndays=NDAYS_TO_QUERY, end_date=None):
+async def _min_daily_pageviews_by_sr(db: AsyncSession, ndays=NDAYS_TO_QUERY, end_date=None):
     """Return dict mapping sr_name to min_pageviews over the last ndays."""
+    from sqlalchemy import select
     if not end_date:
-        last_modified = traffic.get_traffic_last_modified()
+        last_modified = await traffic.get_traffic_last_modified(db)
         end_date = last_modified - timedelta(days=1)
     stop = end_date
     start = stop - timedelta(ndays)
     time_points = traffic.get_time_points('day', start, stop)
     cls = traffic.PageviewsBySubredditAndPath
-    q = (traffic.Session.query(cls.srpath, func.min(cls.pageview_count))
-                               .filter(cls.interval == 'day')
-                               .filter(cls.date.in_(time_points))
-                               .filter(cls.srpath.like('%-GET_listing'))
-                               .group_by(cls.srpath))
+    stmt = (select(cls.srpath, func.min(cls.pageview_count))
+            .where(cls.interval == 'day')
+            .where(cls.date.in_(time_points))
+            .where(cls.srpath.like('%-GET_listing'))
+            .group_by(cls.srpath))
+    rows = (await db.execute(stmt)).all()
 
     # row looks like: ('lightpainting-GET_listing', 16)
     retval = {}
-    for row in q:
+    for row in rows:
         m = PAGEVIEWS_REGEXP.match(row[0])
         if m:
             retval[m.group(1)] = row[1]
@@ -104,24 +107,24 @@ def get_date_range(start, end):
     return dates
 
 
-def get_campaigns_by_date(srs, start, end, ignore=None):
+async def get_campaigns_by_date(db: AsyncSession, srs, start, end, ignore=None):
     srs = tup(srs)
     sr_names = [sr.name for sr in srs]
-    campaign_ids = PromotionWeights.get_campaign_ids(
-        start, end=end, sr_names=sr_names)
+    campaign_ids = await PromotionWeights.get_campaign_ids(
+        db, start, end=end, sr_names=sr_names)
     if ignore:
         campaign_ids.discard(ignore._id)
     campaigns = PromoCampaign._byID(campaign_ids, data=True, return_dict=False)
 
     # filter out deleted campaigns that didn't have their PromotionWeights
     # deleted
-    campaigns = filter(lambda camp: not camp._deleted, campaigns)
+    campaigns = [camp for camp in campaigns if not camp._deleted]
 
     transaction_ids = {camp.trans_id for camp in campaigns
                                      if camp.trans_id != NO_TRANSACTION}
 
     if transaction_ids:
-        transactions = Bid.query().filter(Bid.transaction.in_(transaction_ids))
+        transactions = await Bid.query_by_transactions(db, transaction_ids)
         # index transactions by transaction and campaign id because freebies
         # reuse the same transaction id (they always use -link id)
         transaction_by_id = {
@@ -201,7 +204,7 @@ def make_target_name(target):
     return name
 
 
-def find_campaigns(srs, start, end, ignore):
+async def find_campaigns(db: AsyncSession, srs, start, end, ignore):
     """Get all campaigns in srs and pull in campaigns in other targeted srs."""
     all_sr_names = set()
     all_campaigns = set()
@@ -209,7 +212,7 @@ def find_campaigns(srs, start, end, ignore):
 
     while srs:
         all_sr_names |= {sr.name for sr in srs}
-        new_campaigns_by_date = get_campaigns_by_date(srs, start, end, ignore)
+        new_campaigns_by_date = await get_campaigns_by_date(db, srs, start, end, ignore)
         new_campaigns = set(chain.from_iterable(
             new_campaigns_by_date.values()))
         all_campaigns.update(new_campaigns)
@@ -221,8 +224,8 @@ def find_campaigns(srs, start, end, ignore):
     return all_campaigns
 
 
-def get_available_pageviews(targets, start, end, location=None, datestr=False,
-                            ignore=None, platform='all'):
+async def get_available_pageviews(db: AsyncSession, targets, start, end, location=None,
+                                  datestr=False, ignore=None, platform='all'):
     """
     Return the available pageviews by date for the targets and location.
 
@@ -252,7 +255,7 @@ def get_available_pageviews(targets, start, end, location=None, datestr=False,
     targets, is_single = tup(targets, ret_is_single=True)
     target_srs = list(chain.from_iterable(
         target.subreddits_slow for target in targets))
-    all_campaigns = find_campaigns(target_srs, start, end, ignore)
+    all_campaigns = await find_campaigns(db, target_srs, start, end, ignore)
 
     # get predicted pageviews for each subreddit and location
     all_sr_names = set(sr.name for sr in target_srs)
@@ -317,9 +320,10 @@ def get_available_pageviews(targets, start, end, location=None, datestr=False,
         return ret
 
 
-def get_oversold(target, start, end, daily_request, ignore=None, location=None):
-    available_by_date = get_available_pageviews(target, start, end, location,
-                                                datestr=True, ignore=ignore)
+async def get_oversold(db: AsyncSession, target, start, end, daily_request, ignore=None,
+                       location=None):
+    available_by_date = await get_available_pageviews(db, target, start, end, location,
+                                                      datestr=True, ignore=ignore)
     oversold = {}
     for datestr, available in available_by_date.items():
         if available < daily_request:

@@ -37,7 +37,7 @@ import urllib.request as urllib2
 import urllib.parse as urlparse
 import gzip
 
-import BeautifulSoup
+from bs4 import BeautifulSoup
 from PIL import Image, ImageFile
 import lxml.html
 import requests
@@ -736,7 +736,7 @@ class _ThumbnailOnlyScraper(Scraper):
             return self.url, content
 
         if content_type and "html" in content_type and content:
-            soup = BeautifulSoup.BeautifulSoup(content)
+            soup = BeautifulSoup(content, 'html.parser')
         else:
             return None, None
 

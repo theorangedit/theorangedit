@@ -26,7 +26,14 @@ import random
 
 # import pylons removed (pylons migration)
 
-from webob.exc import HTTPFound, HTTPMovedPermanently
+from starlette.exceptions import HTTPException as _HTTPException
+
+# Redirect exception sentinels — caught to suppress redirect-from-error-page
+class HTTPFound(_HTTPException):
+    def __init__(self): super().__init__(status_code=302)
+
+class HTTPMovedPermanently(_HTTPException):
+    def __init__(self): super().__init__(status_code=301)
 from r2.lib.i18n import _
 from r2.lib.context import request, response
 from r2.lib.context import c

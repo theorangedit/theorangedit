@@ -21,7 +21,7 @@
 ###############################################################################
 
 from r2.config import feature
-from r2.lib.db.legacy import NotFound
+from r2.models.account import NotFound
 from r2.lib.menus import (
   JsButton,
   NavButton,

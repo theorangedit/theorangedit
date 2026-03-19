@@ -19,7 +19,7 @@
 # All portions of the code written by reddit are Copyright (c) 2006-2015 reddit
 # Inc. All Rights Reserved.
 ###############################################################################
-from webob.exc import HTTPBadRequest
+from starlette.exceptions import HTTPException
 from r2.controllers import api_docs
 from r2.controllers.oauth2 import allow_oauth2_access
 from r2.controllers.reddit_base import RedditController
@@ -50,7 +50,7 @@ class APIv1ScopesController(RedditController):
         if scope_str and not scopes.is_valid():
             invalid = [s for s in scopes.scopes if s not in scopes.scope_info]
             error = {"error": "invalid_scopes", "invalid_scopes": invalid}
-            http_err = HTTPBadRequest()
+            http_err = HTTPException(status_code=400, detail=str(error))
             http_err.error_data = error
             abort(http_err)
         return self.api_wrapper({k: v for k, v in scopes.details() if k})

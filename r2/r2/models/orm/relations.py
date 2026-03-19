@@ -194,6 +194,16 @@ class BlockedSubreddit(Base):
     date: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
 
+class QuarantineOptin(Base):
+    """Tracks accounts that have opted in to view quarantined subreddits."""
+    __tablename__ = 'quarantine_optins'
+    __table_args__ = (UniqueConstraint('account_id', 'sr_id'),)
+
+    account_id: Mapped[int] = mapped_column(BigInteger, ForeignKey('accounts.id', ondelete='CASCADE'), primary_key=True)
+    sr_id: Mapped[int] = mapped_column(BigInteger, ForeignKey('subreddits.id', ondelete='CASCADE'), primary_key=True)
+    date: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
 class SubscriptionByDay(Base):
     __tablename__ = 'subscription_by_day'
     __table_args__ = (UniqueConstraint('sr_id', 'date'),)

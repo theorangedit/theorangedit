@@ -22,79 +22,84 @@
 
 from hashlib import md5
 import sys
+import traceback
+
+import sentry_sdk
 
 from r2.lib.context import request
 from r2.lib.context import c
 from r2.lib.app_globals import g
-# pylons.util stubs removed (pylons migration): PylonsContext, AttribSafeContextObj, ContextObj
-import raven
-from raven.processors import Processor
-from weberror.reporter import Reporter
-
 from r2.lib.app_globals import Globals
 
 
 def get_operational_exceptions():
     import _pylibmc
     import sqlalchemy.exc
-    import r2.lib.db.legacy
     import r2.lib.lock
     import r2.lib.cache
+    from r2.models.account import NotFound
 
     return (
         SystemExit,  # gunicorn is shutting us down
         _pylibmc.MemcachedError,
-        r2.lib.db.legacy.NotFound,
+        NotFound,
         r2.lib.lock.TimeoutExpired,
         sqlalchemy.exc.OperationalError,
         sqlalchemy.exc.IntegrityError,
-        pycassa.pool.AllServersUnavailable,
-        pycassa.pool.NoConnectionAvailable,
-        pycassa.pool.MaximumRetryException,
     )
 
 
-class SanitizeStackLocalsProcessor(Processor):
-    keys_to_remove = (
-        "self",
-        "__traceback_supplement__",
-    )
+# Keys / types to strip from stack frame locals before sending to Sentry.
+_KEYS_TO_REMOVE = (
+    "self",
+    "__traceback_supplement__",
+)
+_CLASSES_TO_REMOVE = (Globals,)
 
-    classes_to_remove = (
-        Globals,
-        PylonsContext,
-        AttribSafeContextObj,
-        ContextObj,
-    )
 
-    def filter_stacktrace(self, data, **kwargs):
-        def remove_keys(obj):
-            if isinstance(obj, dict):
-                for k in obj.keys():
-                    if k in self.keys_to_remove:
+def _sanitize_before_send(event, _hint):
+    """Strip large/sensitive locals from stack frames before sending to Sentry."""
+
+    def remove_keys(obj):
+        if isinstance(obj, dict):
+            for k in list(obj.keys()):
+                if k in _KEYS_TO_REMOVE:
+                    obj.pop(k)
+                elif isinstance(obj[k], _CLASSES_TO_REMOVE):
+                    obj.pop(k)
+                elif isinstance(obj[k], str):
+                    contains_forbidden = any(
+                        cls.__name__ in obj[k] for cls in _CLASSES_TO_REMOVE
+                    )
+                    if contains_forbidden:
                         obj.pop(k)
-                    elif isinstance(obj[k], self.classes_to_remove):
-                        obj.pop(k)
-                    elif isinstance(obj[k], str):
-                        contains_forbidden_repr = any(
-                            _cls.__name__ in obj[k]
-                            for _cls in self.classes_to_remove
-                        )
-                        if contains_forbidden_repr:
-                            obj.pop(k)
-                    elif isinstance(obj[k], (list, dict)):
-                        remove_keys(obj[k])
-            elif isinstance(obj, list):
-                for v in obj:
-                    if isinstance(v, (list, dict)):
-                        remove_keys(v)
+                elif isinstance(obj[k], (list, dict)):
+                    remove_keys(obj[k])
+        elif isinstance(obj, list):
+            for v in obj:
+                if isinstance(v, (list, dict)):
+                    remove_keys(v)
 
-        for frame in data.get('frames', []):
-            if 'vars' in frame:
-                remove_keys(frame['vars'])
+    for exc_val in event.get("exception", {}).get("values", []):
+        for frame in exc_val.get("stacktrace", {}).get("frames", []):
+            if "vars" in frame:
+                remove_keys(frame["vars"])
+
+    return event
 
 
-class RavenErrorReporter(Reporter):
+class RavenErrorReporter:
+    """Sentry error reporter (replaces EOL raven.Client)."""
+
+    HEADER_WHITELIST = frozenset((
+        "user-agent",
+        "host",
+        "accept",
+        "accept-encoding",
+        "accept-language",
+        "referer",
+    ))
+
     @classmethod
     def get_module_versions(cls):
         return {
@@ -103,133 +108,76 @@ class RavenErrorReporter(Reporter):
         }
 
     @classmethod
-    def add_http_context(cls, client):
-        """Add request details to the 'request' context
-
-        These fields will be filtered by SanitizePasswordsProcessor
-        as long as they are one of 'data', 'cookies', 'headers', 'env', and
-        'query_string'.
-
-        """
-
-        HEADER_WHITELIST = (
-            "user-agent",
-            "host",
-            "accept",
-            "accept-encoding",
-            "accept-language",
-            "referer",
-        )
-        headers = {
-            k: v for k, v in request.headers.items()
-            if k.lower() in HEADER_WHITELIST
-        }
-
-        client.http_context({
-            "url": request.path,
-            "method": request.method,
-            "query_string": request.query_string,
-            "data": request.body,
-            "headers": headers,
-        })
-
-        if "app" in request.GET:
-            client.tags_context({"app": request.GET["app"]})
-
-    @classmethod
-    def add_reddit_context(cls, client):
-        reddit_context = {
-            "language": c.lang,
-            "render_style": c.render_style,
-        }
-
-        if c.site:
-            reddit_context["subreddit"] = c.site.name
-
-        client.extra_context(reddit_context)
-
-    @classmethod
-    def add_user_context(cls, client):
-        user_context = {}
-
-        if c.user_is_loggedin:
-            user_context["user"] = c.user._id
-
-        if c.oauth2_client:
-            user_context["oauth_client_id"] = c.oauth2_client._id
-            user_context["oauth_client_name"] = c.oauth2_client.name
-
-        client.user_context(user_context)
-
-    @classmethod
-    def get_raven_client(cls):
-        app_path_prefixes = [
-            "r2",
-            "reddit_",  # plugins such as 'reddit_liveupdate'
-            "/opt/",    # scripts may be run from /opt/REPO/scripts
-        ]
+    def _get_release_hash(cls):
         release_str = '|'.join(
-           f"{repo}:{commit_hash}"
-           for repo, commit_hash in sorted(g.versions.items())
+            f"{repo}:{commit_hash}"
+            for repo, commit_hash in sorted(g.versions.items())
         )
-        release_hash = md5(release_str).hexdigest()
+        return md5(release_str.encode()).hexdigest()
 
-        RAVEN_CLIENT = raven.Client(
+    @classmethod
+    def _init_sentry(cls):
+        sentry_sdk.init(
             dsn=g.sentry_dsn,
-            # use the default transport to send errors from another thread:
-            transport=raven.transport.threaded.ThreadedHTTPTransport,
-            include_paths=app_path_prefixes,
-            processors=[
-                'raven.processors.SanitizePasswordsProcessor',
-                'r2.lib.log.SanitizeStackLocalsProcessor',
-            ],
-            release=release_hash,
+            release=cls._get_release_hash(),
             environment=g.pool_name,
-            include_versions=False,     # handled by get_module_versions
-            install_sys_hook=False,
+            before_send=_sanitize_before_send,
+            # Don't auto-instrument — we manage capture explicitly.
+            default_integrations=False,
         )
-        return RAVEN_CLIENT
 
     @classmethod
     def capture_exception(cls, exc_info=None):
         if exc_info is None:
-            # if possible exc_info should be captured as close to the exception
-            # as possible and passed in because sys.exc_info() can give
-            # unexpected behavior
+            # Capture as close to the exception site as possible when
+            # possible; sys.exc_info() can give unexpected results.
             exc_info = sys.exc_info()
+
+        if exc_info[0] is None:
+            return
 
         if issubclass(exc_info[0], get_operational_exceptions()):
             return
 
-        client = cls.get_raven_client()
+        cls._init_sentry()
 
-        if g.running_as_script:
-            # scripts are run like:
-            # paster run INIFILE -c "python code to execute"
-            # OR
-            # paster run INIFILE script.py
-            # either way sys.argv[-1] will tell us the entry point to the error
-            culprit = f'script: "{sys.argv[-1]}"'
-        else:
-            cls.add_http_context(client)
-            cls.add_reddit_context(client)
-            cls.add_user_context(client)
+        with sentry_sdk.push_scope() as scope:
+            if g.running_as_script:
+                culprit = f'script: "{sys.argv[-1]}"'
+                scope.set_tag("culprit", culprit)
+            else:
+                headers = {
+                    k: v for k, v in request.headers.items()
+                    if k.lower() in cls.HEADER_WHITELIST
+                }
+                scope.set_context("request", {
+                    "url": request.path,
+                    "method": request.method,
+                    "query_string": request.query_string,
+                    "data": request.body,
+                    "headers": headers,
+                })
 
-            routes_dict = request.environ["pylons.routes_dict"]
-            controller = routes_dict.get("controller", "unknown")
-            action = routes_dict.get("action", "unknown")
-            culprit = f"{controller}.{action}"
+                if "app" in request.GET:
+                    scope.set_tag("app", request.GET["app"])
 
-        try:
-            client.captureException(
-                exc_info=exc_info,
-                data={
-                    "modules": cls.get_module_versions(),
-                    "culprit": culprit,
-                },
-            )
-        finally:
-            client.context.clear()
+                scope.set_context("reddit", {
+                    "language": c.lang,
+                    "render_style": c.render_style,
+                    "subreddit": c.site.name if c.site else None,
+                })
+
+                if c.user_is_loggedin:
+                    scope.user = {"id": c.user._id}
+
+                if c.oauth2_client:
+                    scope.set_tag("oauth_client_id", c.oauth2_client._id)
+                    scope.set_tag("oauth_client_name", c.oauth2_client.name)
+
+                scope.set_context("modules", cls.get_module_versions())
+                scope.set_tag("culprit", request.path)
+
+            sentry_sdk.capture_exception(exc_info)
 
     def report(self, exc_data):
         self.capture_exception()
@@ -242,20 +190,16 @@ def write_error_summary(error):
     g.log.error("E: %s U: %s FP: %s", error, uid, fullpath)
 
 
-class LoggingErrorReporter(Reporter):
-    """ErrorMiddleware-compatible reporter that writes exceptions to g.log."""
+class LoggingErrorReporter:
+    """Reporter that writes exceptions to g.log."""
 
     def report(self, exc_data):
         # exception_formatted is the output of traceback.format_exception_only
         exception = exc_data.exception_formatted[-1].strip()
 
-        # First emit a single-line summary.  This is great for grepping the
-        # streaming log for errors.
+        # First emit a single-line summary — great for grepping the log.
         write_error_summary(exception)
 
-        text, extra = self.format_text(exc_data)
-        # TODO: send this all in one burst so that error reports aren't
-        # interleaved / individual lines aren't dropped. doing so will take
-        # configuration on the syslog side and potentially in apptail as well
-        for line in text.splitlines():
+        # Then emit the full traceback line by line.
+        for line in traceback.format_exc().splitlines():
             g.log.warning(line)

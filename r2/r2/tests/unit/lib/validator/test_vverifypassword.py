@@ -25,13 +25,13 @@ import uuid
 import unittest
 
 from r2.lib.context import c
-from webob.exc import HTTPException
+from starlette.exceptions import HTTPException
 
 # Needs to be done before other r2 imports, since some code run on module import
 # expects a sane pylons env
 from r2.tests import RedditTestCase
 
-from r2.lib.db.legacy import NotFound
+from r2.models.account import NotFound
 from r2.lib.errors import errors, ErrorSet, UserRequiredException
 from r2.lib.validator import VVerifyPassword
 from r2.models import Account, AccountExists, bcrypt_password

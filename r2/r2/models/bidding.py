@@ -23,7 +23,6 @@
 import datetime
 
 from r2.lib.context import request
-from r2.lib.app_globals import g
 from sqlalchemy import (
     and_,
     Boolean,
@@ -31,317 +30,174 @@ from sqlalchemy import (
     Column,
     DateTime,
     Date,
+    delete,
     distinct,
     Float,
     func as safunc,
     Integer,
+    select,
     String,
 )
 from sqlalchemy.dialects.postgresql.base import PGInet as Inet
-from sqlalchemy.ext.declarative import declarative_base
-from sqlalchemy.orm import sessionmaker
-from sqlalchemy.orm.exc import NoResultFound
+from sqlalchemy.ext.asyncio import AsyncSession
 
-from r2.lib.db.legacy import Thing, NotFound
-from r2.lib.memoize import memoize
+from r2.models.account import NotFound
 from r2.lib.utils import Enum, to_date, tup
-from r2.models.account import Account
-from r2.models import Link, Frontpage
+from r2.models.orm.base import Base
+from r2.models import Frontpage
 
-# see g.databases
-# ENGINE_NAME = 'authorize'
-ENGINE_NAME = 'main'
 
-engine = g.dbm.get_engine(ENGINE_NAME)
-# Allocate a session maker for communicating object changes with the back end  
-Session = sessionmaker(autocommit = True, autoflush = True, bind = engine)
-# allocate a SQLalchemy base class for auto-creation of tables based
-# on class fields.  
-# NB: any class that inherits from this class will result in a table
-# being created, and subclassing doesn't work, hence the
-# object-inheriting interface classes.
-Base = declarative_base(bind = engine)
+class CustomerID(Base):
+    __tablename__ = "authorize_account_id"
 
-class Sessionized(object):
-    """
-    Interface class for wrapping up the "session" in the 0.5 ORM
-    required for all database communication.  This allows subclasses
-    to have a "query" and "commit" method that doesn't require
-    managing of the session.
-    """
-    session = Session()
-
-    def __init__(self, *a, **kw):
-        """
-        Common init used by all other classes in this file.  Allows
-        for object-creation based on the __table__ field which is
-        created by Base (further explained in _disambiguate_args).
-        """
-        for k, v in self._disambiguate_args(None, *a, **kw):
-            setattr(self, k.name, v)
-    
-    @classmethod
-    def _new(cls, *a, **kw):
-        """
-        Just like __init__, except the new object is committed to the
-        db before being returned.
-        """
-        obj = cls(*a, **kw)
-        obj._commit()
-        return obj
-
-    def _commit(self):
-        """
-        Commits current object to the db.
-        """
-        with self.session.begin():
-            self.session.add(self)
-
-    def _delete(self):
-        """
-        Deletes current object from the db. 
-        """
-        with self.session.begin():
-            self.session.delete(self)
-
-    @classmethod
-    def query(cls, **kw):
-        """
-        Ubiquitous class-level query function. 
-        """
-        q = cls.session.query(cls)
-        if kw:
-            q = q.filter_by(**kw)
-        return q
-
-    @classmethod
-    def _disambiguate_args(cls, filter_fn, *a, **kw):
-        """
-        Used in _lookup and __init__ to interpret *a as being a list
-        of args to match columns in the same order as __table__.c
-
-        For example, if a class Foo has fields a and b, this function
-        allows the two to work identically:
-        
-        >>> foo = Foo(a = 'arg1', b = 'arg2')
-        >>> foo = Foo('arg1', 'arg2')
-
-        Additionally, this function invokes _make_storable on each of
-        the values in the arg list (including *a as well as
-        kw.values())
-
-        """
-        args = []
-        if filter_fn is None:
-            cols = cls.__table__.c
-        else:
-            cols = filter(filter_fn, cls.__table__.c)
-        for k, v in zip(cols, a):
-            if not (k.name in kw):
-                args.append((k, cls._make_storable(v)))
-            else:
-                raise TypeError(f"got multiple arguments for '{k.name}'")
-
-        cols = dict((x.name, x) for x in cls.__table__.c)
-        for k, v in kw.items():
-            if (k in cols):
-                args.append((cols[k], cls._make_storable(v)))
-        return args
-
-    @classmethod
-    def _make_storable(self, val):
-        if isinstance(val, Account):
-            return val._id
-        elif isinstance(val, Thing):
-            return val._fullname
-        else:
-            return val
-
-    @classmethod
-    def _lookup(cls, multiple, *a, **kw):
-        """
-        Generates an executes a query where it matches *a to the
-        primary keys of the current class's table.
-
-        The primary key nature can be overridden by providing an
-        explicit list of columns to search.
-
-        This function is only a convenience function, and is called
-        only by one() and lookup().
-        """
-        args = cls._disambiguate_args(lambda x: x.primary_key, *a, **kw)
-        res = cls.query().filter(and_(*[k == v for k, v in args]))
-        try:
-            res = res.all() if multiple else res.one()
-            # res.one() will raise NoResultFound(while all() will)
-            # return an empty list.  This will make the response
-            # uniform
-            if not res:
-                raise NoResultFound
-        except NoResultFound: 
-            raise NotFound("%s with %s" % (cls.__name__,
-                 ",".join("%s=%s" % x for x in args)))
-        return res
-
-    @classmethod
-    def lookup(cls, *a, **kw):
-        """
-        Returns all objects which match the kw list, or primary keys
-        that match the *a.
-        """
-        return cls._lookup(True, *a, **kw)
-
-    @classmethod
-    def one(cls, *a, **kw):
-        """
-        Same as lookup, but returns only one argument. 
-        """
-        return cls._lookup(False, *a, **kw)
-
-    @classmethod
-    def add(cls, key, *a):
-        try:
-            cls.one(key, *a)
-        except NotFound:
-            cls(key, *a)._commit()
-    
-    @classmethod
-    def delete(cls, key, *a):
-        try:
-            cls.one(key, *a)._delete()
-        except NotFound:
-            pass
-    
-    @classmethod
-    def get(cls, key):
-        try:
-            return cls.lookup(key)
-        except NotFound:
-            return []
-
-class CustomerID(Sessionized, Base):
-    __tablename__  = "authorize_account_id"
-
-    account_id    = Column(BigInteger, primary_key = True,
-                           autoincrement = False)
+    account_id    = Column(BigInteger, primary_key=True, autoincrement=False)
     authorize_id  = Column(BigInteger)
 
     def __repr__(self):
         return f"<AuthNetID({self.authorize_id})>"
 
     @classmethod
-    def set(cls, user, _id):
-        try:
-            existing = cls.one(user)
+    async def set(cls, db: AsyncSession, user, _id):
+        account_id = user._id if hasattr(user, '_id') else int(user)
+        stmt = select(cls).where(cls.account_id == account_id)
+        existing = (await db.execute(stmt)).scalar_one_or_none()
+        if existing is not None:
             existing.authorize_id = _id
-            existing._commit()
-        except NotFound:
-            cls(user, _id)._commit()
-    
-    @classmethod
-    def get_id(cls, user):
-        try:
-            return cls.one(user).authorize_id
-        except NotFound:
-            return
+        else:
+            db.add(cls(account_id=account_id, authorize_id=_id))
+        await db.flush()
 
-class PayID(Sessionized, Base):
+    @classmethod
+    async def get_id(cls, db: AsyncSession, user):
+        account_id = user._id if hasattr(user, '_id') else int(user)
+        stmt = select(cls).where(cls.account_id == account_id)
+        row = (await db.execute(stmt)).scalar_one_or_none()
+        return row.authorize_id if row is not None else None
+
+
+class PayID(Base):
     __tablename__ = "authorize_pay_id"
 
-    account_id    = Column(BigInteger, primary_key = True,
-                           autoincrement = False)
-    pay_id        = Column(BigInteger, primary_key = True,
-                           autoincrement = False)
+    account_id    = Column(BigInteger, primary_key=True, autoincrement=False)
+    pay_id        = Column(BigInteger, primary_key=True, autoincrement=False)
 
     def __repr__(self):
-        return f"<{self.__class__.__name__}({self.authorize_id:d})>"
+        return f"<{self.__class__.__name__}({self.pay_id:d})>"
 
     @classmethod
-    def get_ids(cls, key):
-        return [int(x.pay_id) for x in cls.get(key)]
+    async def get_ids(cls, db: AsyncSession, key):
+        account_id = key._id if hasattr(key, '_id') else int(key)
+        stmt = select(cls).where(cls.account_id == account_id)
+        rows = (await db.execute(stmt)).scalars().all()
+        return [int(r.pay_id) for r in rows]
 
-class Bid(Sessionized, Base):
+    @classmethod
+    async def add(cls, db: AsyncSession, key, pay_id):
+        account_id = key._id if hasattr(key, '_id') else int(key)
+        stmt = select(cls).where(
+            and_(cls.account_id == account_id, cls.pay_id == pay_id)
+        )
+        existing = (await db.execute(stmt)).scalar_one_or_none()
+        if existing is None:
+            db.add(cls(account_id=account_id, pay_id=pay_id))
+            await db.flush()
+
+    @classmethod
+    async def delete(cls, db: AsyncSession, key, pay_id):
+        account_id = key._id if hasattr(key, '_id') else int(key)
+        await db.execute(
+            delete(cls).where(
+                and_(cls.account_id == account_id, cls.pay_id == pay_id)
+            )
+        )
+
+
+class Bid(Base):
     __tablename__ = "bids"
 
     STATUS        = Enum("AUTH", "CHARGE", "REFUND", "VOID")
 
-    # will be unique from authorize
-    transaction   = Column(BigInteger, primary_key = True,
-                           autoincrement = False)
-
-    # identifying characteristics
-    account_id    = Column(BigInteger, index = True, nullable = False)
-    pay_id        = Column(BigInteger, index = True, nullable = False)
-    thing_id      = Column(BigInteger, index = True, nullable = False)
-
-    # breadcrumbs
+    transaction   = Column(BigInteger, primary_key=True, autoincrement=False)
+    account_id    = Column(BigInteger, index=True, nullable=False)
+    pay_id        = Column(BigInteger, index=True, nullable=False)
+    thing_id      = Column(BigInteger, index=True, nullable=False)
     ip            = Column(Inet)
-    date          = Column(DateTime(timezone = True), default = safunc.now(),
-                           nullable = False)
-
-    # bid information:
-    bid           = Column(Float, nullable = False)
+    date          = Column(DateTime(timezone=True), default=safunc.now(), nullable=False)
+    bid           = Column(Float, nullable=False)
     charge        = Column(Float)
-
-    status        = Column(Integer, nullable = False,
-                           default = STATUS.AUTH)
-
-    # make this a primary key as well so that we can have more than
-    # one freebie per campaign
-    campaign      = Column(Integer, default = 0, primary_key = True)
+    status        = Column(Integer, nullable=False, default=STATUS.AUTH)
+    campaign      = Column(Integer, default=0, primary_key=True)
 
     @classmethod
-    def _new(cls, trans_id, user, pay_id, thing_id, bid, campaign = 0):
-        bid = Bid(trans_id, user, pay_id, 
-                  thing_id, getattr(request, 'ip', '0.0.0.0'), bid = bid,
-                  campaign = campaign)
-        bid._commit()
-        return bid
+    async def _new(cls, db: AsyncSession, trans_id, user, pay_id, thing_id, bid, campaign=0):
+        account_id = user._id if hasattr(user, '_id') else int(user)
+        obj = cls(
+            transaction=trans_id,
+            account_id=account_id,
+            pay_id=pay_id,
+            thing_id=thing_id,
+            ip=getattr(request, 'ip', '0.0.0.0'),
+            bid=bid,
+            campaign=campaign,
+        )
+        db.add(obj)
+        await db.flush()
+        return obj
 
-#    @classmethod
-#    def for_transactions(cls, transids):
-#        transids = filter(lambda x: x != 0, transids)
-#        if transids:
-#            q = cls.query()
-#            q = q.filter(or_(*[cls.transaction == i for i in transids]))
-#            return dict((p.transaction, p) for p in q)
-#        return {}
+    @classmethod
+    async def one(cls, db: AsyncSession, *a, **kw):
+        conditions = []
+        if a:
+            conditions.append(cls.transaction == a[0])
+        for k, v in kw.items():
+            conditions.append(getattr(cls, k) == v)
+        stmt = select(cls).where(and_(*conditions))
+        row = (await db.execute(stmt)).scalar_one_or_none()
+        if row is None:
+            raise NotFound(f"Bid with {kw}")
+        return row
 
-    def set_status(self, status):
+    @classmethod
+    async def lookup(cls, db: AsyncSession, **kw):
+        conditions = [getattr(cls, k) == v for k, v in kw.items()]
+        stmt = select(cls).where(and_(*conditions))
+        return (await db.execute(stmt)).scalars().all()
+
+    @classmethod
+    async def query_by_transactions(cls, db: AsyncSession, transaction_ids):
+        stmt = select(cls).where(cls.transaction.in_(transaction_ids))
+        return (await db.execute(stmt)).scalars().all()
+
+    async def set_status(self, db: AsyncSession, status):
         if self.status != status:
             self.status = status
-            self._commit()
+            await db.flush()
 
-    def auth(self):
-        self.set_status(self.STATUS.AUTH)
+    async def auth(self, db: AsyncSession):
+        await self.set_status(db, self.STATUS.AUTH)
 
     def is_auth(self):
         return (self.status == self.STATUS.AUTH)
 
-    def void(self):
-        self.set_status(self.STATUS.VOID)
+    async def void(self, db: AsyncSession):
+        await self.set_status(db, self.STATUS.VOID)
 
     def is_void(self):
         return (self.status == self.STATUS.VOID)
 
-    def charged(self):
+    async def charged(self, db: AsyncSession):
         self.charge = self.bid
-        self.set_status(self.STATUS.CHARGE)
-        self._commit()
+        await self.set_status(db, self.STATUS.CHARGE)
+        await db.flush()
 
     def is_charged(self):
-        """
-        Returns True if transaction has been charged with authorize.net or is
-        a freebie with "charged" status.
-        """
         return (self.status == self.STATUS.CHARGE)
 
-    def refund(self, amount):
-        current_charge = self.charge or self.bid    # needed if charged() not
-                                                    # setting charge attr
+    async def refund(self, db: AsyncSession, amount):
+        current_charge = self.charge or self.bid
         self.charge = current_charge - amount
-        self.set_status(self.STATUS.REFUND)
-        self._commit()
+        await self.set_status(db, self.STATUS.REFUND)
+        await db.flush()
 
     def is_refund(self):
         return (self.status == self.STATUS.REFUND)
@@ -351,26 +207,16 @@ class Bid(Sessionized, Base):
         return self.charge or self.bid
 
 
-class PromotionWeights(Sessionized, Base):
+class PromotionWeights(Base):
     __tablename__ = "promotion_weight"
 
-    thing_name = Column(String, primary_key = True,
-                        nullable = False, index = True)
-
-    promo_idx    = Column(BigInteger, index = True, autoincrement = False,
-                          primary_key = True)
-
-    sr_name    = Column(String, primary_key = True,
-                        nullable = True,  index = True)
-    date       = Column(Date(), primary_key = True,
-                        nullable = False, index = True)
-
-    # because we might want to search by account
-    account_id   = Column(BigInteger, index = True, autoincrement = False)
-
-    # bid and weight should always be the same, but they don't have to be
-    bid        = Column(Float, nullable = False)
-    weight     = Column(Float, nullable = False)
+    thing_name = Column(String, primary_key=True, nullable=False, index=True)
+    promo_idx  = Column(BigInteger, index=True, autoincrement=False, primary_key=True)
+    sr_name    = Column(String, primary_key=True, nullable=True, index=True)
+    date       = Column(Date(), primary_key=True, nullable=False, index=True)
+    account_id = Column(BigInteger, index=True, autoincrement=False)
+    bid        = Column(Float, nullable=False)
+    weight     = Column(Float, nullable=False)
     finished   = Column(Boolean)
     # NOTE: bid, weight, finished columns are not used
 
@@ -380,82 +226,81 @@ class PromotionWeights(Sessionized, Base):
         return '' if sr_name == Frontpage.name else sr_name
 
     @classmethod
-    def reschedule(cls, link, campaign):
-        cls.delete(link, campaign)
-        cls.add(link, campaign)
+    async def reschedule(cls, db: AsyncSession, link, campaign):
+        await cls.delete(db, link, campaign)
+        await cls.add(db, link, campaign)
 
     @classmethod
-    def add(cls, link, campaign):
+    async def add(cls, db: AsyncSession, link, campaign):
         start_date = to_date(campaign.start_date)
         end_date = to_date(campaign.end_date)
         ndays = (end_date - start_date).days
-        # note that end_date is not included
         dates = [start_date + datetime.timedelta(days=i) for i in range(ndays)]
 
         sr_names = campaign.target.subreddit_names
         sr_names = {cls.filter_sr_name(sr_name) for sr_name in sr_names}
 
-        with cls.session.begin():
-            for sr_name in sr_names:
-                for date in dates:
-                    obj = cls(
-                        thing_name=link._fullname,
-                        promo_idx=campaign._id,
-                        sr_name=sr_name,
-                        date=date,
-                        account_id=link.author_id,
-                        bid=0.,
-                        weight=0.,
-                        finished=False,
-                    )
-                    cls.session.add(obj)
+        for sr_name in sr_names:
+            for date in dates:
+                obj = cls(
+                    thing_name=link._fullname,
+                    promo_idx=campaign._id,
+                    sr_name=sr_name,
+                    date=date,
+                    account_id=link.author_id,
+                    bid=0.,
+                    weight=0.,
+                    finished=False,
+                )
+                db.add(obj)
+        await db.flush()
 
     @classmethod
-    def delete(cls, link, campaign):
-        query = cls.query(thing_name=link._fullname, promo_idx=campaign._id)
-        with cls.session.begin():
-            for item in query:
-                cls.session.delete(item)
+    async def delete(cls, db: AsyncSession, link, campaign):
+        await db.execute(
+            delete(cls).where(
+                and_(
+                    cls.thing_name == link._fullname,
+                    cls.promo_idx == campaign._id,
+                )
+            )
+        )
 
     @classmethod
-    def _filter_query(cls, query, start, end=None, link=None,
+    def _build_filter(cls, stmt, start, end=None, link=None,
                       author_id=None, sr_names=None):
         start = to_date(start)
 
         if end:
             end = to_date(end)
-            query = query.filter(and_(cls.date >= start, cls.date < end))
+            stmt = stmt.where(and_(cls.date >= start, cls.date < end))
         else:
-            query = query.filter(cls.date == start)
+            stmt = stmt.where(cls.date == start)
 
         if link:
-            query = query.filter(cls.thing_name == link._fullname)
+            stmt = stmt.where(cls.thing_name == link._fullname)
 
         if author_id:
-            query = query.filter(cls.account_id == author_id)
+            stmt = stmt.where(cls.account_id == author_id)
 
         if sr_names:
             sr_names = [cls.filter_sr_name(sr_name) for sr_name in sr_names]
-            query = query.filter(cls.sr_name.in_(sr_names))
+            stmt = stmt.where(cls.sr_name.in_(sr_names))
 
-        return query
-
-    @classmethod
-    def get_campaign_ids(cls, start, end=None, link=None, author_id=None,
-                         sr_names=None):
-        query = cls.session.query(distinct(cls.promo_idx))
-        query = cls._filter_query(query, start, end, link, author_id, sr_names)
-        return {i[0] for i in query}
+        return stmt
 
     @classmethod
-    def get_link_names(cls, start, end=None, link=None, author_id=None,
-                       sr_names=None):
-        query = cls.session.query(distinct(cls.thing_name))
-        query = cls._filter_query(query, start, end, link, author_id, sr_names)
-        return {i[0] for i in query}
+    async def get_campaign_ids(cls, db: AsyncSession, start, end=None, link=None,
+                               author_id=None, sr_names=None):
+        stmt = select(distinct(cls.promo_idx))
+        stmt = cls._build_filter(stmt, start, end, link, author_id, sr_names)
+        rows = (await db.execute(stmt)).all()
+        return {r[0] for r in rows}
 
-
-# do all the leg work of creating/connecting to tables
-if g.db_create_tables:
-    Base.metadata.create_all()
-
+    @classmethod
+    async def get_link_names(cls, db: AsyncSession, start, end=None, link=None,
+                             author_id=None, sr_names=None):
+        stmt = select(distinct(cls.thing_name))
+        stmt = cls._build_filter(stmt, start, end, link, author_id, sr_names)
+        rows = (await db.execute(stmt)).all()
+        return {r[0] for r in rows}

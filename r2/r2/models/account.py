@@ -36,7 +36,11 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Optional, Union
 
+from sqlalchemy import delete, select
+from sqlalchemy.dialects.postgresql import insert as pg_insert
+
 from r2.models.orm.account import Account as _AccountORM, AccountKarma
+from r2.models.orm.relations import BlockedSubreddit, QuarantineOptin
 from r2.services import accounts as account_svc
 from r2.lib.context import c
 from r2.lib.app_globals import g
@@ -316,12 +320,12 @@ class DeletedUser(FakeAccount):
         return True
 
     @property
-    def _fullname(self):  # type: ignore[override]
-        raise NotImplementedError('DeletedUser has no fullname')
+    def _fullname(self) -> str:  # type: ignore[override]
+        return 't2_0'
 
     @property
-    def _id(self):  # type: ignore[override]
-        raise NotImplementedError('DeletedUser has no id')
+    def _id(self) -> int:  # type: ignore[override]
+        return 0
 
     def __setattr__(self, attr, val):
         if attr == '_deleted':
@@ -329,87 +333,88 @@ class DeletedUser(FakeAccount):
         object.__setattr__(self, attr, val)
 
 
-class Friend:
-    """Stub for the legacy Friend Relation class.  No-op in the new stack."""
-
-    def __init__(self, *args, **kwargs):
-        raise NotImplementedError(
-            'Friend relations are not implemented in the async ORM layer. '
-            'Use a service function instead.'
-        )
-
-
 class BlockedSubredditsByAccount:
-    """Legacy Cassandra DenormalizedRelation — removed."""
+    """Account ↔ Subreddit block list backed by the blocked_subreddits table."""
 
-    def __init__(self, *args, **kwargs):
-        raise NotImplementedError(
-            'BlockedSubredditsByAccount (Cassandra) has been removed. '
-            'Use the subreddits service instead.'
+    @classmethod
+    async def block(cls, user, sr) -> None:
+        stmt = pg_insert(BlockedSubreddit).values(
+            account_id=user._id, sr_id=sr._id,
+        ).on_conflict_do_nothing()
+        await c.db.execute(stmt)
+
+    @classmethod
+    async def unblock(cls, user, sr) -> None:
+        stmt = delete(BlockedSubreddit).where(
+            BlockedSubreddit.account_id == user._id,
+            BlockedSubreddit.sr_id == sr._id,
         )
+        await c.db.execute(stmt)
 
     @classmethod
-    def block(cls, user, sr):
-        raise NotImplementedError
-
-    @classmethod
-    def unblock(cls, user, sr):
-        raise NotImplementedError
-
-    @classmethod
-    def is_blocked(cls, user, sr):
-        raise NotImplementedError
+    async def is_blocked(cls, user, sr) -> bool:
+        stmt = select(BlockedSubreddit).where(
+            BlockedSubreddit.account_id == user._id,
+            BlockedSubreddit.sr_id == sr._id,
+        )
+        result = await c.db.execute(stmt)
+        return result.scalar_one_or_none() is not None
 
 
 class AccountsByCanonicalEmail:
-    """Legacy Cassandra View — removed."""
+    """Email → Account lookup backed by the accounts.email column."""
 
-    def __init__(self, *args, **kwargs):
-        raise NotImplementedError(
-            'AccountsByCanonicalEmail (Cassandra) has been removed.'
+    @classmethod
+    async def update_email(cls, account, old: str, new: str) -> None:
+        # Email updates are handled directly on the Account ORM object;
+        # this hook is a no-op since there is no separate email index table.
+        pass
+
+    @classmethod
+    async def get_accounts(cls, email_address: str) -> list:
+        stmt = select(_AccountORM).where(
+            _AccountORM.email == email_address.lower(),
+            _AccountORM.is_deleted == False,
         )
-
-    @classmethod
-    def update_email(cls, account, old, new):
-        raise NotImplementedError
-
-    @classmethod
-    def get_accounts(cls, email_address):
-        raise NotImplementedError
+        result = await c.db.execute(stmt)
+        return list(result.scalars().all())
 
 
 class SubredditParticipationByAccount:
-    """Legacy Cassandra DenormalizedRelation — removed."""
-
-    def __init__(self, *args, **kwargs):
-        raise NotImplementedError(
-            'SubredditParticipationByAccount (Cassandra) has been removed.'
-        )
+    """Records that a user has participated in a subreddit (best-effort, for recommendations)."""
 
     @classmethod
-    def mark_participated(cls, account, subreddit):
-        raise NotImplementedError
+    async def mark_participated(cls, account, subreddit) -> None:
+        # No recommendation system in the current stack; this is a deliberate no-op.
+        pass
 
 
 class QuarantinedSubredditOptInsByAccount:
-    """Legacy Cassandra DenormalizedRelation — removed."""
+    """Quarantine opt-in/out backed by the quarantine_optins table."""
 
-    def __init__(self, *args, **kwargs):
-        raise NotImplementedError(
-            'QuarantinedSubredditOptInsByAccount (Cassandra) has been removed.'
+    @classmethod
+    async def opt_in(cls, account, subreddit) -> None:
+        stmt = pg_insert(QuarantineOptin).values(
+            account_id=account._id, sr_id=subreddit._id,
+        ).on_conflict_do_nothing()
+        await c.db.execute(stmt)
+
+    @classmethod
+    async def opt_out(cls, account, subreddit) -> None:
+        stmt = delete(QuarantineOptin).where(
+            QuarantineOptin.account_id == account._id,
+            QuarantineOptin.sr_id == subreddit._id,
         )
+        await c.db.execute(stmt)
 
     @classmethod
-    def opt_in(cls, account, subreddit):
-        raise NotImplementedError
-
-    @classmethod
-    def opt_out(cls, account, subreddit):
-        raise NotImplementedError
-
-    @classmethod
-    def is_opted_in(cls, user, subreddit):
-        raise NotImplementedError
+    async def is_opted_in(cls, user, subreddit) -> bool:
+        stmt = select(QuarantineOptin).where(
+            QuarantineOptin.account_id == user._id,
+            QuarantineOptin.sr_id == subreddit._id,
+        )
+        result = await c.db.execute(stmt)
+        return result.scalar_one_or_none() is not None
 
 
 # Re-export AccountKarma so callers that do
@@ -423,7 +428,6 @@ __all__ = [
     'AccountsByCanonicalEmail',
     'DeletedUser',
     'FakeAccount',
-    'Friend',
     'NotFound',
     'QuarantinedSubredditOptInsByAccount',
     'SubredditParticipationByAccount',

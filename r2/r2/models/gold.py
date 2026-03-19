@@ -20,8 +20,6 @@
 # Inc. All Rights Reserved.
 ###############################################################################
 
-from r2.lib.db.legacy import make_metadata, index_str, create_table
-
 import json
 import pytz
 import uuid
@@ -60,7 +58,7 @@ NON_REVENUE_STATUSES = ("declined", "chargeback", "fudge", "invalid",
 ENGINE_NAME = 'main'
 
 ENGINE = g.dbm.get_engine(ENGINE_NAME)
-METADATA = make_metadata(ENGINE)
+METADATA = sa.MetaData()
 TIMEZONE = pytz.timezone("America/Los_Angeles")
 
 Session = scoped_session(sessionmaker(bind=ENGINE))
@@ -83,31 +81,15 @@ gold_table = sa.Table('reddit_gold', METADATA,
                       sa.Column('subscr_id', sa.String, nullable = True),
                       sa.Column('gilding_type', sa.String, nullable = True))
 
-indices = [index_str(gold_table, 'status', 'status'),
-           index_str(gold_table, 'date', 'date'),
-           index_str(gold_table, 'account_id', 'account_id'),
-           index_str(gold_table, 'secret', 'secret'),
-           index_str(gold_table, 'payer_email', 'payer_email'),
-           index_str(gold_table, 'subscr_id', 'subscr_id')]
-create_table(gold_table, indices)
-
-
-class GoldRevenueGoalByDate:
-    """Revenue goal tracking — Cassandra removed, stub only."""
-
-    ROWKEY = '1'
-
-    @staticmethod
-    def _colkey(date):
-        return date.strftime("%Y-%m-%d")
-
-    @classmethod
-    def set(cls, date, goal):
-        raise NotImplementedError('GoldRevenueGoalByDate: Cassandra removed')
-
-    @classmethod
-    def get(cls, date):
-        raise NotImplementedError('GoldRevenueGoalByDate: Cassandra removed')
+indices = [
+    sa.Index(f'idx_{gold_table.name}_status', gold_table.c['status']),
+    sa.Index(f'idx_{gold_table.name}_date', gold_table.c['date']),
+    sa.Index(f'idx_{gold_table.name}_account_id', gold_table.c['account_id']),
+    sa.Index(f'idx_{gold_table.name}_secret', gold_table.c['secret']),
+    sa.Index(f'idx_{gold_table.name}_payer_email', gold_table.c['payer_email']),
+    sa.Index(f'idx_{gold_table.name}_subscr_id', gold_table.c['subscr_id']),
+]
+# Table creation is handled by Alembic migrations; create_table is a no-op.
 
 
 def create_unclaimed_gold (trans_id, payer_email, paying_id,
@@ -354,13 +336,11 @@ def gold_revenue_steady(date):
 
 @memoize("gold-goal", stale=True)
 def gold_goal_on(date):
-    """Returns the gold revenue goal (in pennies) for a given date."""
-    goal = GoldRevenueGoalByDate.get(date)
+    """Returns the gold revenue goal (in pennies) for a given date.
 
-    if not goal:
-        return 0
-
-    return float(goal)
+    Revenue goal tracking via Cassandra has been removed; always returns 0.
+    """
+    return 0
 
 
 def account_from_stripe_customer_id(stripe_customer_id):
@@ -490,7 +470,7 @@ PENNIES_PER_SERVER_SECOND = {
 def calculate_server_seconds(pennies, date):
     cutoff_dates = sorted(PENNIES_PER_SERVER_SECOND.keys())
     date = to_date(date)
-    key = max(filter(lambda cutoff_date: date >= cutoff_date, cutoff_dates))
+    key = max(d for d in cutoff_dates if date >= d)
     rate = PENNIES_PER_SERVER_SECOND[key]
 
     # for simplicity all payment processor fees are $0.30 + 2.9%

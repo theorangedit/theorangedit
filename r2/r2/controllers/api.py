@@ -194,7 +194,7 @@ class ApiController(RedditController):
 
         thing_classes = (Link, Comment, Subreddit)
         things = things or []
-        things = filter(lambda thing: isinstance(thing, thing_classes), things)
+        things = [thing for thing in things if isinstance(thing, thing_classes)]
 
         c.update_last_visit = False
         listing = wrap_links(things)
@@ -345,7 +345,7 @@ class ApiController(RedditController):
         body=VMarkdownLength(['text', 'message'], max_length=10000),
     )
     @api_doc(api_section.messages)
-    def POST_compose(self, form, jquery, from_sr, to, subject, body):
+    async def POST_compose(self, form, jquery, from_sr, to, subject, body):
         """
         Handles message composition under /message/compose.
         """
@@ -372,7 +372,7 @@ class ApiController(RedditController):
             form.has_errors("from", errors.NO_SR_TO_SR_MESSAGE)
             return
 
-        if from_sr and BlockedSubredditsByAccount.is_blocked(to, from_sr):
+        if from_sr and await BlockedSubredditsByAccount.is_blocked(to, from_sr):
             c.errors.add(errors.USER_BLOCKED_MESSAGE, field="to")
             form.has_errors("to", errors.USER_BLOCKED_MESSAGE)
             return
@@ -1811,7 +1811,7 @@ class ApiController(RedditController):
         if getattr(thing, "from_sr", False) and sr:
             # Users may only block a subreddit they don't mod
             if not (sr.is_moderator(c.user) or c.user_is_admin):
-                BlockedSubredditsByAccount.block(c.user, sr)
+                await BlockedSubredditsByAccount.block(c.user, sr)
             return
 
         # Users may only block someone who has actively harassed them
@@ -1863,7 +1863,7 @@ class ApiController(RedditController):
             sr = None
 
         if getattr(thing, "from_sr", False) and sr:
-            BlockedSubredditsByAccount.unblock(c.user, sr)
+            await BlockedSubredditsByAccount.unblock(c.user, sr)
             return
 
     @require_oauth2_scope("modcontributors")
@@ -2347,7 +2347,7 @@ class ApiController(RedditController):
                    reason=VPrintable('reason', 256, empty_error=None),
                    op = VOneOf('op',['save','preview']))
     @api_doc(api_section.subreddits, uses_site=True)
-    def POST_subreddit_stylesheet(self, form, jquery,
+    async def POST_subreddit_stylesheet(self, form, jquery,
                                   stylesheet_contents = '', prevstyle='',
                                   op='save', reason=None):
         """Update a subreddit's stylesheet.
@@ -2398,7 +2398,7 @@ class ApiController(RedditController):
         if op == 'preview':
             # try to find a link to use, otherwise give up and
             # return
-            links = SubredditStylesheet.find_preview_links(c.site)
+            links = await SubredditStylesheet.find_preview_links(c.site)
             if links:
 
                 jquery('#preview-table').show()
@@ -2421,7 +2421,7 @@ class ApiController(RedditController):
                         links, media='off', compress=False, stickied=True))
     
             # and do a comment
-            comments = SubredditStylesheet.find_preview_comments(c.site)
+            comments = await SubredditStylesheet.find_preview_comments(c.site)
             if comments:
                 jquery('#preview_comment').html(
                     SubredditStylesheet.rendered_comment(comments))
@@ -3752,7 +3752,7 @@ class ApiController(RedditController):
                 action = VOneOf('action', ('sub', 'unsub')),
                 sr = VSubscribeSR('sr', 'sr_name'))
     @api_doc(api_section.subreddits)
-    def POST_subscribe(self, action, sr):
+    async def POST_subscribe(self, action, sr):
         """Subscribe to or unsubscribe from a subreddit.
 
         To subscribe, `action` should be `sub`. To unsubscribe, `action` should
@@ -3773,7 +3773,7 @@ class ApiController(RedditController):
         Subreddit.subscribe_defaults(c.user)
 
         if action == "sub":
-            SubredditParticipationByAccount.mark_participated(c.user, sr)
+            await SubredditParticipationByAccount.mark_participated(c.user, sr)
 
             if not sr.is_subscriber(c.user):
                 sr.add_subscriber(c.user)
@@ -3834,14 +3834,14 @@ class ApiController(RedditController):
         VModhash(),
         sr=VSRByName('sr_name'),
     )
-    def POST_quarantine_optout(self, sr):
+    async def POST_quarantine_optout(self, sr):
         """Opt out from a quarantined subreddit"""
         if not sr:
             return abort(404, 'not found')
         else:
             g.events.quarantine_event('quarantine_opt_out', sr,
                 request=request, context=c)
-            QuarantinedSubredditOptInsByAccount.opt_out(c.user, sr)
+            await QuarantinedSubredditOptInsByAccount.opt_out(c.user, sr)
         return self.redirect('/')
 
     @require_oauth2_scope("subscribe")
@@ -3850,7 +3850,7 @@ class ApiController(RedditController):
         VModhash(),
         sr=VSRByName('sr_name'),
     )
-    def POST_quarantine_optin(self, sr):
+    async def POST_quarantine_optin(self, sr):
         """Opt in to a quarantined subreddit"""
         if not sr:
             return abort(404, 'not found')
@@ -3859,7 +3859,7 @@ class ApiController(RedditController):
         else:
             g.events.quarantine_event('quarantine_opt_in', sr,
                 request=request, context=c)
-            QuarantinedSubredditOptInsByAccount.opt_in(c.user, sr)
+            await QuarantinedSubredditOptInsByAccount.opt_in(c.user, sr)
         return self.redirect(f'/r/{sr.name}')
 
     @validatedForm(VAdmin(),

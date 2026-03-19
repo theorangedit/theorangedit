@@ -49,7 +49,15 @@ from r2.lib.db import queries
 from r2.lib.strings import strings
 from r2.lib.validator import *
 from r2.lib import jsontemplates
-import r2.lib.db.legacy as thing
+class _LegacyQuery:
+    """Stub for the removed Thing ORM Query — used only for isinstance checks."""
+    pass
+
+class _LegacyThingModule:
+    """Minimal shim so that isinstance(q, thing.Query) checks still work."""
+    Query = _LegacyQuery
+
+thing = _LegacyThingModule()
 from r2.lib.errors import errors, ForbiddenError
 from listingcontroller import ListingController
 from oauth2 import require_oauth2_scope

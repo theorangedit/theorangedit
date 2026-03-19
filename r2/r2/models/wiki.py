@@ -291,70 +291,8 @@ class WikiRevision:
 
 
 # ---------------------------------------------------------------------------
-# Stub Cassandra View classes
+# Stub Cassandra View classes retained because they still have call sites
 # ---------------------------------------------------------------------------
-# These names are preserved so that any remaining import sites produce a clear
-# NotImplementedError rather than an ImportError.
-
-class WikiPageEditors:
-    def __init__(self, *a, **kw):
-        raise NotImplementedError("Cassandra removed — use service layer")
-
-    @classmethod
-    def add_object(cls, *a, **kw):
-        raise NotImplementedError("Cassandra removed — use service layer")
-
-    @classmethod
-    def _set_values(cls, *a, **kw):
-        raise NotImplementedError("Cassandra removed — use service layer")
-
-    @classmethod
-    def _remove(cls, *a, **kw):
-        raise NotImplementedError("Cassandra removed — use service layer")
-
-    @classmethod
-    def _byID(cls, *a, **kw):
-        raise NotImplementedError("Cassandra removed — use service layer")
-
-
-class WikiRevisionHistoryByPage:
-    def __init__(self, *a, **kw):
-        raise NotImplementedError("Cassandra removed — use service layer")
-
-    @classmethod
-    def add_object(cls, *a, **kw):
-        raise NotImplementedError("Cassandra removed — use service layer")
-
-    @classmethod
-    def query(cls, *a, **kw):
-        raise NotImplementedError("Cassandra removed — use service layer")
-
-
-class WikiPagesBySR:
-    def __init__(self, *a, **kw):
-        raise NotImplementedError("Cassandra removed — use service layer")
-
-    @classmethod
-    def add_object(cls, *a, **kw):
-        raise NotImplementedError("Cassandra removed — use service layer")
-
-    @classmethod
-    def query(cls, *a, **kw):
-        raise NotImplementedError("Cassandra removed — use service layer")
-
-
-class WikiRevisionsRecentBySR:
-    def __init__(self, *a, **kw):
-        raise NotImplementedError("Cassandra removed — use service layer")
-
-    @classmethod
-    def add_object(cls, *a, **kw):
-        raise NotImplementedError("Cassandra removed — use service layer")
-
-    @classmethod
-    def query(cls, *a, **kw):
-        raise NotImplementedError("Cassandra removed — use service layer")
-
 
 class ImagesByWikiPage:
     def __init__(self, *a, **kw):
@@ -375,3 +313,4 @@ class ImagesByWikiPage:
     @classmethod
     def delete_image(cls, *a, **kw):
         raise NotImplementedError("Cassandra removed — use service layer")
+

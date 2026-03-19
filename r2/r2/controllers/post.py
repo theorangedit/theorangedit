@@ -135,17 +135,17 @@ class PostController(ApiController):
         accept=VBoolean('accept'),
         dest=VDestination(default='/'),
     )
-    def POST_quarantine(self, sr, accept, dest):
+    async def POST_quarantine(self, sr, accept, dest):
         can_opt_in = c.user_is_loggedin and c.user.email_verified
 
         if accept and can_opt_in and not c.errors:
-            QuarantinedSubredditOptInsByAccount.opt_in(c.user, sr)
+            await QuarantinedSubredditOptInsByAccount.opt_in(c.user, sr)
             g.events.quarantine_event('quarantine_opt_in', sr,
                 request=request, context=c)
             return self.redirect(dest)
         else:
             if c.user_is_loggedin and not c.errors:
-                QuarantinedSubredditOptInsByAccount.opt_out(c.user, sr)
+                await QuarantinedSubredditOptInsByAccount.opt_out(c.user, sr)
             g.events.quarantine_event('quarantine_interstitial_dismiss', sr,
                 request=request, context=c)
             return self.redirect('/')

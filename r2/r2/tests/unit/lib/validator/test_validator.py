@@ -28,7 +28,7 @@ from datetime import datetime as dt
 from mock import MagicMock, patch
 from r2.lib.context import c
 from r2.lib.app_globals import g
-from webob.exc import HTTPForbidden
+from starlette.exceptions import HTTPException as HTTPForbidden
 
 from r2.lib.errors import errors, ErrorSet
 from r2.lib.validator import (

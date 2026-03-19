@@ -24,13 +24,30 @@ import datetime
 import hashlib
 import time
 import email.utils
-from email.MIMEText import MIMEText
+from email.mime.text import MIMEText
 from email.errors import HeaderParseError
 
 import sqlalchemy as sa
+from sqlalchemy import select, delete
 from sqlalchemy.dialects.postgresql.base import PGInet
+from sqlalchemy.ext.asyncio import AsyncSession
 
-from r2.lib.db.legacy import make_metadata, index_str, create_table
+import sqlalchemy as _sa_top  # for make_metadata / index_str inlining
+
+
+def _make_metadata(engine=None):
+    """Return an unbound SQLAlchemy MetaData (SA 2.x compatible)."""
+    return _sa_top.MetaData()
+
+
+def _index_str(table, name, col):
+    """Return a SQLAlchemy Index for table.c[col]."""
+    return _sa_top.Index(f'idx_{table.name}_{name}', table.c[col])
+
+
+def _create_table(table, indices=None):
+    """No-op: schema creation is handled by Alembic migrations."""
+    pass
 from r2.lib.utils import Enum, tup
 from r2.lib.memoize import memoize
 from r2.lib.context import request
@@ -69,8 +86,8 @@ def mail_queue(metadata):
 
                     # when added to the queue
                     sa.Column('date',
-                              sa.DateTime(timezone = True),
-                              nullable = False),
+                              sa.DateTime(timezone=True),
+                              nullable=False),
 
                     # IP of original request
                     sa.Column('ip', PGInet),
@@ -83,7 +100,7 @@ def mail_queue(metadata):
 
                     )
 
-def sent_mail_table(metadata, name = 'sent_mail'):
+def sent_mail_table(metadata, name='sent_mail'):
     return sa.Table(g.db_app_name + '_' + name, metadata,
                     # tracking hash of the email
                     sa.Column('msg_hash', sa.String, primary_key=True),
@@ -108,9 +125,9 @@ def sent_mail_table(metadata, name = 'sent_mail'):
 
                     # send date
                     sa.Column('date',
-                              sa.DateTime(timezone = True),
-                              default = sa.func.now(),
-                              nullable = False),
+                              sa.DateTime(timezone=True),
+                              default=sa.func.now(),
+                              nullable=False),
 
                     # enum of kind of event
                     sa.Column('kind', sa.Integer),
@@ -120,101 +137,101 @@ def sent_mail_table(metadata, name = 'sent_mail'):
 
 def opt_out(metadata):
     return sa.Table(g.db_app_name + '_opt_out', metadata,
-                    sa.Column('email', sa.String, primary_key = True),
+                    sa.Column('email', sa.String, primary_key=True),
                     # when added to the list
                     sa.Column('date',
-                              sa.DateTime(timezone = True),
-                              default = sa.func.now(),
-                              nullable = False),
+                              sa.DateTime(timezone=True),
+                              default=sa.func.now(),
+                              nullable=False),
                     # why did they do it!?
                     sa.Column('msg_hash', sa.String),
                     )
 
 class EmailHandler(object):
-    def __init__(self, force = False):
+    def __init__(self, force=False):
         engine = g.dbm.get_engine(ENGINE_NAME)
-        self.metadata = make_metadata(engine)
+        self.metadata = _make_metadata(engine)
         self.queue_table = mail_queue(self.metadata)
-        indices = [index_str(self.queue_table, "date", "date"),
-                   index_str(self.queue_table, 'kind', 'kind')]
-        create_table(self.queue_table, indices)
+        indices = [_index_str(self.queue_table, "date", "date"),
+                   _index_str(self.queue_table, 'kind', 'kind')]
+        _create_table(self.queue_table, indices)
 
         self.opt_table = opt_out(self.metadata)
-        indices = [index_str(self.opt_table, 'email', 'email')]
-        create_table(self.opt_table, indices)
+        indices = [_index_str(self.opt_table, 'email', 'email')]
+        _create_table(self.opt_table, indices)
 
         self.track_table = sent_mail_table(self.metadata)
-        self.reject_table = sent_mail_table(self.metadata, name = "reject_mail")
+        self.reject_table = sent_mail_table(self.metadata, name="reject_mail")
 
         def sent_indices(tab):
-            indices = [index_str(tab, 'to_addr', 'to_addr'),
-                       index_str(tab, 'date', 'date'),
-                       index_str(tab, 'ip', 'ip'),
-                       index_str(tab, 'kind', 'kind'),
-                       index_str(tab, 'fullname', 'fullname'),
-                       index_str(tab, 'account_id', 'account_id'),
-                       index_str(tab, 'msg_hash', 'msg_hash'),
+            indices = [_index_str(tab, 'to_addr', 'to_addr'),
+                       _index_str(tab, 'date', 'date'),
+                       _index_str(tab, 'ip', 'ip'),
+                       _index_str(tab, 'kind', 'kind'),
+                       _index_str(tab, 'fullname', 'fullname'),
+                       _index_str(tab, 'account_id', 'account_id'),
+                       _index_str(tab, 'msg_hash', 'msg_hash'),
                        ]
 
-        create_table(self.track_table, sent_indices(self.track_table))
-        create_table(self.reject_table, sent_indices(self.reject_table))
+        _create_table(self.track_table, sent_indices(self.track_table))
+        _create_table(self.reject_table, sent_indices(self.reject_table))
 
     def __repr__(self):
         return "<email-handler>"
 
-    def has_opted_out(self, email):
+    async def has_opted_out(self, db: AsyncSession, email):
         o = self.opt_table
-        s = sa.select([o.c.email], o.c.email == email, limit = 1)
-        res = s.execute()
-        return bool(res.fetchall())
+        stmt = select(o.c.email).where(o.c.email == email).limit(1)
+        res = (await db.execute(stmt)).fetchall()
+        return bool(res)
 
-
-    def opt_out(self, msg_hash):
+    async def opt_out(self, db: AsyncSession, msg_hash):
         """Adds the recipient of the email to the opt-out list and returns
         that address."""
-        email = self.get_recipient(msg_hash)
+        email = await self.get_recipient(db, msg_hash)
         if email:
             o = self.opt_table
             try:
-                o.insert().values({o.c.email: email,
-                                   o.c.msg_hash: msg_hash}).execute()
+                await db.execute(
+                    o.insert().values({o.c.email: email,
+                                       o.c.msg_hash: msg_hash})
+                )
                 g.stats.simple_event('share.opt_out')
 
                 #clear caches
-                has_opted_out(email, _update = True)
-                opt_count(_update = True)
+                await has_opted_out(db, email, _update=True)
+                await opt_count(db, _update=True)
                 return (email, True)
             except sa.exc.DBAPIError:
                 return (email, False)
         return (None, False)
 
-    def opt_in(self, msg_hash):
+    async def opt_in(self, db: AsyncSession, msg_hash):
         """Removes recipient of the email from the opt-out list"""
-        email = self.get_recipient(msg_hash)
+        email = await self.get_recipient(db, msg_hash)
         if email:
             o = self.opt_table
-            if self.has_opted_out(email):
-                sa.delete(o, o.c.email == email).execute()
+            if await self.has_opted_out(db, email):
+                await db.execute(delete(o).where(o.c.email == email))
                 g.stats.simple_event('share.opt_in')
 
                 #clear caches
-                has_opted_out(email, _update = True)
-                opt_count(_update = True)
+                await has_opted_out(db, email, _update=True)
+                await opt_count(db, _update=True)
                 return (email, True)
             else:
                 return (email, False)
         return (None, False)
 
-    def get_recipient(self, msg_hash):
+    async def get_recipient(self, db: AsyncSession, msg_hash):
         t = self.track_table
-        s = sa.select([t.c.to_addr], t.c.msg_hash == msg_hash).execute()
-        res = s.fetchall()
+        stmt = select(t.c.to_addr).where(t.c.msg_hash == msg_hash)
+        res = (await db.execute(stmt)).fetchall()
         return res[0][0] if res and res[:1] else None
 
-
-    def add_to_queue(self, user, emails, from_name, fr_addr, kind,
-                     date = None, ip = None,
-                     body = "", reply_to = "", thing = None):
+    async def add_to_queue(self, db: AsyncSession, user, emails, from_name,
+                           fr_addr, kind, date=None, ip=None,
+                           body="", reply_to="", thing=None):
         s = self.queue_table
         hashes = []
         if not date:
@@ -225,24 +242,25 @@ class EmailHandler(object):
             uid = user._id if user else 0
             tid = thing._fullname if thing else ""
             key = hashlib.sha1(str((email, from_name, uid, tid, ip, kind, body,
-                               datetime.datetime.now(g.tz)))).hexdigest()
-            s.insert().values({s.c.to_addr : email,
-                               s.c.account_id : uid,
-                               s.c.from_name : from_name,
-                               s.c.fr_addr : fr_addr,
-                               s.c.reply_to : reply_to,
-                               s.c.fullname: tid,
-                               s.c.ip : ip,
-                               s.c.kind: kind,
-                               s.c.body: body,
-                               s.c.date : date,
-                               s.c.msg_hash : key}).execute()
+                               datetime.datetime.now(g.tz))).encode()).hexdigest()
+            await db.execute(
+                s.insert().values({s.c.to_addr: email,
+                                   s.c.account_id: uid,
+                                   s.c.from_name: from_name,
+                                   s.c.fr_addr: fr_addr,
+                                   s.c.reply_to: reply_to,
+                                   s.c.fullname: tid,
+                                   s.c.ip: ip,
+                                   s.c.kind: kind,
+                                   s.c.body: body,
+                                   s.c.date: date,
+                                   s.c.msg_hash: key})
+            )
             hashes.append(key)
         return hashes
 
-
-    def from_queue(self, max_date, batch_limit = 50, kind = None):
-        from r2.models import Account, Thing
+    async def from_queue(self, db: AsyncSession, max_date, batch_limit=50, kind=None):
+        from r2.services import accounts as account_svc
         keep_trying = True
         min_id = None
         s = self.queue_table
@@ -253,25 +271,24 @@ class EmailHandler(object):
             if kind:
                 where.append(s.c.kind == kind)
 
-            res = sa.select([s.c.to_addr, s.c.account_id,
-                             s.c.from_name, s.c.fullname, s.c.body,
-                             s.c.kind, s.c.ip, s.c.date, s.c.uid,
-                             s.c.msg_hash, s.c.fr_addr, s.c.reply_to],
-                            sa.and_(*where),
-                            order_by = s.c.uid, limit = batch_limit).execute()
-            res = res.fetchall()
+            stmt = (select(s.c.to_addr, s.c.account_id,
+                           s.c.from_name, s.c.fullname, s.c.body,
+                           s.c.kind, s.c.ip, s.c.date, s.c.uid,
+                           s.c.msg_hash, s.c.fr_addr, s.c.reply_to)
+                    .where(sa.and_(*where))
+                    .order_by(s.c.uid)
+                    .limit(batch_limit))
+            res = (await db.execute(stmt)).fetchall()
 
-            if not res: break
+            if not res:
+                break
 
             # batch load user accounts
             aids = [x[1] for x in res if x[1] > 0]
-            accts = Account._byID(aids, data = True,
-                                  return_dict = True) if aids else {}
+            accts = await account_svc.get_by_ids(db, aids) if aids else {}
 
-            # batch load things
-            tids = [x[3] for x in res if x[3]]
-            things = Thing._by_fullname(tids, data = True,
-                                        return_dict = True) if tids else {}
+            # thing loading removed; callers that need the thing must load it separately
+            things = {}
 
             # get the lower bound date for next iteration
             min_id = max(x[8] for x in res)
@@ -285,19 +302,19 @@ class EmailHandler(object):
                        fname, date, ip, kind, msg_hash, body,
                        fr_addr, reply_to)
 
-    def clear_queue(self, max_date, kind = None):
+    async def clear_queue(self, db: AsyncSession, max_date, kind=None):
         s = self.queue_table
         where = [s.c.date < max_date]
         if kind:
-            where.append([s.c.kind == kind])
-        sa.delete(s, sa.and_(*where)).execute()
+            where.append(s.c.kind == kind)
+        await db.execute(delete(s).where(sa.and_(*where)))
 
 
 class Email(object):
     handler = EmailHandler()
 
     # Do not modify in any way other than appending new items!
-    # Database tables storing mail stuff use an int column as an index into 
+    # Database tables storing mail stuff use an int column as an index into
     # this Enum, so anything other than appending new items breaks mail history.
     Kind = Enum("SHARE", "FEEDBACK", "ADVERTISE", "OPTOUT", "OPTIN",
                 "VERIFY_EMAIL", "RESET_PASSWORD",
@@ -355,8 +372,8 @@ class Email(object):
         }
 
     def __init__(self, user, thing, email, from_name, date, ip,
-                 kind, msg_hash, body = '', from_addr = '',
-                 reply_to = ''):
+                 kind, msg_hash, body='', from_addr='',
+                 reply_to=''):
         self.user = user
         self.thing = thing
         self.to_addr = email
@@ -371,10 +388,9 @@ class Email(object):
         self.reply_to = reply_to
         self.subject = self.subjects.get(kind, "")
         try:
-            self.subject = self.subject % dict(user = self.from_name())
+            self.subject = self.subject % dict(user=self.from_name())
         except UnicodeDecodeError:
-            self.subject = self.subject % dict(user = "a user")
-
+            self.subject = self.subject % dict(user="a user")
 
     def from_name(self):
         if not self.user:
@@ -383,13 +399,13 @@ class Email(object):
             name = "%(name)s (%(uname)s)"
         else:
             name = "%(uname)s"
-        return name % dict(name = self._from_name,
-                           uname = self.user.name if self.user else '')
+        return name % dict(name=self._from_name,
+                           uname=self.user.name if self.user else '')
 
     @classmethod
-    def get_unsent(cls, max_date, batch_limit = 50, kind = None):
-        for e in cls.handler.from_queue(max_date, batch_limit = batch_limit,
-                                        kind = kind):
+    async def get_unsent(cls, db: AsyncSession, max_date, batch_limit=50, kind=None):
+        async for e in cls.handler.from_queue(db, max_date, batch_limit=batch_limit,
+                                              kind=kind):
             yield cls(*e)
 
     def should_queue(self):
@@ -398,24 +414,26 @@ class Email(object):
                (self.kind == self.Kind.OPTOUT or
                 not has_opted_out(self.to_addr))
 
-    def set_sent(self, date = None, rejected = False):
+    async def set_sent(self, db: AsyncSession, date=None, rejected=False):
         if not self.sent:
             self.date = date or datetime.datetime.now(g.tz)
             t = self.handler.reject_table if rejected else self.handler.track_table
             try:
-                t.insert().values({t.c.account_id:
-                                       self.user._id if self.user else 0,
-                                   t.c.to_addr :   self.to_addr,
-                                   t.c.fr_addr :   self.fr_addr,
-                                   t.c.reply_to :  self.reply_to,
-                                   t.c.ip :        self.ip,
-                                   t.c.fullname:
-                                       self.thing._fullname if self.thing else "",
-                                   t.c.date:       self.date,
-                                   t.c.kind :      self.kind,
-                                   t.c.msg_hash :  self.msg_hash,
-                                   }).execute()
-            except:
+                await db.execute(
+                    t.insert().values({t.c.account_id:
+                                           self.user._id if self.user else 0,
+                                       t.c.to_addr:   self.to_addr,
+                                       t.c.fr_addr:   self.fr_addr,
+                                       t.c.reply_to:  self.reply_to,
+                                       t.c.ip:        self.ip,
+                                       t.c.fullname:
+                                           self.thing._fullname if self.thing else "",
+                                       t.c.date:      self.date,
+                                       t.c.kind:      self.kind,
+                                       t.c.msg_hash:  self.msg_hash,
+                                       })
+                )
+            except Exception:
                 print("failed to send message")
 
             self.sent = True
@@ -451,16 +469,16 @@ class Email(object):
         return None
 
 @memoize('r2.models.mail_queue.has_opted_out')
-def has_opted_out(email):
+async def has_opted_out(db: AsyncSession, email):
     o = Email.handler.opt_table
-    s = sa.select([o.c.email], o.c.email == email, limit = 1)
-    res = s.execute()
-    return bool(res.fetchall())
+    stmt = select(o.c.email).where(o.c.email == email).limit(1)
+    res = (await db.execute(stmt)).fetchall()
+    return bool(res)
 
 
 @memoize('r2.models.mail_queue.opt_count')
-def opt_count():
+async def opt_count(db: AsyncSession):
     o = Email.handler.opt_table
-    s = sa.select([sa.func.count(o.c.email)])
-    res = s.execute().fetchone()
+    stmt = select(sa.func.count(o.c.email))
+    res = (await db.execute(stmt)).fetchone()
     return int(res[0])
