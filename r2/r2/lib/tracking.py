@@ -144,7 +144,7 @@ def get_srpath():
     if c.render_style in ("mobile", "compact"):
         action = c.render_style
     else:
-        action = request.environ['pylons.routes_dict'].get('action')
+        action = getattr(request.state, 'action_name', None)
 
     if not action:
         return name

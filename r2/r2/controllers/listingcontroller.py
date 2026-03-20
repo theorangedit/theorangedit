@@ -943,7 +943,7 @@ class UserController(ListingController):
                 _("suspended"),
                 content=BannedUserInterstitial(),
             )
-            request.environ['usable_error_content'] = errpage.render()
+            request.state.usable_error_content = errpage.render()
             return self.abort403()
 
         if (c.user_is_loggedin and
@@ -953,7 +953,7 @@ class UserController(ListingController):
                 _("blocked"),
                 content=UserBlockedInterstitial(),
             )
-            request.environ['usable_error_content'] = errpage.render()
+            request.state.usable_error_content = errpage.render()
             return self.abort403()
 
         # continue supporting /liked and /disliked paths for API clients
@@ -964,7 +964,7 @@ class UserController(ListingController):
             where = new_where
             if not is_api():
                 path = "/".join(("/user", vuser.name, where))
-                query_string = request.environ.get('QUERY_STRING')
+                query_string = request.url.query
                 if query_string:
                     path += "?" + query_string
                 return self.redirect(path, code=301)
@@ -980,7 +980,7 @@ class UserController(ListingController):
                 _("deleted"),
                 content=DeletedUserInterstitial(),
             )
-            request.environ['usable_error_content'] = errpage.render()
+            request.state.usable_error_content = errpage.render()
             return self.abort404()
 
         if c.user_is_admin:
@@ -1074,10 +1074,10 @@ class UserController(ListingController):
             abort(404)
 
         dest = "/".join(("/user", c.user.name, "saved"))
-        extension = request.environ.get('extension')
+        extension = getattr(request.state, 'extension', None)
         if extension:
             dest = ".".join((dest, extension))
-        query_string = request.environ.get('QUERY_STRING')
+        query_string = request.url.query
         if query_string:
             dest += "?" + query_string
         return self.redirect(dest)

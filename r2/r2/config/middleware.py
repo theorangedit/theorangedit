@@ -31,7 +31,6 @@ Custom WSGI middleware from the old stack has been rewritten as Starlette
 middleware where possible, or ported to request-lifecycle hooks.
 """
 
-import importlib
 import re
 import tempfile
 import urllib.parse
@@ -158,9 +157,15 @@ class SubredditMiddleware(BaseHTTPMiddleware):
         m = self.sr_pattern.match(path)
         if m:
             request.state.subreddit = m.group(1)
-            # Rewrite scope — Starlette Request path is immutable; store
-            # the stripped path in state for the router to use.
-            request.state.path_without_sr = m.group(2) or '/'
+            stripped = m.group(2) or '/'
+            request.state.path_without_sr = stripped
+            # Rewrite routing scope so FastAPI matches on the stripped path.
+            # Handlers read subreddit context from request.state.subreddit / c.site.
+            # The root_path accumulates the /r/{srname} prefix for URL generation.
+            request.scope["path"] = stripped
+            request.scope["root_path"] = (
+                request.scope.get("root_path", "") + "/r/" + m.group(1)
+            )
         return await call_next(request)
 
 
@@ -254,6 +259,13 @@ async def http_exception_handler(request: Request, exc: StarletteHTTPException):
     mirroring the old error_mapper / ErrorDocuments behaviour.
     """
     code = exc.status_code
+
+    # Pass 3xx redirects through unchanged — controllers use abort(302/301, ...)
+    # to issue redirects and we must not convert them to error pages.
+    if 300 <= code < 400:
+        location = (exc.headers or {}).get('location', '/')
+        return RedirectResponse(url=location, status_code=code)
+
     detail = exc.detail or ""
 
     accept = request.headers.get('accept', '')
@@ -277,28 +289,17 @@ async def http_exception_handler(request: Request, exc: StarletteHTTPException):
     return RedirectResponse(url=error_url, status_code=302)
 
 
-# ---------------------------------------------------------------------------
-# Controller loader (equivalent to RedditApp.load_controllers)
-# ---------------------------------------------------------------------------
-
-_controllers_loaded = False
 _hooks_registered = False
 _loading_lock = Lock()
 
 
-def _ensure_controllers_loaded(app_config):
-    global _controllers_loaded, _hooks_registered
+def _ensure_hooks_registered():
+    global _hooks_registered
 
-    if _controllers_loaded and _hooks_registered:
+    if _hooks_registered:
         return
 
     with _loading_lock:
-        if not _controllers_loaded:
-            controllers = importlib.import_module('r2.controllers')
-            controllers.load_controllers()
-            app_config['r2.plugins'].load_controllers()
-            _controllers_loaded = True
-
         if not _hooks_registered:
             hooks.register_hooks()
             _hooks_registered = True
@@ -317,8 +318,8 @@ def make_app(global_conf, full_stack=True, **app_conf):
     config = load_environment(global_conf, app_conf)
     from r2.lib.app_globals import g
 
-    # Deferred controller + hook loading
-    _ensure_controllers_loaded(config)
+    # Register hooks (deferred until app is configured)
+    _ensure_hooks_registered()
 
     # Import the FastAPI app defined in r2.main (routers already registered)
     from r2.main import app
@@ -326,13 +327,18 @@ def make_app(global_conf, full_stack=True, **app_conf):
     # Register exception handlers
     app.add_exception_handler(StarletteHTTPException, http_exception_handler)
 
-    # --- Middleware stack (outermost first) ---
+    # --- Middleware stack ---
+    # add_middleware order: last-added = outermost = first to receive requests.
+    # Execution order for requests:
+    #   RequestContext → Domain → Subreddit → Extension → Limit → Reddit → Safety → route
+    from r2.config.request_lifecycle import RedditRequestMiddleware
     app.add_middleware(SafetyMiddleware)
+    app.add_middleware(RedditRequestMiddleware)     # auth, DB session, rate limits
     app.add_middleware(LimitUploadSizeMiddleware)
     app.add_middleware(ExtensionMiddleware)
     app.add_middleware(SubredditMiddleware)
     app.add_middleware(DomainMiddleware)
-    app.add_middleware(RequestContextMiddleware)  # innermost — must run first
+    app.add_middleware(RequestContextMiddleware)    # outermost — sets up ContextVars first
 
     # --- Static files ---
     static_path = config['r2.paths']['static_files']

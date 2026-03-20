@@ -149,23 +149,30 @@ class Validator(object):
         return param_info
 
     def _extract_params(self, url):
-        """Extract raw parameter values from the current request."""
+        """Extract raw parameter values from the current request.
+
+        POST (form) data is pre-cached by RedditRequestMiddleware as
+        request.state._form_data before the route handler is called.
+        GET (query string) data is accessed via request.query_params.
+        """
         a = []
         if self.param:
+            # Form data is cached synchronously by the middleware
+            _form = getattr(request.state, '_form_data', {})
+            _qs = request.query_params
             for p in utils.tup(self.param):
                 # cgi.FieldStorage is falsy even if it has a filled value
                 # property. :(
-                post_val = request.POST.get(p)
+                post_val = _form.get(p)
                 if self.post and (post_val or
                                   isinstance(post_val, cgi.FieldStorage)):
-                    val = request.POST[p]
-                elif ((self.get_multiple and
-                      (self.get_multiple == True or
-                       p in self.get_multiple)) and
-                      request.GET.getall(p)):
-                    val = request.GET.getall(p)
-                elif self.get and request.GET.get(p):
-                    val = request.GET[p]
+                    val = _form[p]
+                elif (self.get_multiple and
+                      (self.get_multiple is True or p in self.get_multiple) and
+                      _qs.getlist(p)):
+                    val = _qs.getlist(p)
+                elif self.get and _qs.get(p):
+                    val = _qs[p]
                 elif self.url and url.get(p):
                     val = url[p]
                 elif self.body:
@@ -191,7 +198,7 @@ class Validator(object):
                 raise
 
 
-def build_arg_list(fn, env):
+def build_arg_list(fn, env, has_self=True):
     """given a fn and and environment the builds a keyword argument list
     for fn"""
     kw = {}
@@ -203,20 +210,42 @@ def build_arg_list(fn, env):
         kw = env
     #else for each entry in the arglist set the value from the environment
     else:
-        #skip self
-        argnames = argspec[0][1:]
+        # skip self only for class methods, not standalone functions
+        argnames = argspec[0][1:] if has_self else argspec[0]
         for name in argnames:
             if name in env:
                 kw[name] = env[name]
     return kw
 
-async def _make_validated_kw(fn, simple_vals, param_vals, env):
+async def _make_validated_kw(fn, simple_vals, param_vals, env, has_self=True):
     for validator in simple_vals:
         await validator(env)
-    kw = build_arg_list(fn, env)
+    kw = build_arg_list(fn, env, has_self=has_self)
     for var, validator in param_vals.items():
         kw[var] = await validator(env)
     return kw
+
+
+def _default_validation_error_handler(error):
+    """Fallback error handler used by standalone (non-class) route handlers.
+
+    Called by @validate when the decorated function is not a controller method
+    (i.e. has no on_validation_error attribute). Mirrors the behaviour of
+    MinimalController.on_validation_error / OAuth2OnlyController.on_validation_error.
+    """
+    from r2.lib.base import BaseController
+    from r2.lib.errors import reddit_http_error
+    if error.name == errors.USER_REQUIRED:
+        BaseController.intermediate_redirect('/login')
+    elif error.name == errors.VERIFIED_USER_REQUIRED:
+        BaseController.intermediate_redirect('/verify')
+    else:
+        abort(reddit_http_error(
+            code=error.code or 400,
+            error_name=error.name,
+            explanation=error.message,
+            fields=error.fields,
+        ))
 
 def set_api_docs(fn, simple_vals, param_vals, extra_vals=None):
     doc = fn._api_doc = getattr(fn, '_api_doc', {})
@@ -241,30 +270,49 @@ def _validators_handle_csrf(simple_vals, param_vals):
     return False
 
 def validate(*simple_vals, **param_vals):
-    """Validation decorator that delegates error handling to the controller.
+    """Validation decorator that works on both controller methods and standalone functions.
 
-    Runs the validators specified and calls self.on_validation_error to
-    process each error. This allows controllers to define their own fatal
-    error processing logic.
+    For controller methods (where self has on_validation_error), delegates error
+    handling to self.on_validation_error as before.
+
+    For standalone FastAPI route handlers (no self), uses
+    _default_validation_error_handler unless _on_error is supplied:
+
+        @validate(path_info=VMultiPath("multipath"), _on_error=my_handler)
+
+    _on_error is popped from param_vals before validators are built, so it is
+    never treated as a validator name.
     """
+    on_error = param_vals.pop('_on_error', None)
+
     def val(fn):
         @wraps(fn)
-        async def newfn(self, *a, **env):
+        async def newfn(*a, **env):
+            # Detect class-method vs standalone: class methods receive the
+            # controller instance as the first positional argument.
+            _self = a[0] if a and hasattr(a[0], 'on_validation_error') else None
+            _handle_error = (
+                on_error if on_error is not None else
+                _self.on_validation_error if _self else
+                _default_validation_error_handler
+            )
+            kw = {}
             try:
-                kw = await _make_validated_kw(fn, simple_vals, param_vals, env)
+                kw = await _make_validated_kw(fn, simple_vals, param_vals, env,
+                                              has_self=_self is not None)
             except RedditError as err:
-                self.on_validation_error(err)
+                _handle_error(err)
 
             for err in c.errors:
-                self.on_validation_error(c.errors[err])
+                _handle_error(c.errors[err])
 
             try:
-                result = fn(self, *a, **kw)
+                result = fn(*a, **kw)
                 if inspect.isawaitable(result):
                     result = await result
                 return result
             except RedditError as err:
-                self.on_validation_error(err)
+                _handle_error(err)
 
         set_api_docs(newfn, simple_vals, param_vals)
         newfn.handles_csrf = _validators_handle_csrf(simple_vals, param_vals)

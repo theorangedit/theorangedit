@@ -59,10 +59,10 @@ def load_controllers():
     from admin import AdminToolController
     from front import FormsController
     from front import FrontController
-    from health import HealthController
-    from buttons import ButtonsController
+    # health migrated to r2.controllers.fastapi.health (D-3)
+    # buttons migrated to r2.routers.buttons (D-3)
+    # embed migrated to r2.routers.embed (D-3)
     from captcha import CaptchaController
-    from embed import EmbedController
     from error import ErrorController
     from post import PostController
     from toolbar import ToolbarController
@@ -80,8 +80,7 @@ def load_controllers():
     from policies import PoliciesController
     from web import WebLogController
 
-    from wiki import WikiController
-    from wiki import WikiApiController
+    # wiki migrated to r2.routers.wiki (D-3)
 
     from api import ApiController
     from api import ApiminimalController
@@ -90,9 +89,8 @@ def load_controllers():
     from apiv1.login import APIv1LoginController
     from apiv1.gold import APIv1GoldController
     from apiv1.scopes import APIv1ScopesController
-    from multi import MultiApiController
-    from oauth2 import OAuth2FrontendController
-    from oauth2 import OAuth2AccessController
+    # multi migrated to r2.routers.multi (D-3)
+    # oauth2 migrated to r2.routers.oauth2 (D-3)
     from redirect import RedirectController
     from robots import RobotsController
     from ipn import IpnController

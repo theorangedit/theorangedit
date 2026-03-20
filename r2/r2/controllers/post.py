@@ -105,7 +105,7 @@ class PostController(ApiController):
                 email_verified=c.user_is_loggedin and c.user.email_verified,
             ),
         )
-        request.environ['usable_error_content'] = errpage.render()
+        request.state.usable_error_content = errpage.render()
         self.abort403()
 
     @csrf_exempt

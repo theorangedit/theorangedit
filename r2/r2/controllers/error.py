@@ -127,11 +127,9 @@ class ErrorController(RedditController):
         except Exception as e:
             handle_awful_failure(f"ErrorController.__before__: {e!r}")
 
-        # c.error_page is special-cased in a couple places to bypass
-        # c.site checks. We shouldn't allow the user to get here other
-        # than through `middleware.py:error_mapper`.
-        if not request.environ.get('pylons.error_call'):
-            abort(403, "direct access to error controller disallowed")
+        # In the Starlette architecture, /error/document/ is reached via
+        # HTTP redirect from the exception handler, not via Pylons error_mapper.
+        # No direct-access guard needed — the endpoint is public.
 
     def __after__(self): 
         try:
@@ -147,34 +145,34 @@ class ErrorController(RedditController):
 
 
     def send400(self):
-        if 'usable_error_content' in request.environ:
-            return request.environ['usable_error_content']
+        if hasattr(request.state, 'usable_error_content'):
+            return request.state.usable_error_content
         else:
             res = pages.RedditError(
                 title=_("bad request (%(domain)s)") % dict(domain=g.domain),
                 message=_("you sent an invalid request"),
-                explanation=request.GET.get('explanation'))
+                explanation=request.query_params.get('explanation'))
             return res.render()
 
     def send403(self):
         c.site = DefaultSR()
-        if 'usable_error_content' in request.environ:
-            return request.environ['usable_error_content']
+        if hasattr(request.state, 'usable_error_content'):
+            return request.state.usable_error_content
         else:
             res = pages.RedditError(
                 title=_("forbidden (%(domain)s)") % dict(domain=g.domain),
                 message=_("you are not allowed to do that"),
-                explanation=request.GET.get('explanation'))
+                explanation=request.query_params.get('explanation'))
             return res.render()
 
     def send404(self):
-        if 'usable_error_content' in request.environ:
-            return request.environ['usable_error_content']
+        if hasattr(request.state, 'usable_error_content'):
+            return request.state.usable_error_content
         return pages.RedditError(_("page not found"),
                                  _("the page you requested does not exist")).render()
 
     def send429(self):
-        retry_after = request.environ.get("retry_after")
+        retry_after = getattr(request.state, 'retry_after', None)
         if retry_after:
             response.headers["Retry-After"] = str(retry_after)
             template_name = '/ratelimit_toofast.html'
@@ -188,10 +186,10 @@ class ErrorController(RedditController):
         )
 
     def send503(self):
-        retry_after = request.environ.get("retry_after")
+        retry_after = getattr(request.state, 'retry_after', None)
         if retry_after:
             response.headers["Retry-After"] = str(retry_after)
-        return request.environ['usable_error_content']
+        return request.state.usable_error_content
 
     async def GET_document(self):
         try:
@@ -199,14 +197,14 @@ class ErrorController(RedditController):
             # clear cookies the old fashioned way 
             c.cookies = Cookies()
 
-            code =  request.GET.get('code', '')
+            code = request.query_params.get('code', '')
             try:
                 code = int(code)
             except ValueError:
                 code = 404
-            srname = request.GET.get('srname', '')
-            takedown = request.GET.get('takedown', '')
-            error_name = request.GET.get('error_name', '')
+            srname = request.query_params.get('srname', '')
+            takedown = request.query_params.get('takedown', '')
+            error_name = request.query_params.get('error_name', '')
 
             if isinstance(c.user, str):
                 # somehow requests are getting here with c.user unset
@@ -216,11 +214,11 @@ class ErrorController(RedditController):
             if srname:
                 c.site = await Subreddit._by_name(srname)
 
-            if ('allow_framing' in request.GET):
-                c.allow_framing = bool(request.GET['allow_framing'] == '1')
+            if ('allow_framing' in request.query_params):
+                c.allow_framing = bool(request.query_params.get('allow_framing') == '1')
 
             if (error_name == 'IN_TIMEOUT' and
-                    not 'usable_error_content' in request.environ):
+                    not hasattr(request.state, 'usable_error_content')):
                 timeout_days_remaining = c.user.days_remaining_in_timeout
 
                 errpage = pages.InterstitialPage(
@@ -229,7 +227,7 @@ class ErrorController(RedditController):
                         timeout_days_remaining=timeout_days_remaining,
                     ),
                 )
-                request.environ['usable_error_content'] = errpage.render()
+                request.state.usable_error_content = errpage.render()
 
             if code in (204, 304):
                 # NEVER return a content body on 204/304 or downstream
@@ -238,11 +236,11 @@ class ErrorController(RedditController):
             elif c.render_style not in self.allowed_render_styles:
                 return str(code)
             elif c.render_style in extensions.API_TYPES:
-                data = request.environ.get('extra_error_data', {'error': code})
-                message = request.GET.get('message', '')
+                data = getattr(request.state, 'extra_error_data', {'error': code})
+                message = request.query_params.get('message', '')
                 if message:
                     data['message'] = message
-                if request.environ.get("WANT_RAW_JSON"):
+                if getattr(request.state, 'want_raw_json', False):
                     return scriptsafe_dumps(data)
                 return websafe_json(json.dumps(data))
             elif takedown and code == 404:

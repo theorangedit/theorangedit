@@ -264,7 +264,7 @@ class FrontController(RedditController):
         sr = await Subreddit._byID(article.sr_id, True)
 
         if sr.name == g.takedown_sr:
-            request.environ['REDDIT_TAKEDOWN'] = article._fullname
+            request.state.reddit_takedown = article._fullname
             return self.abort404()
 
         if not c.default_sr and c.site._id != sr._id:
@@ -1681,7 +1681,7 @@ class FormsController(RedditController):
                 title=_('incorrect message token'),
                 message='',
             )
-            request.environ["usable_error_content"] = error_page.render()
+            request.state.usable_error_content = error_page.render()
             self.abort404()
         user = await Account._byID36(user_id36, data=True)
         user.pref_email_messages = False
@@ -1734,7 +1734,7 @@ class FormsController(RedditController):
         in during submission or voting from the bookmarklets."""
 
         if (c.user_is_loggedin and
-            not request.environ.get('extension') == 'embed'):
+            not getattr(request.state, 'extension', None) == 'embed'):
             return self.redirect(dest)
         return LoginPage(dest=dest).render()
 
@@ -1742,7 +1742,7 @@ class FormsController(RedditController):
     @validate(dest=VDestination())
     def GET_register(self, dest):
         if (c.user_is_loggedin and
-            not request.environ.get('extension') == 'embed'):
+            not getattr(request.state, 'extension', None) == 'embed'):
             return self.redirect(dest)
         return RegisterPage(dest=dest).render()
 

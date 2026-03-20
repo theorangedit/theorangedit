@@ -124,10 +124,30 @@ from r2.controllers.fastapi import health, error  # noqa: E402
 app.include_router(health.router, tags=["meta"])
 app.include_router(error.router, tags=["meta"])
 
+# Native FastAPI routers — Phase D-3/D-4 complete.
+from r2.routers import api as api_router  # noqa: E402
+from r2.routers import apiv1 as apiv1_router  # noqa: E402
+from r2.routers import buttons as buttons_router  # noqa: E402
+from r2.routers import embed as embed_router  # noqa: E402
+from r2.routers import front as front_router  # noqa: E402
+from r2.routers import ipn as ipn_router  # noqa: E402
+from r2.routers import listing as listing_router  # noqa: E402
+from r2.routers import misc as misc_router  # noqa: E402
+from r2.routers import multi as multi_router  # noqa: E402
+from r2.routers import oauth2 as oauth2_router  # noqa: E402
+from r2.routers import promote as promote_router  # noqa: E402
+from r2.routers import wiki as wiki_router  # noqa: E402
 
-# ---------------------------------------------------------------------------
-# Fallback: catch-all that defers to the legacy routing table
-# ---------------------------------------------------------------------------
-
-from r2.controllers.fastapi.legacy_dispatcher import router as legacy_router  # noqa: E402
-app.include_router(legacy_router)
+app.include_router(api_router.router, tags=["api"])
+app.include_router(apiv1_router.router, tags=["apiv1"])
+app.include_router(buttons_router.router, tags=["buttons"])
+app.include_router(embed_router.router, tags=["embed"])
+app.include_router(listing_router.router, tags=["listings"])
+app.include_router(front_router.router, tags=["front"])
+app.include_router(multi_router.router, tags=["multis"])
+app.include_router(oauth2_router.router, tags=["oauth2"])
+app.include_router(wiki_router.router, tags=["wiki"])
+app.include_router(ipn_router.router, tags=["ipn"])
+app.include_router(promote_router.router, tags=["promote"])
+app.include_router(misc_router.router, tags=["misc"])
+# misc_router's /{url:path} catch-all handles all remaining requests (D-4)

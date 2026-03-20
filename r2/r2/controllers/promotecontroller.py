@@ -1634,7 +1634,7 @@ class PromoteApiController(ApiController):
         mime_type, encoding = mimetypes.guess_type(filepath)
 
         if not mime_type or mime_type not in ALLOWED_IMAGE_TYPES:
-            request.environ["extra_error_data"] = {
+            request.state.extra_error_data = {
                 "message": _("image must be a jpg or png"),
             }
             abort(403)

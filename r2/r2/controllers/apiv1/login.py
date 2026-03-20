@@ -42,7 +42,7 @@ class APIv1LoginController(RedditController):
     def pre(self):
         super().pre()
         c.extension = "json"
-        set_extension(request.environ, "json")
+        set_extension("json")
 
     @csrf_exempt
     @json_validate(

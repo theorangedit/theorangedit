@@ -22,11 +22,13 @@ async def health():
 
 
 @router.get("/health/promo")
+@router.get("/health/ads")  # legacy path alias
 async def promo_health():
     return JSONResponse(promote.health_check())
 
 
 @router.get("/health/cache")
+@router.get("/health/caches")  # legacy path alias
 async def cache_health():
     results = {}
     behaviors = {

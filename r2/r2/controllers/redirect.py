@@ -32,7 +32,7 @@ from r2.models import Subreddit
 class RedirectController(BaseController):
     def pre(self, *k, **kw):
         BaseController.pre(self, *k, **kw)
-        c.extension = request.environ.get('extension')
+        c.extension = getattr(request.state, 'extension', None)
 
     def GET_redirect(self, dest):
         return self.redirect(str(dest))

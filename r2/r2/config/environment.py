@@ -105,13 +105,6 @@ def load_environment(global_conf={}, app_conf={}, setup_globals=True):
     g.jinja_env = jinja_env
     config['r2.jinja_env'] = jinja_env
 
-    # -----------------------------------------------------------------
-    # Routes map (kept for reference during incremental migration;
-    # FastAPI routing defined in r2.main takes precedence at runtime)
-    # -----------------------------------------------------------------
-    from r2.config.routing import make_map
-    config['routes.map'] = make_map(config)
-
     config['r2.response_options'] = {'headers': {}}
 
     if setup_globals:

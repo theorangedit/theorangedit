@@ -150,8 +150,8 @@ def js_config(extra_config=None):
     user_id = c.user_is_loggedin and c.user._id
     user_in_timeout = c.user_is_loggedin and c.user.in_timeout
     gold = bool(logged and c.user.gold)
-    controller_name = request.environ['pylons.routes_dict']['controller']
-    action_name = request.environ['pylons.routes_dict']['action']
+    controller_name = getattr(request.state, 'controller_name', 'unknown')
+    action_name = getattr(request.state, 'action_name', 'unknown')
     route_name = controller_name + '.' + action_name
 
     cache_policy = "loggedout_www"

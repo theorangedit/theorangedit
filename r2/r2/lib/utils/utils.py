@@ -898,28 +898,28 @@ def url_to_thing(url):
         except NotFound:
             return None
 
-    # potential TypeError raised here because of environ being None
-    # when calling outside of app context
+    # Parse known URL patterns without the legacy Routes.map.
+    # Patterns extracted: /comments/:article/:title/:comment
+    #                     /message/messages/:mid
+    import re as _re
+    _COMMENT_RE = _re.compile(
+        r'^/comments/([0-9a-z]+)(?:/[^/]*(?:/([0-9a-z]+))?)?$'
+    )
+    _MESSAGE_RE = _re.compile(r'^/message/messages/([0-9a-z]+)')
+
     try:
-        route_dict = config['routes.map'].match(path)
-    except TypeError:
-        return None
+        m = _COMMENT_RE.match(path)
+        if m:
+            article_id = m.group(1)
+            comment_id = m.group(2)
+            if comment_id:
+                return Comment._byID36(comment_id, data=True)
+            if article_id:
+                return Link._byID36(article_id, data=True)
 
-    if not route_dict:
-        return None
-
-    try:
-        comment = route_dict.get('comment')
-        if comment:
-            return Comment._byID36(comment, data=True)
-
-        article = route_dict.get('article')
-        if article:
-            return Link._byID36(article, data=True)
-
-        msg = route_dict.get('mid')
-        if msg:
-            return Message._byID36(msg, data=True)
+        m = _MESSAGE_RE.match(path)
+        if m:
+            return Message._byID36(m.group(1), data=True)
     except (NotFound, ValueError):
         return None
 

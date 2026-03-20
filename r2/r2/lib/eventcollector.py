@@ -347,8 +347,8 @@ class EventQueue(object):
 
         """
         if not action_name:
-            request_vars = request.environ["pylons.routes_dict"]
-            action_name = request_vars.get('action_name')
+            request_vars = getattr(request.state, 'routes_dict', {})
+            action_name = getattr(request.state, 'action_name', None)
 
             # type of vote
             if action_name == "vote":
@@ -530,11 +530,11 @@ class EventQueue(object):
         # original, so referrer and action data is missing for certain events
         if request and (event_type == "quarantine_interstitial_view" or
                  event_type == "quarantine_opt_out"):
-            request_vars = request.environ["pylons.routes_dict"]
-            event.add("sr_action", request_vars.get("action", None))
+            request_vars = getattr(request.state, 'routes_dict', {})
+            event.add("sr_action", getattr(request.state, 'action_name', None))
 
             # The thing_id the user is trying to view is a comment
-            if request.environ["pylons.routes_dict"].get("comment", None):
+            if request_vars.get("comment", None):
                 thing_id36 = request_vars.get("comment", None)
             # The thing_id is a link
             else:

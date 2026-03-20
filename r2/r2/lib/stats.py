@@ -310,7 +310,8 @@ class Stats:
         counter = self.get_counter(counter_name)
         if counter:
             from r2.lib.context import request
-            counter.increment(f'{request.environ["pylons.routes_dict"]["action"]}.{name}', delta=delta)
+            action = getattr(request.state, 'action_name', 'unknown')
+            counter.increment(f'{action}.{name}', delta=delta)
 
     def action_event_count(self, event_name, state=None, delta=1, true_name="success", false_name="fail"):
         counter_name = f'event.{event_name}'

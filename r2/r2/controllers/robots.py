@@ -50,7 +50,7 @@ class RobotsController(MinimalController):
         # modified to not skip assignment of reddit-domain-extension on
         # localhost for this to work properly.
         return (requested_domain == g.domain or
-                request.environ.get('reddit-domain-extension') in
+                getattr(request.state, 'reddit_domain_extension', None) in
                     ('mobile', 'compact'))
 
     def GET_robots(self):
@@ -63,7 +63,7 @@ class RobotsController(MinimalController):
     def GET_crossdomain(self):
         # Our middleware is weird and won't let us add a route for just
         # '/crossdomain.xml'. Just 404 for other extensions.
-        if request.environ.get('extension', None) != 'xml':
+        if getattr(request.state, 'extension', None) != 'xml':
             abort(404)
         response.content_type = "text/x-cross-domain-policy"
         return CrossDomain().render(style='xml')
