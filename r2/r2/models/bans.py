@@ -24,6 +24,10 @@ from r2.models.trylater import TryLaterBySubject
 
 
 class UserTempBan(object):
+    # TryLaterBySubject is a no-op (Cassandra scheduler removed).
+    # Temporary ban expiry is handled lazily: Subreddit.is_banned() checks the
+    # duration column on the SubredditBanned row at read time and auto-removes
+    # expired rows. No background job is needed.
     @classmethod
     def schedule(cls, victim, duration):
         TryLaterBySubject.schedule(

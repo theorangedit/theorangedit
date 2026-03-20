@@ -355,7 +355,7 @@ def wiki_template(template_slug, sr=None):
 
     try:
         wiki = WikiPage.get(sr, f"templates/{template_slug}")
-    except Exception:  # was tdb_cassandra.NotFound
+    except Exception:
         return None
 
     return wiki._get("content")

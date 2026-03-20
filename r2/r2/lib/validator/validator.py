@@ -3189,25 +3189,6 @@ class VMultiPath(Validator):
         }
 
 
-class VMultiByPath(Validator):
-    """Retired — LabeledMulti lookup is now async (done inline in controllers).
-
-    Kept as an import shim only. run() always returns None.
-    Controllers now use VMultiPath for format validation and call
-    await LabeledMulti._byID() directly.
-    """
-    def __init__(self, param, require_view=True, require_edit=False, kinds=None):
-        Validator.__init__(self, param)
-
-    def run(self, path):
-        return None
-
-    def param_docs(self):
-        return {
-            self.param: "multireddit url path",
-        }
-
-
 sr_path_rx = re.compile(r"\A(/?r/)?(?P<name>.*?)/?\Z")
 class VSubredditList(Validator):
 

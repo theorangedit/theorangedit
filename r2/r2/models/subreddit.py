@@ -17,10 +17,10 @@ Migration note:
 
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import datetime, timedelta, timezone
 from typing import List, Optional, Union
 
-from sqlalchemy import select
+from sqlalchemy import select, delete
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 
 from r2.lib.context import c
@@ -185,13 +185,31 @@ class Subreddit(_ORMSubreddit):
         return row is not None
 
     async def is_banned(self, account) -> bool:
-        """True if *account* is banned from this subreddit."""
+        """True if *account* is currently banned from this subreddit.
+
+        Handles temporary bans via lazy expiry: if a ban row has a duration
+        and that duration has elapsed, the row is deleted and False is returned.
+        """
         row = (await c.db.execute(
             select(SubredditBanned)
             .where(SubredditBanned.sr_id == self.id)
             .where(SubredditBanned.account_id == account.id)
         )).scalar_one_or_none()
-        return row is not None
+        if row is None:
+            return False
+        if row.duration is not None:
+            expiry = row.date + timedelta(days=row.duration)
+            if expiry.tzinfo is None:
+                expiry = expiry.replace(tzinfo=timezone.utc)
+            if datetime.now(timezone.utc) >= expiry:
+                await c.db.execute(
+                    delete(SubredditBanned)
+                    .where(SubredditBanned.sr_id == self.id)
+                    .where(SubredditBanned.account_id == account.id)
+                )
+                await c.db.flush()
+                return False
+        return True
 
     async def add_moderator(self, account) -> None:
         """Add *account* as a moderator (idempotent)."""
